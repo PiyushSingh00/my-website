@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Join Tournament | ScheduleIt</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="join-page">
+  <header class="top-bar">
+    <div class="logo">ScheduleIt</div>
+    <div class="auth-actions">
+      <button id="signInBtn" class="secondary-btn">Sign In</button>
+      <button id="createAccountBtn" class="primary-btn">Create Account</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="hero join-hero">
+      <p class="eyebrow">Join Tournament</p>
+      <h1>Enter the code, confirm the details, and get on the roster.</h1>
+      <p class="lead">
+        Use the access code shared by the host to view tournament info and proceed to register.
+      </p>
+      <div class="join-controls">
+        <button class="secondary-btn" onclick="window.location.href='index.html'">Back to home</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Available tournaments</h2>
+        <p>Pick a tournament and keep the access code handy when you check in.</p>
+      </div>
+      <form id="joinCodeForm" class="join-code-form">
+        <label for="joinCodeInput">Enter access code</label>
+        <div class="code-group">
+          <input type="text" id="joinCodeInput" name="joinCode" placeholder="e.g., AB42J9" autocomplete="one-time-code" required />
+          <button type="submit" class="primary-btn code-btn">View tournament</button>
+        </div>
+      </form>
+      <div id="tournamentList" class="join-list empty">
+        <div class="empty-state">
+          <div class="feature-icon">🔍</div>
+          <h4>No tournaments yet</h4>
+          <p class="muted">Hosts will appear here after they create an event.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal" id="joinPlayerModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-join></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="joinPlayerTitle">
+      <button class="modal-close" type="button" aria-label="Close" data-close-join>&times;</button>
+      <p class="eyebrow">Join tournament</p>
+      <h3 id="joinPlayerTitle">Tournament</h3>
+      <p class="muted" id="joinPlayerSubtitle"></p>
+      <form id="joinPlayerForm" class="modal-form">
+        <div id="joinStepOne">
+          <label>
+            Name
+            <input type="text" id="joinPlayerName" name="name" required />
+          </label>
+          <label>
+            Age
+            <input type="number" id="joinPlayerAge" name="age" min="1" required />
+          </label>
+          <label>
+            Phone number
+            <input type="tel" id="joinPlayerPhone" name="phone" required />
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" id="joinPlayerCaptain" name="captain" />
+            Captain?
+          </label>
+        </div>
+
+        <div id="joinStepTwo" class="hidden">
+          <label>
+            Team Name
+            <input type="text" id="joinTeamName" name="teamName" />
+          </label>
+          <label>
+            Upload team logo (optional)
+            <input type="file" id="joinTeamLogo" name="teamLogo" accept="image/*" />
+          </label>
+          <label>
+            Upload payment details (optional)
+            <input type="file" id="joinPayment" name="payment" />
+          </label>
+        </div>
+
+        <button type="submit" id="joinSubmitBtn" class="primary-btn modal-submit">Next</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

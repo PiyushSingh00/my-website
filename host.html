@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Host a Tournament | ScheduleIt</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="host-page">
+  <header class="top-bar">
+    <div class="logo">ScheduleIt</div>
+    <div class="auth-actions">
+      <button id="signInBtn" class="secondary-btn">Sign In</button>
+      <button id="createAccountBtn" class="primary-btn">Create Account</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="host-layout">
+      <div class="panel form-panel">
+        <div class="panel-header">
+          <h2>Host a Tournament</h2>
+          <p>Set the essentials and generate a code to invite players.</p>
+        </div>
+
+        <form id="hostForm" class="host-form">
+          <div class="form-field">
+            <label for="tournamentName">Tournament name</label>
+            <input type="text" id="tournamentName" name="tournamentName" placeholder="e.g., Winter Open 2025" required />
+          </div>
+
+          <div class="form-field">
+            <label for="sportName">Sport name</label>
+            <input type="text" id="sportName" name="sportName" placeholder="e.g., Football" required />
+          </div>
+
+          <div class="form-field">
+            <label for="tournamentDate">Tournament dates</label>
+            <input type="text" id="tournamentDate" name="tournamentDate" placeholder="e.g., Jan 12 - Jan 14, 2025" />
+          </div>
+
+          <div class="form-field">
+            <label for="tournamentCode">Access code</label>
+            <div class="code-group">
+              <input type="text" id="tournamentCode" name="tournamentCode" placeholder="Click Generate code" readonly />
+              <button type="button" id="generateCodeBtn" class="secondary-btn code-btn">Generate code</button>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="playerDetails">Details for players</label>
+            <textarea id="playerDetails" name="playerDetails" rows="4" placeholder="Share venue, timing, and any special rules."></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="primary-btn">Save tournament</button>
+            <button type="button" class="secondary-btn ghost-btn" onclick="window.location.href='index.html'">Back to home</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel info-panel">
+        <div class="panel-header">
+          <h3>Player-ready details</h3>
+          <p>Share clear instructions with the generated code.</p>
+        </div>
+        <ul class="info-list">
+          <li>Send the access code to players after saving.</li>
+          <li>Include venue, start time, and check-in window.</li>
+          <li>Add equipment notes or roster limits if needed.</li>
+          <li>Update details any time; players see them instantly.</li>
+        </ul>
+        <div class="callout">
+          <div>
+            <p class="eyebrow">Tip</p>
+            <h4>Pin the code in your team chat</h4>
+            <p class="muted">It cuts down on back-and-forth and speeds up registrations.</p>
+          </div>
+          <div class="callout-badge">
+            <div class="badge-dot"></div>
+            <span>Fast onboarding</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="host-hero">
+      <div class="host-hero__copy">
+        <p class="eyebrow">Host Tournament</p>
+        <h1>Set your event, share the code, let players join fast.</h1>
+        <p class="lead">
+          Create the tournament, generate a unique access code, and hand players clear
+          instructions so they can register without friction.
+        </p>
+        <div class="chip-row">
+          <span class="chip">Unique code generator</span>
+          <span class="chip">Player-ready details</span>
+          <span class="chip">Works across sports</span>
+        </div>
+      </div>
+
+      <div class="host-hero__visual">
+        <div class="visual-card">
+          <div class="visual-header">
+            <div>
+              <p class="eyebrow">Live snapshot</p>
+              <h3>Ready to launch</h3>
+            </div>
+            <span class="pill pill--success">On track</span>
+          </div>
+          <div class="visual-graphic">
+            <div class="trophy">
+              <svg viewBox="0 0 80 80" aria-hidden="true">
+                <defs>
+                  <linearGradient id="trophyGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#2563eb" />
+                    <stop offset="100%" stop-color="#1d4ed8" />
+                  </linearGradient>
+                </defs>
+                <path d="M20 18h40v10c0 10-8 18-18 18h-4c-10 0-18-8-18-18V18Z" fill="url(#trophyGradient)" />
+                <path d="M26 10h28v10H26z" fill="#0f172a" opacity="0.1" />
+                <path d="M34 46h12v6c0 3.3-2.7 6-6 6s-6-2.7-6-6v-6Z" fill="#1f2937" />
+                <rect x="30" y="52" width="20" height="8" rx="2" fill="#0f172a" opacity="0.18" />
+                <rect x="28" y="60" width="24" height="6" rx="2" fill="#111827" />
+                <rect x="24" y="66" width="32" height="6" rx="2" fill="#0f172a" opacity="0.7" />
+              </svg>
+            </div>
+            <div class="mini-metrics">
+              <div class="metric">
+                <span class="metric-label">Spots</span>
+                <div class="bar">
+                  <span class="bar-fill" style="width: 68%"></span>
+                </div>
+                <span class="metric-value">68% filled</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Check-ins</span>
+                <div class="bar">
+                  <span class="bar-fill" style="width: 42%"></span>
+                </div>
+                <span class="metric-value">12 pending</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Share code</span>
+                <div class="code-chip">AB42J9</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
