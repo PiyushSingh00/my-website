@@ -403,14 +403,22 @@ signUpCloseTriggers.forEach((el) =>
   }
 
   function lockActions() {
-    if (actionsGrid) actionsGrid.classList.add("locked");
-    if (lockedBanner) lockedBanner.style.display = "block";
-  }
+  if (actionsGrid) actionsGrid.classList.add("locked");
+  // Disable all action buttons and show hover hint
+  document.querySelectorAll(".action-btn").forEach((btn) => {
+    btn.disabled = true;
+    btn.setAttribute("title", "Sign in to access");
+  });
+}
 
-  function unlockActions() {
-    if (actionsGrid) actionsGrid.classList.remove("locked");
-    if (lockedBanner) lockedBanner.style.display = "none";
-  }
+function unlockActions() {
+  if (actionsGrid) actionsGrid.classList.remove("locked");
+  // Re-enable buttons and remove the hint
+  document.querySelectorAll(".action-btn").forEach((btn) => {
+    btn.disabled = false;
+    btn.removeAttribute("title");
+  });
+}
 
   function setSignedIn(username) {
     localStorage.setItem("scheduleitUser", username);

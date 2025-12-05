@@ -190,6 +190,16 @@ button:focus-visible {
   font-size: 1.5rem;
 }
 
+.feature-action-btn {
+  margin-top: 0.6rem;
+  align-self: flex-start;
+}
+
+.actions-grid.locked .feature-action-btn {
+  cursor: not-allowed;
+}
+
+
 /* Action grid */
 
 .actions-section {
@@ -208,10 +218,11 @@ button:focus-visible {
 }
 
 .actions-grid.locked {
-  opacity: 0.5;
-  filter: blur(1px);
-  pointer-events: none;
+  opacity: 0.6;
+  filter: blur(0);      /* keep text sharp */
+  /* no pointer-events here so the title tooltip still shows on hover */
 }
+
 
 .locked-banner {
   background: #fff1f2;

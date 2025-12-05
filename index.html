@@ -32,75 +32,61 @@
       </div>
     </section>
 
-    <section class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">🗂️</div>
-        <h3>Profile-ready</h3>
-        <p>Keep player details organized so every tournament starts with clean data.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🏆</div>
-        <h3>Host in minutes</h3>
-        <p>Spin up events, generate codes, and invite players without back-and-forth.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🚀</div>
-        <h3>Join with a code</h3>
-        <p>Players enter the shared code to register—no tedious forms or emails.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">📊</div>
-        <h3>Track performance</h3>
-        <p>See stats and outcomes in one place to plan the next match smarter.</p>
-      </div>
-    </section>
+    <section class="features-grid actions-grid locked" id="actionsGrid">
+  <div class="feature-card">
+    <div class="feature-icon">🗂️</div>
+    <h3>Profile-ready</h3>
+    <p>Keep player details organized so every tournament starts with clean data.</p>
+    <button
+      class="action-btn feature-action-btn"
+      data-action="create-profile"
+      title="Sign in to access"
+    >
+      Edit Profile
+    </button>
+  </div>
 
-    <section class="actions-section">
-      <div id="lockedBanner" class="locked-banner">
-        Sign in to unlock your actions.
-      </div>
-      <div class="actions-grid locked" id="actionsGrid">
-        <!-- Edit/Create Profile -->
-        <div class="action-card">
-          <div class="icon-circle">
-            <span class="icon-text" aria-hidden="true">🧾</span>
-          </div>
-          <button class="action-btn" data-action="create-profile">
-            Edit Profile
-          </button>
-        </div>
+  <div class="feature-card">
+    <div class="feature-icon">🏆</div>
+    <h3>Host in minutes</h3>
+    <p>Spin up events, generate codes, and invite players without back-and-forth.</p>
+    <button
+      class="action-btn feature-action-btn"
+      data-action="host-tournament"
+      title="Sign in to access"
+    >
+      Host Tournament
+    </button>
+  </div>
 
-        <!-- Host Tournament -->
-        <div class="action-card">
-          <div class="icon-circle">
-            <span class="icon-text" aria-hidden="true">🏟️</span>
-          </div>
-          <button class="action-btn" data-action="host-tournament">
-            Host Tournament
-          </button>
-        </div>
+  <div class="feature-card">
+    <div class="feature-icon">🚀</div>
+    <h3>Join with a code</h3>
+    <p>Players enter the shared code to register—no tedious forms or emails.</p>
+    <button
+      class="action-btn feature-action-btn"
+      data-action="join-tournament"
+      title="Sign in to access"
+    >
+      Join Tournament
+    </button>
+  </div>
 
-        <!-- Join Tournament -->
-        <div class="action-card">
-          <div class="icon-circle">
-            <span class="icon-text" aria-hidden="true">🎟️</span>
-          </div>
-          <button class="action-btn" data-action="join-tournament">
-            Join Tournament
-          </button>
-        </div>
+  <div class="feature-card">
+    <div class="feature-icon">📊</div>
+    <h3>Track performance</h3>
+    <p>See stats and outcomes in one place to plan the next match smarter.</p>
+    <button
+      class="action-btn feature-action-btn"
+      data-action="my-performance"
+      title="Sign in to access"
+    >
+      My Performance
+    </button>
+  </div>
+</section>
 
-        <!-- My Performance -->
-        <div class="action-card">
-          <div class="icon-circle">
-            <span class="icon-text" aria-hidden="true">📈</span>
-          </div>
-          <button class="action-btn" data-action="my-performance">
-            My Performance
-          </button>
-        </div>
-      </div>
-    </section>
+
   </main>
 
   <div class="modal" id="signInModal" aria-hidden="true">
