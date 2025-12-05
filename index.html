@@ -13,9 +13,7 @@
       <button id="signInBtn" class="secondary-btn">Sign In</button>
       <button id="createAccountBtn" class="primary-btn">Create Account</button>
     </div>
-    <div style="background: #ffe600; padding: 10px; text-align: center;">
-  Welcome to my website – updated via staging → main flow 🚀
-</div>
+    
 
   </header>
 
@@ -125,6 +123,28 @@
       </form>
     </div>
   </div>
+  <div class="modal" id="signUpModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-signup></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="signUpTitle">
+      <button class="modal-close" type="button" aria-label="Close" data-close-signup>&times;</button>
+      <p class="eyebrow">Create account</p>
+      <h3 id="signUpTitle">Sign up for ScheduleIt</h3>
+      <p class="muted">Choose a username and password to get started.</p>
+      <form id="signUpForm" class="modal-form">
+        <label>
+          Username
+          <input type="text" id="signUpUsername" name="username" required />
+        </label>
+        <label>
+          Password
+          <input type="password" id="signUpPassword" name="password" required />
+        </label>
+        <button type="submit" class="primary-btn modal-submit">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+
 
   <script src="script.js"></script>
 </body>

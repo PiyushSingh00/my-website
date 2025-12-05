@@ -42,6 +42,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const joinStepTwo = document.getElementById("joinStepTwo");
   const joinSubmitBtn = document.getElementById("joinSubmitBtn");
   const joinModalClose = document.querySelectorAll("[data-close-join]");
+  const signUpModal = document.getElementById("signUpModal");
+  const signUpForm = document.getElementById("signUpForm");
+  const signUpUsername = document.getElementById("signUpUsername");
+  const signUpPassword = document.getElementById("signUpPassword");
+  const signUpCloseTriggers = document.querySelectorAll("[data-close-signup]");
+
 
   let joinStep = 1;
 
@@ -75,27 +81,91 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Sign in submit
-  if (signInForm) {
-    signInForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const username = usernameInput.value.trim();
-      const password = passwordInput.value.trim();
-      if (!username || !password) {
-        alert("Please enter both username and password.");
+if (signInForm) {
+  signInForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    if (!username || !password) {
+      alert("Please enter both username and password.");
+      return;
+    }
+
+    try {
+      const resp = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        alert(errData.message || "Login failed");
         return;
       }
-      setSignedIn(username);
+
+      const data = await resp.json();
+      // data.username is from backend
+      setSignedIn(data.username);
       closeModal();
       signInForm.reset();
       alert("Signed in successfully.");
-    });
-  }
+    } catch (err) {
+      console.error("Login error", err);
+      alert("Something went wrong. Please try again.");
+    }
+  });
+}
+
+if (signUpForm) {
+  signUpForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const username = signUpUsername.value.trim();
+    const password = signUpPassword.value.trim();
+
+    if (!username || !password) {
+      alert("Please enter both username and password.");
+      return;
+    }
+
+    try {
+      const resp = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        alert(data.message || "Signup failed");
+        return;
+      }
+
+      alert("Account created. You can now sign in.");
+      signUpForm.reset();
+      closeSignUpModal();
+      openModal(); // open sign-in modal so they can login
+    } catch (err) {
+      console.error("Signup error", err);
+      alert("Something went wrong. Please try again.");
+    }
+  });
+}
 
   // Modal close handlers
   modalCloseTriggers.forEach((el) => el.addEventListener("click", closeModal));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeModal();
   });
+  // *** NEW: close sign-up modal when clicking backdrop or X ***
+signUpCloseTriggers.forEach((el) =>
+  el.addEventListener("click", closeSignUpModal)
+);
+
+
+
 
   // Host page: code generation
   if (generateCodeBtn && tournamentCodeInput) {
@@ -368,11 +438,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (createAccountBtn) {
       createAccountBtn.textContent = "Create Account";
-      createAccountBtn.onclick = () => alert("Account creation flow will go here.");
+      createAccountBtn.onclick = openSignUpModal;   // <--- change here
       createAccountBtn.classList.remove("secondary-btn");
       createAccountBtn.classList.add("primary-btn");
     }
   }
+
+  function openSignUpModal() {
+  if (!signUpModal) return;
+  signUpModal.classList.add("open");
+  signUpModal.setAttribute("aria-hidden", "false");
+  if (signUpUsername) signUpUsername.focus();
+  }
+
+function closeSignUpModal() {
+  if (!signUpModal) return;
+  signUpModal.classList.remove("open");
+  signUpModal.setAttribute("aria-hidden", "true");
+  }
+
 
   function handleSignOut() {
     setSignedOut();
