@@ -48,6 +48,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const signUpPassword = document.getElementById("signUpPassword");
   const signUpCloseTriggers = document.querySelectorAll("[data-close-signup]");
 
+  let currentUser = null; // <--- add this
+  let joinStep = 1;
+
+
 
   let joinStep = 1;
 
@@ -71,11 +75,21 @@ document.addEventListener("DOMContentLoaded", () => {
   actionButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
+
+      // 1) If user is NOT signed in, open sign-in modal
+      if (!currentUser) {
+        openModal();
+        return;
+      }
+
+      // 2) If signed in, go to the relevant page (if we have one)
       const route = actionRoutes[action];
       if (route) {
         window.location.href = route;
         return;
       }
+
+      // Fallback for actions not wired yet (e.g. profile/performance placeholders)
       alert(`You clicked: "${btn.textContent.trim()}" (action: ${action})`);
     });
   });
@@ -403,26 +417,26 @@ signUpCloseTriggers.forEach((el) =>
   }
 
   function lockActions() {
-  if (actionsGrid) actionsGrid.classList.add("locked");
-  // Disable all action buttons and show hover hint
-  document.querySelectorAll(".action-btn").forEach((btn) => {
-    btn.disabled = true;
-    btn.setAttribute("title", "Sign in to access");
-  });
-}
+    // Just add the "locked" style (slight dimming) – keep buttons clickable
+    if (actionsGrid) actionsGrid.classList.add("locked");
+  }
 
-function unlockActions() {
-  if (actionsGrid) actionsGrid.classList.remove("locked");
-  // Re-enable buttons and remove the hint
-  document.querySelectorAll(".action-btn").forEach((btn) => {
-    btn.disabled = false;
-    btn.removeAttribute("title");
-  });
-}
+  function unlockActions() {
+    // Remove the dimmed style; buttons stay clickable
+    if (actionsGrid) actionsGrid.classList.remove("locked");
+    // Clean up any old title attributes if present
+    document.querySelectorAll(".action-btn").forEach((btn) => {
+      btn.removeAttribute("title");
+    });
+  }
+
+
 
   function setSignedIn(username) {
     localStorage.setItem("scheduleitUser", username);
+    currentUser = username;          // <--- remember who is signed in
     unlockActions();
+
     if (signInBtn) {
       signInBtn.textContent = `Signed in as ${username}`;
       signInBtn.disabled = true;
@@ -438,7 +452,9 @@ function unlockActions() {
 
   function setSignedOut() {
     localStorage.removeItem("scheduleitUser");
+    currentUser = null;              // <--- clear user
     lockActions();
+
     if (signInBtn) {
       signInBtn.textContent = "Sign In";
       signInBtn.disabled = false;
@@ -446,7 +462,7 @@ function unlockActions() {
     }
     if (createAccountBtn) {
       createAccountBtn.textContent = "Create Account";
-      createAccountBtn.onclick = openSignUpModal;   // <--- change here
+      createAccountBtn.onclick = openSignUpModal;
       createAccountBtn.classList.remove("secondary-btn");
       createAccountBtn.classList.add("primary-btn");
     }
