@@ -195,9 +195,7 @@ button:focus-visible {
   align-self: flex-start;
 }
 
-.actions-grid.locked .feature-action-btn {
-  cursor: not-allowed;
-}
+/* When locked, we only dim the section; buttons stay clickable */
 
 
 /* Action grid */

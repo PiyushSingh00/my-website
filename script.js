@@ -53,8 +53,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
-  let joinStep = 1;
-
   // Restore auth state
   const storedUser = localStorage.getItem("scheduleitUser");
   if (storedUser) {
@@ -71,8 +69,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Action buttons routing
+// Action buttons routing
   actionButtons.forEach((btn) => {
+    // Make sure buttons are always enabled and have no leftover tooltip
+    btn.disabled = false;
+    btn.removeAttribute("title");
+
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
 
@@ -93,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
       alert(`You clicked: "${btn.textContent.trim()}" (action: ${action})`);
     });
   });
+
 
   // Sign in submit
 if (signInForm) {
