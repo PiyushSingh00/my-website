@@ -1,89 +1,150 @@
-﻿// Homepage interactivity
-console.debug('ScheduleIt homepage loaded');
-
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const API_BASE = "/api";
 
-  // Buttons
-  const createAccountBtn = document.getElementById("create-account-btn");
-  const heroSigninBtn = document.getElementById("hero-signin-btn");
+  // Top bar buttons
+  const signInBtn = document.getElementById("signInBtn");
+  const createAccountBtn = document.getElementById("createAccountBtn");
 
-  // Modals
-  const signupModal = document.getElementById("signup-modal");
-  const signinModal = document.getElementById("signin-modal");
-  const signupCloseBtn = signupModal.querySelector(".modal-close");
-  const signinCloseBtn = signinModal.querySelector(".modal-close");
+  // Optional hero buttons (for now just open modals)
+  const heroHostBtn = document.getElementById("heroHostBtn");
+  const heroPlayerBtn = document.getElementById("heroPlayerBtn");
 
-  // Forms + fields
-  const signupForm = document.getElementById("signup-form");
-  const signinForm = document.getElementById("signin-form");
+  // Modals and forms
+  const signUpModal = document.getElementById("signUpModal");
+  const signInModal = document.getElementById("signInModal");
 
-  const signupName = document.getElementById("signup-name");
-  const signupEmail = document.getElementById("signup-email");
-  const signupPhone = document.getElementById("signup-phone");
-  const signupRole = document.getElementById("signup-role");
-  const signupUsername = document.getElementById("signup-username");
-  const signupUsernameHint = document.getElementById("signup-username-hint");
-  const signupPassword = document.getElementById("signup-password");
-  const signupPhoto = document.getElementById("signup-photo");
+  const signUpForm = document.getElementById("signUpForm");
+  const signInForm = document.getElementById("signInForm");
 
-  const signinUsername = document.getElementById("signin-username");
-  const signinPassword = document.getElementById("signin-password");
+  // Sign up fields
+  const signupName = document.getElementById("signupName");
+  const signupEmail = document.getElementById("signupEmail");
+  const signupPhone = document.getElementById("signupPhone");
+  const signupRole = document.getElementById("signupRole");
+  const signupUsername = document.getElementById("signupUsername");
+  const signupUsernameHint = document.getElementById("signupUsernameHint");
+  const signupPassword = document.getElementById("signupPassword");
+  const signupPhoto = document.getElementById("signupPhoto"); // not used yet
+
+  // Sign in fields
+  const signinUsername = document.getElementById("signinUsername");
+  const signinPassword = document.getElementById("signinPassword");
 
   // Links inside modals
-  const signupSigninLink = document.getElementById("signup-signin-link");   // "Sign in" inside signup
-  const signinCreateLink = document.getElementById("signin-create-link");   // "Create account" inside signin
- 
+  const signupSigninLink = document.getElementById("signupSigninLink");
+  const signinCreateLink = document.getElementById("signinCreateLink");
 
-  const modals = [];
-  if (signupModal) modals.push(signupModal);
-  if (signinModal) modals.push(signinModal);
+  // Close triggers
+  const signUpCloseTriggers = document.querySelectorAll("[data-close-signup]");
+  const signInCloseTriggers = document.querySelectorAll("[data-close-signin]");
 
-  function openModal(modal) {
-    if (!modal) return;
-    modal.classList.add('is-visible');
-    modal.setAttribute('aria-hidden', 'false');
+  // ---------- Modal helpers ----------
 
-    const firstInput = modal.querySelector('input, select');
-    if (firstInput) firstInput.focus();
+  function openSignUp() {
+    if (signUpModal) {
+      signUpModal.classList.add("open");
+      signUpModal.setAttribute("aria-hidden", "false");
+    }
+    if (signInModal) {
+      signInModal.classList.remove("open");
+      signInModal.setAttribute("aria-hidden", "true");
+    }
+    if (signupName) signupName.focus();
   }
 
-  function closeModal(modal) {
-    if (!modal) return;
-    modal.classList.remove('is-visible');
-    modal.setAttribute('aria-hidden', 'true');
+  function openSignIn() {
+    if (signInModal) {
+      signInModal.classList.add("open");
+      signInModal.setAttribute("aria-hidden", "false");
+    }
+    if (signUpModal) {
+      signUpModal.classList.remove("open");
+      signUpModal.setAttribute("aria-hidden", "true");
+    }
+    if (signinUsername) signinUsername.focus();
   }
 
-  // ----- Open modals from main buttons -----
+  function closeSignUp() {
+    if (signUpModal) {
+      signUpModal.classList.remove("open");
+      signUpModal.setAttribute("aria-hidden", "true");
+    }
+  }
 
-  if (createAccountBtn) createAccountBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    openSignup();
+  function closeSignIn() {
+    if (signInModal) {
+      signInModal.classList.remove("open");
+      signInModal.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  // ---------- Attach button handlers ----------
+
+  if (createAccountBtn) {
+    createAccountBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openSignUp();
+    });
+  }
+
+  if (signInBtn) {
+    signInBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openSignIn();
+    });
+  }
+
+  if (heroHostBtn) {
+    heroHostBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openSignUp();
+    });
+  }
+
+  if (heroPlayerBtn) {
+    heroPlayerBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openSignIn();
+    });
+  }
+
+  signUpCloseTriggers.forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeSignUp();
+    });
   });
 
-  if (heroSigninBtn) heroSigninBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    openSignin();
+  signInCloseTriggers.forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeSignIn();
+    });
   });
 
-  signupCloseBtn.addEventListener("click", closeSignup);
-  signinCloseBtn.addEventListener("click", closeSignin);
+  if (signupSigninLink) {
+    signupSigninLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      openSignIn();
+    });
+  }
 
-  signupSigninLink.addEventListener("click", (e) => {
-    e.preventDefault();
-    openSignin();
-  });
+  if (signinCreateLink) {
+    signinCreateLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      openSignUp();
+    });
+  }
 
-  signinCreateLink.addEventListener("click", (e) => {
-    e.preventDefault();
-    openSignup();
-  });
+  // ---------- Username availability (live check) ----------
 
-    let usernameCheckTimeout = null;
+  let usernameCheckTimeout = null;
 
   function setUsernameHint(status, message) {
+    if (!signupUsernameHint) return;
     signupUsernameHint.textContent = message || "";
-    signupUsernameHint.className = "field-hint"; // reset base
+    signupUsernameHint.className = "field-hint"; // reset base class
+    if (!status) return;
 
     if (status === "checking") {
       signupUsernameHint.classList.add("hint-checking");
@@ -96,221 +157,65 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  signupUsername.addEventListener("input", () => {
-    const value = signupUsername.value.trim();
+  if (signupUsername) {
+    signupUsername.addEventListener("input", () => {
+      const value = signupUsername.value.trim();
 
-    if (!value) {
-      setUsernameHint(null, "");
-      return;
-    }
+      if (!value) {
+        setUsernameHint(null, "");
+        return;
+      }
 
-    // Basic length rule to avoid spamming API
-    if (value.length < 3) {
-      setUsernameHint("error", "Username must be at least 3 characters.");
-      return;
-    }
+      if (value.length < 3) {
+        setUsernameHint("error", "Username must be at least 3 characters.");
+        return;
+      }
 
-    // Debounce
-    if (usernameCheckTimeout) {
-      clearTimeout(usernameCheckTimeout);
-    }
+      if (usernameCheckTimeout) {
+        clearTimeout(usernameCheckTimeout);
+      }
 
-    usernameCheckTimeout = setTimeout(async () => {
-      try {
-        setUsernameHint("checking", "Checking availability...");
-        const resp = await fetch(`${API_BASE}/users/check-username?username=${encodeURIComponent(value)}`);
-        const data = await resp.json();
+      usernameCheckTimeout = setTimeout(async () => {
+        try {
+          setUsernameHint("checking", "Checking availability...");
+          const resp = await fetch(
+            `${API_BASE}/users/check-username?username=${encodeURIComponent(value)}`
+          );
+          const data = await resp.json();
 
-        if (!resp.ok) {
-          setUsernameHint("error", data.message || "Could not check username.");
-          return;
+          if (!resp.ok) {
+            setUsernameHint("error", data.message || "Could not check username.");
+            return;
+          }
+
+          if (data.available) {
+            setUsernameHint("available", "Username is available ✅");
+          } else {
+            setUsernameHint("taken", "Username is already taken ❌");
+          }
+        } catch (err) {
+          console.error(err);
+          setUsernameHint("error", "Error checking username.");
         }
-
-        if (data.available) {
-          setUsernameHint("available", "Username is available ✅");
-        } else {
-          setUsernameHint("taken", "Username is already taken ❌");
-        }
-      } catch (err) {
-        console.error(err);
-        setUsernameHint("error", "Error checking username.");
-      }
-    }, 400); // 400ms debounce
-  });
-
-
-  function openSignup() {
-    signupModal.setAttribute("aria-hidden", "false");
-    signupModal.classList.add("open");
-    signinModal.setAttribute("aria-hidden", "true");
-    signinModal.classList.remove("open");
-    signupName.focus();
-  }
-
-    function openSignin() {
-    signinModal.setAttribute("aria-hidden", "false");
-    signinModal.classList.add("open");
-    signupModal.setAttribute("aria-hidden", "true");
-    signupModal.classList.remove("open");
-    signinUsername.focus();
-  }
-
-  function closeSignup() {
-    signupModal.setAttribute("aria-hidden", "true");
-    signupModal.classList.remove("open");
-  }
-
-  function closeSignin() {
-    signinModal.setAttribute("aria-hidden", "true");
-    signinModal.classList.remove("open");
-  }
-
-
-  // ----- Close buttons -----
-
-
-
-  // ----- Click outside modal to close -----
-
-  modals.forEach((modal) => {
-    modal.addEventListener('click', (event) => {
-      if (event.target === modal) {
-        closeModal(modal);
-      }
+      }, 400); // debounce
     });
-  });
-
-  // ----- ESC key closes any open modal -----
-
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      modals.forEach((modal) => closeModal(modal));
-    }
-  });
-
-  // ----- Switch between Signup <-> Signin from links -----
-
-  // "Already have an account? Sign in" inside signup modal
-
-  // "New here? Create account" inside signin modal
-
-
-  // ----- Username uniqueness (local, front-end only) -----
-
-  const USERNAMES_KEY = 'scheduleItUsernames';
-
-  function loadStoredUsernames() {
-    try {
-      const raw = localStorage.getItem(USERNAMES_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (err) {
-      console.error('Failed to load stored usernames', err);
-      return [];
-    }
   }
 
-  function saveStoredUsernames(usernames) {
-    try {
-      localStorage.setItem(USERNAMES_KEY, JSON.stringify(usernames));
-    } catch (err) {
-      console.error('Failed to save usernames', err);
-    }
-  }
+  // ---------- Sign up submit → /api/register ----------
 
-  function normalizeUsername(value) {
-    return (value || '').trim().toLowerCase();
-  }
-
-  let storedUsernames = loadStoredUsernames();
-
-  function isUsernameTaken(username) {
-    const norm = normalizeUsername(username);
-    if (!norm) return false;
-    return storedUsernames.includes(norm);
-  }
-
-  function updateUsernameHint() {
-    if (!signupUsernameInput || !signupUsernameHint) return;
-
-    const raw = signupUsernameInput.value;
-    const norm = normalizeUsername(raw);
-
-    signupUsernameHint.textContent = '';
-    signupUsernameHint.className = 'field-hint';
-    signupUsernameInput.classList.remove('input-error', 'input-success');
-
-    if (!norm) {
-      // Empty username, no message
-      return;
-    }
-
-    if (isUsernameTaken(norm)) {
-      signupUsernameHint.textContent = 'Username already taken';
-      signupUsernameHint.classList.add('error');
-      signupUsernameInput.classList.add('input-error');
-    } else {
-      signupUsernameHint.textContent = 'Username is available';
-      signupUsernameHint.classList.add('success');
-      signupUsernameInput.classList.add('input-success');
-    }
-  }
-
-  if (signupUsernameInput) {
-    signupUsernameInput.addEventListener('input', updateUsernameHint);
-  }
-
-  // ----- Password show / hide toggles -----
-
-  function resetPasswordField(inputEl, toggleBtn) {
-    if (!inputEl || !toggleBtn) return;
-    inputEl.type = 'password';
-    const textSpan = toggleBtn.querySelector('.password-toggle-text');
-    if (textSpan) {
-      textSpan.textContent = 'Show';
-    }
-  }
-
-  const passwordToggleButtons = document.querySelectorAll('.password-toggle');
-  passwordToggleButtons.forEach((btn) => {
-    const targetId = btn.dataset.target;
-    if (!targetId) return;
-
-    const input = document.getElementById(targetId);
-    if (!input) return;
-
-    btn.addEventListener('click', () => {
-      const isHidden = input.type === 'password';
-      input.type = isHidden ? 'text' : 'password';
-
-      const textSpan = btn.querySelector('.password-toggle-text');
-      if (textSpan) {
-        textSpan.textContent = isHidden ? 'Hide' : 'Show';
-      }
-
-      btn.setAttribute(
-        'aria-label',
-        isHidden ? 'Hide password' : 'Show password'
-      );
-    });
-  });
-
-  // ----- Handle signup submit -----
-
-  if (signupForm) {
-    signupForm.addEventListener("submit", async (e) => {
+  if (signUpForm) {
+    signUpForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const name = signupName.value.trim();
-      const email = signupEmail.value.trim();
-      const phone = signupPhone.value.trim();
-      const role = signupRole.value;
-      const username = signupUsername.value.trim();
-      const password = signupPassword.value;
+      const name = signupName ? signupName.value.trim() : "";
+      const email = signupEmail ? signupEmail.value.trim() : "";
+      const phone = signupPhone ? signupPhone.value.trim() : "";
+      const role = signupRole ? signupRole.value : "";
+      const username = signupUsername ? signupUsername.value.trim() : "";
+      const password = signupPassword ? signupPassword.value : "";
 
       if (!name || !phone || !username || !password || !role) {
-        alert("Please fill all required fields.");
+        alert("Please fill all required fields (name, phone, role, username, password).");
         return;
       }
 
@@ -322,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
           role,
           username,
           password,
-          // photoUrl: null // for future, when you add S3
+          // photoUrl: null // in future, once you add S3/file upload
         };
 
         const resp = await fetch(`${API_BASE}/register`, {
@@ -339,9 +244,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         alert("Account created successfully! Please sign in.");
-        signupForm.reset();
+        signUpForm.reset();
         setUsernameHint(null, "");
-        openSignin();
+        openSignIn();
       } catch (err) {
         console.error(err);
         alert("Something went wrong while creating your account.");
@@ -349,17 +254,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  
+  // ---------- Sign in submit → /api/login ----------
 
-
-  // ----- Handle signin submit -----
-
-  if (signinForm) {
-    signinForm.addEventListener("submit", async (e) => {
+  if (signInForm) {
+    signInForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const username = signinUsername.value.trim();
-      const password = signinPassword.value;
+      const username = signinUsername ? signinUsername.value.trim() : "";
+      const password = signinPassword ? signinPassword.value : "";
 
       if (!username || !password) {
         alert("Please enter both username and password.");
@@ -380,21 +282,27 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        // Save basic session info
-        localStorage.setItem("scheduleitUser", data.username || username);
-        if (data.role) {
-          localStorage.setItem("scheduleitRole", data.role);
+        const loggedInUsername = data.username || username;
+        const role = data.role || null;
+
+        // Save in localStorage for later pages (host/join)
+        localStorage.setItem("scheduleitUser", loggedInUsername);
+        if (role) {
+          localStorage.setItem("scheduleitRole", role);
         }
 
         alert("Signed in successfully!");
 
-        // OPTIONAL: redirect based on role
-        // if (data.role === "host") {
+        // Example: redirect based on role (uncomment when backend returns role)
+        // if (role === "host") {
         //   window.location.href = "/host.html";
-        // } else {
+        // } else if (role === "player") {
         //   window.location.href = "/join.html";
+        // } else {
+        //   closeSignIn();
         // }
 
+        closeSignIn();
       } catch (err) {
         console.error(err);
         alert("Something went wrong while signing in.");
