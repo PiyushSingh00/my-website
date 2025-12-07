@@ -1,0 +1,584 @@
+:root {
+  /* same palette as home.css */
+  --bg: #050b18;
+  --panel: rgba(11, 17, 31, 0.8);
+  --card: rgba(12, 20, 36, 0.9);
+  --accent: #f25f4c;
+  --accent-2: #4dd0e1;
+  --text: #e6eef8;
+  --muted: #a9b6cc;
+  --border: rgba(255, 255, 255, 0.1);
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  --radius-lg: 22px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.22), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(242, 95, 76, 0.18), transparent 60%),
+    var(--bg);
+}
+
+/* Layout shell */
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar – aligned with index */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px clamp(20px, 5vw, 56px);
+}
+
+.brand {
+  font-family: "Space Grotesk", "Inter", system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 18px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* User menu */
+
+.user-menu {
+  position: relative;
+}
+
+.user-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(132, 152, 185, 0.55);
+  background: rgba(5, 11, 24, 0.95);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.caret {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 170px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.14s ease-out, transform 0.14s ease-out;
+  z-index: 20;
+}
+
+.user-menu-dropdown.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.dropdown-item {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Sign out button */
+
+.signout-btn {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(132, 152, 185, 0.65);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.signout-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Main content */
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px 40px;
+}
+
+.join-card {
+  width: min(480px, 100%);
+  padding: 26px 26px 22px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.14), transparent 55%),
+    var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.join-card h1 {
+  font-family: "Space Grotesk", "Inter", system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+
+.join-card .lede {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Form */
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field-group label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.field-group input {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(5, 11, 24, 0.96);
+  color: var(--text);
+  font: inherit;
+}
+
+.field-group input::placeholder {
+  color: rgba(169, 182, 204, 0.75);
+}
+
+.field-group input:focus {
+  outline: none;
+  border-color: rgba(77, 208, 225, 0.8);
+  box-shadow: 0 0 0 1px rgba(77, 208, 225, 0.3);
+}
+
+/* Button – reusing homepage primary CTA */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent) 0%, #f88b7d 100%);
+  color: #111;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 18px 35px rgba(242, 95, 76, 0.4);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 48px rgba(242, 95, 76, 0.48);
+}
+
+.helper-text {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Small screens */
+
+@media (max-width: 600px) {
+  .topbar {
+    padding-inline: 16px;
+  }
+
+  .brand {
+    font-size: 16px;
+  }
+
+  .join-card {
+    padding: 22px 18px 18px;
+  }
+}
+
+/* ===== Join page: tournaments list & filter ===== */
+
+.join-main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 4vw, 32px) 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.join-intro h1 {
+  font-size: 26px;
+  margin-bottom: 4px;
+}
+
+.tournament-browser {
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(77, 208, 225, 0.12),
+      transparent 55%
+    ),
+    var(--card);
+  padding: 18px 18px 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+/* ===== Join page: tabs (All / My tournaments) ===== */
+
+.join-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.join-tab {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.join-tab:hover {
+  transform: translateY(-1px);
+  background: rgba(77, 208, 225, 0.08);
+}
+
+.join-tab.is-active {
+  background: rgba(77, 208, 225, 0.16);
+  border-color: rgba(77, 208, 225, 0.6);
+  color: var(--text);
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.is-active {
+  display: block;
+}
+
+
+.browser-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  font-size: 13px;
+}
+
+.filter-group select {
+  background: rgba(5, 11, 24, 0.96);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+}
+
+.tournament-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.tournament-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    135deg,
+    rgba(77, 208, 225, 0.06),
+    rgba(5, 11, 24, 0.98)
+  );
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.tournament-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(77, 208, 225, 0.7);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+}
+
+.tournament-primary-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tournament-name {
+  font-weight: 600;
+}
+
+.tournament-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Registration status pill */
+
+.status-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-pill--open {
+  background: rgba(77, 208, 225, 0.16);
+  color: #a5f3ff;
+}
+
+.status-pill--closed {
+  background: rgba(242, 95, 76, 0.16);
+  color: #ffb4a8;
+}
+
+/* ===== Modals ===== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal {
+  width: min(420px, calc(100% - 32px));
+  border-radius: 20px;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(77, 208, 225, 0.16),
+      transparent 55%
+    ),
+    rgba(5, 11, 24, 0.98);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 20px 20px 18px;
+  position: relative;
+}
+
+/* Make dropdown in the modal match the dark theme */
+
+.modal .field-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(5, 11, 24, 0.96);
+  color: var(--text);
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.modal .field-group select:focus {
+  outline: none;
+  border-color: rgba(77, 208, 225, 0.8);
+  box-shadow: 0 0 0 1px rgba(77, 208, 225, 0.3);
+}
+
+.modal .field-group select option {
+  background: #050b18;
+  color: var(--text);
+}
+
+
+.modal h2 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.modal .helper-text {
+  margin-bottom: 14px;
+}
+
+.modal .field-group {
+  margin-bottom: 12px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.error-text {
+  color: #ffb4a8;
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+
+/* ===== Tabs: All vs My tournaments ===== */
+
+.tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(5, 11, 24, 0.9);
+  border: 1px solid var(--border);
+}
+
+.tab {
+  border: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.03);
+  transform: translateY(-0.5px);
+}
+
+.tab--active {
+  background: linear-gradient(135deg, var(--accent) 0%, #f88b7d 100%);
+  color: #111;
+  box-shadow: 0 10px 24px rgba(242, 95, 76, 0.4);
+}
+
+/* Slight tweak so header has room for tabs + filter */
+.tournament-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+
+@media (max-width: 640px) {
+  .browser-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .join-main {
+    padding-inline: 16px;
+  }
+}

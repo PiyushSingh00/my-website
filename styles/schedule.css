@@ -1,0 +1,85 @@
+/* Reuse the same container width as join page */
+.schedule-main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 4vw, 32px) 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.back-link-btn {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.back-link-btn:hover {
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.schedule-title-block h1 {
+  font-size: 24px;
+  margin: 0 0 4px;
+}
+
+.schedule-meta {
+  margin-top: 2px;
+}
+
+/* Card around the schedule table */
+
+.schedule-card {
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(77, 208, 225, 0.12),
+      transparent 55%
+    ),
+    var(--card);
+  padding: 18px 18px 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+/* Table */
+
+.schedule-table-wrapper {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.schedule-table thead th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+}
+
+.schedule-table tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.schedule-table tbody tr:last-child td {
+  border-bottom: none;
+}

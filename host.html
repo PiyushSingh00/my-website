@@ -1,156 +1,253 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Host a Tournament | ScheduleIt</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body class="host-page">
-  <header class="top-bar">
-    <div class="logo">ScheduleIt</div>
-    <div class="auth-actions">
-      <button id="signInBtn" class="secondary-btn">Sign In</button>
-      <button id="createAccountBtn" class="primary-btn">Create Account</button>
+  <head>
+    <meta charset="UTF-8" />
+    <title>ScheduleIt – Host a tournament</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Fonts to match the rest of the app -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles/host.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Top bar -->
+    <header class="topbar">
+        <div class="brand">ScheduleIt</div>
+
+        <div class="topbar-right">
+            <div class="user-menu">
+            <button
+                class="user-trigger"
+                id="host-user-menu-trigger"
+                type="button"
+            >
+                Signed in as <span id="username-label">Host</span>
+                <span class="caret">▾</span>
+            </button>
+
+            <div
+                class="user-menu-dropdown"
+                id="host-user-menu-dropdown"
+            >
+                <button
+                type="button"
+                class="dropdown-item"
+                id="switch-player-mode"
+                >
+                Switch to player mode
+                </button>
+            </div>
+            </div>
+
+            <button class="signout-btn" id="signout-btn" type="button">
+            Sign out
+            </button>
+        </div>
+    </header>
+
+
+      <!-- Main content -->
+    <main class="main">
+    <div class="host-layout">
+        <!-- Mode toggle cards -->
+        <section class="host-mode-toggle">
+        <button
+            class="host-mode-card active"
+            type="button"
+            data-host-mode="my"
+        >
+            <h2>My tournaments</h2>
+            <p>See and manage all tournaments you have hosted.</p>
+        </button>
+
+        <button
+            class="host-mode-card"
+            type="button"
+            data-host-mode="new"
+        >
+            <h2>Host new tournament</h2>
+            <p>Create a new tournament and share the access code.</p>
+        </button>
+        </section>
+
+    <!-- My tournaments view -->
+    <section
+        id="my-tournaments-view"
+        class="host-view host-view--active"
+        aria-label="My tournaments"
+        >
+        <div id="my-tournaments-list" class="tournaments-list">
+            <!-- initial placeholder; JS will replace when needed -->
+            <div class="empty-state">
+            <div class="feature-icon">📋</div>
+            <h3>No tournaments yet</h3>
+            <p class="muted">
+                Once you host tournaments, you’ll see them listed here.
+            </p>
+            </div>
+        </div>
+
+        <!-- NEW: details placeholder shown when a card is clicked -->
+        <div id="tournament-detail" class="tournament-detail hidden">
+            <div class="tournament-detail-card">
+            <h2 id="detail-tournament-name">Tournament name</h2>
+
+            <p class="detail-line">
+                <span class="detail-label">Code:</span>
+                <span id="detail-tournament-code"></span>
+            </p>
+
+            <p class="detail-line">
+                <span class="detail-label">Total registrations:</span>
+                <span id="detail-total-registrations">0</span>
+            </p>
+
+            <button
+                type="button"
+                class="btn-secondary danger-btn"
+                id="stop-registrations-btn"
+            >
+                Stop registrations
+            </button>
+            </div>
+        </div>
+    </section>
+
+
+        <!-- Host new tournament view (wrap your existing card+form) -->
+        <section
+        id="new-tournament-view"
+        class="host-view"
+        aria-label="Host new tournament"
+        >
+        <section class="host-card">
+            <h1>Host a Tournament</h1>
+            <p class="lede">
+            Set the essentials and generate a code to invite players.
+            </p>
+
+            <form id="host-form">
+            <div class="field-group">
+                <label for="tournament-name">Tournament name</label>
+                <input
+                type="text"
+                id="tournament-name"
+                name="tournamentName"
+                placeholder="e.g., Winter Open 2025"
+                required
+                />
+            </div>
+
+            <div class="field-group">
+                <label for="sport-name">Sport name</label>
+                <input
+                type="text"
+                id="sport-name"
+                name="sportName"
+                placeholder="e.g., Football"
+                required
+                />
+            </div>
+
+            <div class="field-group">
+                <label for="tournament-dates">Tournament dates</label>
+                <input
+                type="text"
+                id="tournament-dates"
+                name="tournamentDates"
+                placeholder="e.g., Jan 12 – Jan 14, 2025"
+                required
+                />
+            </div>
+
+            <div class="field-group">
+                <label for="access-code">Access code</label>
+                <div class="code-row">
+                <input
+                    type="text"
+                    id="access-code"
+                    name="accessCode"
+                    placeholder="Click Generate code"
+                    readonly
+                />
+                <button
+                    type="button"
+                    class="btn-dark"
+                    id="generate-code-btn"
+                >
+                    Generate code
+                </button>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label for="player-details">Details for players</label>
+                <textarea
+                id="player-details"
+                name="playerDetails"
+                rows="4"
+                placeholder="Share venue, timing, and any special rules."
+                ></textarea>
+            </div>
+
+            <div class="actions-row">
+            <button type="submit" class="btn-primary">
+                Save tournament
+            </button>
+            </div>
+
+            </form>
+        </section>
+        </section>
     </div>
-  </header>
+    </main>
 
-  <main class="main-content">
-    <section class="host-layout">
-      <div class="panel form-panel">
-        <div class="panel-header">
-          <h2>Host a Tournament</h2>
-          <p>Set the essentials and generate a code to invite players.</p>
-        </div>
+    
 
-        <form id="hostForm" class="host-form">
-          <div class="form-field">
-            <label for="tournamentName">Tournament name</label>
-            <input type="text" id="tournamentName" name="tournamentName" placeholder="e.g., Winter Open 2025" required />
-          </div>
+    </div>
 
-          <div class="form-field">
-            <label for="sportName">Sport name</label>
-            <input type="text" id="sportName" name="sportName" placeholder="e.g., Football" required />
-          </div>
+      <!-- Tournament details popup -->
+    <div class="modal-overlay" id="tournament-details-modal" aria-hidden="true">
+        <div class="modal">
+            <button class="modal-close" type="button" aria-label="Close">&times;</button>
 
-          <div class="form-field">
-            <label for="tournamentDate">Tournament dates</label>
-            <input type="text" id="tournamentDate" name="tournamentDate" placeholder="e.g., Jan 12 - Jan 14, 2025" />
-          </div>
+            <p class="eyebrow">Tournament details</p>
+            <h3 id="modalTournamentName"></h3>
 
-          <div class="form-field">
-            <label for="tournamentCode">Access code</label>
-            <div class="code-group">
-              <input type="text" id="tournamentCode" name="tournamentCode" placeholder="Click Generate code" readonly />
-              <button type="button" id="generateCodeBtn" class="secondary-btn code-btn">Generate code</button>
+            <p class="muted">
+                Code: <span id="modalTournamentCode"></span>
+            </p>
+            <p class="muted">
+                Total registrations: <span id="modalTournamentRegistrations"></span>
+            </p>
+
+            <div class="modal-actions">
+                <button class="btn primary full-width" id="modalStopRegistrations">
+                    Stop registrations
+                </button>
+
+            <!-- Hidden by default – shown only when registrations are closed -->
+                <button
+                    class="btn secondary full-width"
+                    id="modalViewPlayers"
+                    type="button"
+                    style="display: none;"
+                >
+                    View players
+                </button>
             </div>
-          </div>
 
-          <div class="form-field">
-            <label for="playerDetails">Details for players</label>
-            <textarea id="playerDetails" name="playerDetails" rows="4" placeholder="Share venue, timing, and any special rules."></textarea>
-          </div>
-
-          <div class="form-actions">
-            <button type="submit" class="primary-btn">Save tournament</button>
-            <button type="button" class="secondary-btn ghost-btn" onclick="window.location.href='index.html'">Back to home</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="panel info-panel">
-        <div class="panel-header">
-          <h3>Player-ready details</h3>
-          <p>Share clear instructions with the generated code.</p>
         </div>
-        <ul class="info-list">
-          <li>Send the access code to players after saving.</li>
-          <li>Include venue, start time, and check-in window.</li>
-          <li>Add equipment notes or roster limits if needed.</li>
-          <li>Update details any time; players see them instantly.</li>
-        </ul>
-        <div class="callout">
-          <div>
-            <p class="eyebrow">Tip</p>
-            <h4>Pin the code in your team chat</h4>
-            <p class="muted">It cuts down on back-and-forth and speeds up registrations.</p>
-          </div>
-          <div class="callout-badge">
-            <div class="badge-dot"></div>
-            <span>Fast onboarding</span>
-          </div>
-        </div>
-      </div>
-    </section>
+    </div>
 
-    <section class="host-hero">
-      <div class="host-hero__copy">
-        <p class="eyebrow">Host Tournament</p>
-        <h1>Set your event, share the code, let players join fast.</h1>
-        <p class="lead">
-          Create the tournament, generate a unique access code, and hand players clear
-          instructions so they can register without friction.
-        </p>
-        <div class="chip-row">
-          <span class="chip">Unique code generator</span>
-          <span class="chip">Player-ready details</span>
-          <span class="chip">Works across sports</span>
-        </div>
-      </div>
 
-      <div class="host-hero__visual">
-        <div class="visual-card">
-          <div class="visual-header">
-            <div>
-              <p class="eyebrow">Live snapshot</p>
-              <h3>Ready to launch</h3>
-            </div>
-            <span class="pill pill--success">On track</span>
-          </div>
-          <div class="visual-graphic">
-            <div class="trophy">
-              <svg viewBox="0 0 80 80" aria-hidden="true">
-                <defs>
-                  <linearGradient id="trophyGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stop-color="#2563eb" />
-                    <stop offset="100%" stop-color="#1d4ed8" />
-                  </linearGradient>
-                </defs>
-                <path d="M20 18h40v10c0 10-8 18-18 18h-4c-10 0-18-8-18-18V18Z" fill="url(#trophyGradient)" />
-                <path d="M26 10h28v10H26z" fill="#0f172a" opacity="0.1" />
-                <path d="M34 46h12v6c0 3.3-2.7 6-6 6s-6-2.7-6-6v-6Z" fill="#1f2937" />
-                <rect x="30" y="52" width="20" height="8" rx="2" fill="#0f172a" opacity="0.18" />
-                <rect x="28" y="60" width="24" height="6" rx="2" fill="#111827" />
-                <rect x="24" y="66" width="32" height="6" rx="2" fill="#0f172a" opacity="0.7" />
-              </svg>
-            </div>
-            <div class="mini-metrics">
-              <div class="metric">
-                <span class="metric-label">Spots</span>
-                <div class="bar">
-                  <span class="bar-fill" style="width: 68%"></span>
-                </div>
-                <span class="metric-value">68% filled</span>
-              </div>
-              <div class="metric">
-                <span class="metric-label">Check-ins</span>
-                <div class="bar">
-                  <span class="bar-fill" style="width: 42%"></span>
-                </div>
-                <span class="metric-value">12 pending</span>
-              </div>
-              <div class="metric">
-                <span class="metric-label">Share code</span>
-                <div class="code-chip">AB42J9</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <script src="script.js"></script>
-</body>
+    <script src="scripts/host.js"></script>
+  </body>
 </html>

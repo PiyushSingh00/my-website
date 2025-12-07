@@ -1,101 +1,225 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Join Tournament | ScheduleIt</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body class="join-page">
-  <header class="top-bar">
-    <div class="logo">ScheduleIt</div>
-    <div class="auth-actions">
-      <button id="signInBtn" class="secondary-btn">Sign In</button>
-      <button id="createAccountBtn" class="primary-btn">Create Account</button>
+  <head>
+    <meta charset="UTF-8" />
+    <title>ScheduleIt – Join tournament</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Fonts (optional, to match main page) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- NOTE: styles/ path -->
+    <link rel="stylesheet" href="styles/join.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Top bar -->
+      <header class="topbar">
+        <div class="brand">ScheduleIt</div>
+
+        <div class="topbar-right">
+          <div class="user-menu">
+            <button
+              class="user-trigger"
+              id="user-menu-trigger"
+              type="button"
+            >
+              Signed in as <span id="username-label">Player</span>
+              <span class="caret">▾</span>
+            </button>
+
+            <div class="user-menu-dropdown" id="user-menu-dropdown">
+              <button
+                type="button"
+                class="dropdown-item"
+                id="switch-host-mode"
+              >
+                Switch to host mode
+              </button>
+            </div>
+          </div>
+
+          <button class="signout-btn" id="signout-btn" type="button">
+            Sign out
+          </button>
+        </div>
+      </header>
+
+        <!-- Main content -->
+    <main class="join-main">
+      <section class="join-intro">
+        <h1>Join a tournament</h1>
+        <p class="helper-text">
+          Browse tournaments across sports and join using the code shared by your host.
+        </p>
+      </section>
+
+      <section class="tournament-browser">
+        <!-- Tabs -->
+        <div class="join-tabs">
+            <button class="join-tab is-active" data-tab="all" type="button">
+            All tournaments
+            </button>
+            <button class="join-tab" data-tab="mine" type="button">
+            My tournaments
+            </button>
+        </div>
+
+        <!-- ALL TOURNAMENTS PANEL (existing list & filter moved inside) -->
+        <div class="tab-panel is-active" data-panel="all">
+            <div class="browser-header">
+            <div>
+                <h2>Available tournaments</h2>
+                <p class="helper-text">
+                Showing tournaments created by all hosts.
+                </p>
+            </div>
+
+            <div class="filter-group">
+                <label for="sport-filter">Filter by sport</label>
+                <select id="sport-filter">
+                <option value="all">All sports</option>
+                <!-- more options filled by JS -->
+                </select>
+            </div>
+            </div>
+
+            <div id="tournament-list" class="tournament-list">
+            <!-- Tournament cards will be injected here by JS -->
+            </div>
+
+            <p class="helper-text" id="empty-state" style="display: none;">
+            No tournaments found yet. Ask a host to create one from the Host page.
+            </p>
+        </div>
+
+        <!-- MY TOURNAMENTS PANEL -->
+        <div class="tab-panel" data-panel="mine">
+            <div class="browser-header">
+            <div>
+                <h2>My tournaments</h2>
+                <p class="helper-text">
+                Tournaments you have registered for using this account.
+                </p>
+            </div>
+            </div>
+
+            <div id="my-tournament-list" class="tournament-list">
+            <!-- Joined tournaments will be injected here by JS -->
+            </div>
+
+            <p class="helper-text" id="my-empty-state" style="display: none;">
+            You haven’t joined any tournaments yet. Use “All tournaments” tab to register.
+            </p>
+        </div>
+        </section>
+
+    </main>
+
+
     </div>
-  </header>
 
-  <main class="main-content">
-    <section class="hero join-hero">
-      <p class="eyebrow">Join Tournament</p>
-      <h1>Enter the code, confirm the details, and get on the roster.</h1>
-      <p class="lead">
-        Use the access code shared by the host to view tournament info and proceed to register.
-      </p>
-      <div class="join-controls">
-        <button class="secondary-btn" onclick="window.location.href='index.html'">Back to home</button>
-      </div>
-    </section>
+    <!-- Tournament code modal -->
+    <div class="modal-overlay hidden" id="code-modal" aria-hidden="true">
+        <div class="modal">
+            <button class="modal-close" type="button" data-close-modal>&times;</button>
 
-    <section class="panel">
-      <div class="panel-header">
-        <h2>Available tournaments</h2>
-        <p>Pick a tournament and keep the access code handy when you check in.</p>
-      </div>
-      <form id="joinCodeForm" class="join-code-form">
-        <label for="joinCodeInput">Enter access code</label>
-        <div class="code-group">
-          <input type="text" id="joinCodeInput" name="joinCode" placeholder="e.g., AB42J9" autocomplete="one-time-code" required />
-          <button type="submit" class="primary-btn code-btn">View tournament</button>
+            <h2 id="code-modal-title">Enter tournament code</h2>
+            <p class="helper-text" id="code-modal-subtitle">
+            Ask your host for the unique tournament code and enter it below.
+            </p>
+
+            <form id="code-form">
+            <div class="field-group">
+                <label for="code-input">Tournament code</label>
+                <input
+                type="text"
+                id="code-input"
+                name="code"
+                placeholder="e.g. ABCD-1234"
+                required
+                />
+            </div>
+
+            <p class="error-text" id="code-error" style="display: none;">
+                Incorrect code. Please try again.
+            </p>
+
+            <button type="submit" class="btn-primary full-width">
+                Continue
+            </button>
+            </form>
         </div>
-      </form>
-      <div id="tournamentList" class="join-list empty">
-        <div class="empty-state">
-          <div class="feature-icon">🔍</div>
-          <h4>No tournaments yet</h4>
-          <p class="muted">Hosts will appear here after they create an event.</p>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <div class="modal" id="joinPlayerModal" aria-hidden="true">
-    <div class="modal-backdrop" data-close-join></div>
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="joinPlayerTitle">
-      <button class="modal-close" type="button" aria-label="Close" data-close-join>&times;</button>
-      <p class="eyebrow">Join tournament</p>
-      <h3 id="joinPlayerTitle">Tournament</h3>
-      <p class="muted" id="joinPlayerSubtitle"></p>
-      <form id="joinPlayerForm" class="modal-form">
-        <div id="joinStepOne">
-          <label>
-            Name
-            <input type="text" id="joinPlayerName" name="name" required />
-          </label>
-          <label>
-            Age
-            <input type="number" id="joinPlayerAge" name="age" min="1" required />
-          </label>
-          <label>
-            Phone number
-            <input type="tel" id="joinPlayerPhone" name="phone" required />
-          </label>
-          <label class="checkbox-inline">
-            <input type="checkbox" id="joinPlayerCaptain" name="captain" />
-            Captain?
-          </label>
-        </div>
-
-        <div id="joinStepTwo" class="hidden">
-          <label>
-            Team Name
-            <input type="text" id="joinTeamName" name="teamName" />
-          </label>
-          <label>
-            Upload team logo (optional)
-            <input type="file" id="joinTeamLogo" name="teamLogo" accept="image/*" />
-          </label>
-          <label>
-            Upload payment details (optional)
-            <input type="file" id="joinPayment" name="payment" />
-          </label>
-        </div>
-
-        <button type="submit" id="joinSubmitBtn" class="primary-btn modal-submit">Next</button>
-      </form>
     </div>
-  </div>
 
-  <script src="script.js"></script>
-</body>
+    <!-- Player registration modal -->
+    <div class="modal-overlay hidden" id="player-modal" aria-hidden="true">
+        <div class="modal">
+            <button class="modal-close" type="button" data-close-modal>&times;</button>
+
+            <h2 id="player-modal-title">Player details</h2>
+            <p class="helper-text">
+            Enter your details to complete the registration.
+            </p>
+
+            <form id="player-form">
+            <div class="field-group">
+                <label for="player-name">Name of player</label>
+                <input
+                id="player-name"
+                name="playerName"
+                type="text"
+                required
+                />
+            </div>
+
+            <div class="field-group">
+                <label for="player-age">Age</label>
+                <input
+                id="player-age"
+                name="playerAge"
+                type="number"
+                min="1"
+                max="120"
+                required
+                />
+            </div>
+
+            <div class="field-group">
+                <label for="player-gender">Gender</label>
+                <select id="player-gender" name="playerGender" required>
+                <option value="">Select</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+            </div>
+
+            <div class="field-group">
+                <label for="player-phone">Phone number</label>
+                <input
+                id="player-phone"
+                name="playerPhone"
+                type="tel"
+                required
+                />
+            </div>
+
+            <button type="submit" class="btn-primary full-width">
+                Submit registration
+            </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- NOTE: scripts/ path -->
+    <script src="scripts/join.js"></script>
+  </body>
 </html>
