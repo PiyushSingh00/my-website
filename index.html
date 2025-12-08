@@ -2,160 +2,235 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>ScheduleIt | Tournament Platform</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Use your existing CSS file; just make sure these classes exist or add them -->
-  <link rel="stylesheet" href="style.css" />
+  <title>ScheduleIt | Tournament Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/home.css" />
 </head>
 <body>
-  <!-- Top bar -->
-  <header class="top-bar">
-    <div class="logo">ScheduleIt</div>
-    <div class="auth-actions">
-      <button id="signInBtn" class="secondary-btn">Sign In</button>
-      <button id="createAccountBtn" class="primary-btn">Create Account</button>
+  <header class="hero">
+    <nav class="topbar">
+      <div class="brand">ScheduleIt</div>
+    </nav>
+
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Tournament HQ</p>
+        <h1>Host and join sports tournaments with confidence.</h1>
+        <p class="lede">
+          ScheduleIt brings brackets, fixtures, and live scores into one streamlined
+          place so clubs can focus on the game.
+        </p>
+
+        <!-- Hero auth buttons -->
+        <div class="cta">
+          <a class="btn primary" href="#" id="create-account-btn">Create account</a>
+          <a class="btn ghost" href="#" id="hero-signin-btn">Sign in</a>
+        </div>
+      </div>
+
+      <div class="feature-stack">
+        <article class="feature-card">
+          <div class="pill">Host tournament</div>
+          <h3>Create, seed, and launch in minutes.</h3>
+          <ul>
+            <li>Custom brackets and round-robin pools</li>
+            <li>Automated scheduling and score capture</li>
+            <li>Share live standings with one link</li>
+          </ul>
+          <a class="text-link" href="#">Start hosting</a>
+        </article>
+
+        <article class="feature-card">
+          <div class="pill alt">Join tournament</div>
+          <h3>Find the right competition fast.</h3>
+          <ul>
+            <li>Browse by sport, level, or location</li>
+            <li>Join solo or register your full squad</li>
+            <li>Instant notifications for fixtures</li>
+          </ul>
+          <a class="text-link" href="#">Browse tournaments</a>
+        </article>
+      </div>
     </div>
   </header>
 
-  <!-- Main hero section -->
-  <main>
-    <section class="hero">
-      <h1>Organise & Join Tournaments in Minutes</h1>
-      <p>Host leagues, manage schedules, and track registrations with ease.</p>
-      <div class="hero-actions">
-        <button id="heroHostBtn" class="primary-btn">Host a tournament</button>
-        <button id="heroPlayerBtn" class="secondary-btn">Join as player</button>
-      </div>
-    </section>
-  </main>
+  <!-- Create account modal -->
+  <div class="modal-overlay" id="signup-modal" aria-hidden="true">
+    <div class="modal">
+      <button class="modal-close" type="button" aria-label="Close create account form">&times;</button>
 
-  <!-- ========== SIGN UP MODAL ========== -->
-  <div class="modal" id="signUpModal" aria-hidden="true">
-    <div class="modal-backdrop" data-close-signup></div>
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="signUpTitle">
-      <button
-        type="button"
-        class="modal-close"
-        aria-label="Close"
-        data-close-signup
-      >
-        &times;
-      </button>
+      <h2 class="modal-title">Create your account</h2>
 
-      <h2 id="signUpTitle">Create your ScheduleIt account</h2>
-
-      <form id="signUpForm" class="modal-form">
-        <label>
-          Full name
-          <input type="text" id="signupName" required />
-        </label>
-
-        <label>
-          Email
-          <input type="email" id="signupEmail" placeholder="you@example.com" />
-        </label>
-
-        <label>
-          Phone number
-          <input type="tel" id="signupPhone" required />
-        </label>
-
-        <label>
-          You are signing up as
-          <select id="signupRole" required>
-            <option value="">Select role</option>
-            <option value="host">Host</option>
-            <option value="player">Player</option>
-          </select>
-        </label>
-
-        <label>
-          Username
+      <form id="signup-form">
+        <div class="field-group">
+          <label for="signup-name">
+            Name <span class="required-asterisk">*</span>
+          </label>
           <input
             type="text"
-            id="signupUsername"
-            autocomplete="username"
+            id="signup-name"
+            name="name"
+            placeholder="Your name"
             required
           />
-          <div id="signupUsernameHint" class="field-hint"></div>
-        </label>
+        </div>
 
-        <label>
-          Password
+        <div class="field-group">
+          <label for="signup-email">
+            Email <span class="optional">(optional)</span>
+          </label>
           <input
-            type="password"
-            id="signupPassword"
-            autocomplete="new-password"
+            type="email"
+            id="signup-email"
+            name="email"
+            placeholder="you@example.com"
+          />
+        </div>
+
+        <div class="field-group">
+          <label for="signup-phone">
+            Phone Number <span class="required-asterisk">*</span>
+          </label>
+          <input
+            type="tel"
+            id="signup-phone"
+            name="phone"
+            placeholder="e.g. +91 98765 43210"
             required
           />
-        </label>
+        </div>
 
-        <label>
-          Profile image (optional)
-          <input type="file" id="signupPhoto" accept="image/*" />
-        </label>
+        <div class="field-group">
+          <label for="signup-role">
+            I am <span class="required-asterisk">*</span>
+          </label>
+          <select id="signup-role" name="role" required>
+            <option value="player" selected>Player</option>
+            <option value="host">Host</option>
+          </select>
+        </div>
 
-        <button type="submit" class="primary-btn modal-submit">
+        <!-- Username with live availability status -->
+        <div class="field-group">
+          <label for="signup-username">
+            Username <span class="required-asterisk">*</span>
+          </label>
+          <input
+            type="text"
+            id="signup-username"
+            name="username"
+            placeholder="Choose a username"
+            required
+          />
+          <p class="field-hint" id="signup-username-hint"></p>
+        </div>
+
+        <!-- Password with eye / show-hide -->
+        <div class="field-group">
+          <label for="signup-password">
+            Password <span class="required-asterisk">*</span>
+          </label>
+          <div class="password-field">
+            <input
+              type="password"
+              id="signup-password"
+              name="password"
+              placeholder="Create a password"
+              required
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              data-target="signup-password"
+              aria-label="Show password"
+            >
+              <span class="password-toggle-text">Show</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Photo field -->
+        <div class="field-group">
+          <label for="signup-photo">Photo</label>
+          <input
+            type="file"
+            id="signup-photo"
+            name="photo"
+            accept="image/*"
+          />
+        </div>
+
+        <button type="submit" class="btn primary full-width">
           Create account
         </button>
 
         <p class="form-footnote">
           Already have an account?
-          <a href="#" id="signupSigninLink">Sign in</a>
+          <a href="#" id="signup-signin-link">Sign in</a>
         </p>
       </form>
     </div>
   </div>
 
-  <!-- ========== SIGN IN MODAL ========== -->
-  <div class="modal" id="signInModal" aria-hidden="true">
-    <div class="modal-backdrop" data-close-signin></div>
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="signInTitle">
-      <button
-        type="button"
-        class="modal-close"
-        aria-label="Close"
-        data-close-signin
-      >
-        &times;
-      </button>
+  <!-- Sign in modal -->
+  <div class="modal-overlay" id="signin-modal" aria-hidden="true">
+    <div class="modal">
+      <button class="modal-close" type="button" aria-label="Close sign in form">&times;</button>
 
-      <h2 id="signInTitle">Sign in to ScheduleIt</h2>
+      <h2 class="modal-title">Sign in</h2>
 
-      <form id="signInForm" class="modal-form">
-        <label>
-          Username
+      <form id="signin-form">
+        <div class="field-group">
+          <label for="signin-username">
+            Username <span class="required-asterisk">*</span>
+          </label>
           <input
             type="text"
-            id="signinUsername"
-            autocomplete="username"
+            id="signin-username"
+            name="username"
+            placeholder="Your username"
             required
           />
-        </label>
+        </div>
 
-        <label>
-          Password
-          <input
-            type="password"
-            id="signinPassword"
-            autocomplete="current-password"
-            required
-          />
-        </label>
+        <div class="field-group">
+          <label for="signin-password">
+            Password <span class="required-asterisk">*</span>
+          </label>
+          <div class="password-field">
+            <input
+              type="password"
+              id="signin-password"
+              name="password"
+              placeholder="Your password"
+              required
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              data-target="signin-password"
+              aria-label="Show password"
+            >
+              <span class="password-toggle-text">Show</span>
+            </button>
+          </div>
+        </div>
 
-        <button type="submit" class="primary-btn modal-submit">
+        <button type="submit" class="btn primary full-width">
           Sign in
         </button>
 
         <p class="form-footnote">
           New here?
-          <a href="#" id="signinCreateLink">Create account</a>
+          <a href="#" id="signin-create-link">Create account</a>
         </p>
       </form>
     </div>
   </div>
 
-  <!-- Your JS -->
-  <script src="home.js"></script>
+  <script src="scripts/home.js"></script>
 </body>
 </html>
