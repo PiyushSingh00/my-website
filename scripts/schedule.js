@@ -15,14 +15,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const titleEl = document.getElementById("schedule-tournament-name");
   const metaEl = document.getElementById("schedule-tournament-meta");
 
-  // --- Schedule elements ---
-  const emptyEl = document.getElementById("schedule-empty");
+  // --- Schedule table elements ---
+  const emptyEl = document.getElementById("schedule-empty-state");
   const tableWrapperEl = document.getElementById("schedule-table-wrapper");
   const tableBodyEl = document.getElementById("schedule-table-body");
 
-  // ===== Auth: ensure user is signed in =====
+  // ===== Auth =====
 
-  const storedUsername = localStorage.getItem("scheduleItUser");
+  const storedUsername =
+    localStorage.getItem("scheduleItUser") ||
+    localStorage.getItem("scheduleitUser");
 
   if (!storedUsername) {
     window.location.href = "index.html";
@@ -33,8 +35,42 @@ document.addEventListener("DOMContentLoaded", () => {
     usernameLabel.textContent = storedUsername;
   }
 
-  // ===== Sign out =====
+  // ===== User menu =====
 
+  function setupUserMenu(trigger, dropdown) {
+    if (!trigger || !dropdown) return;
+
+    const userMenu = document.querySelector(".user-menu");
+
+    const closeDropdown = () => {
+      dropdown.classList.remove("show");
+      if (userMenu) {
+        userMenu.classList.remove("user-menu--open");
+      }
+    };
+
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle("show");
+      if (userMenu) {
+        userMenu.classList.toggle("user-menu--open");
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (
+        !dropdown.contains(e.target) &&
+        !trigger.contains(e.target) &&
+        dropdown.classList.contains("show")
+      ) {
+        closeDropdown();
+      }
+    });
+  }
+
+  setupUserMenu(userMenuTrigger, userMenuDropdown);
+
+  // ===== Sign out =====
   if (signoutBtn) {
     signoutBtn.addEventListener("click", () => {
       localStorage.removeItem("scheduleItUser");
@@ -43,37 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ===== User menu dropdown =====
-
-  if (userMenuTrigger && userMenuDropdown) {
-    const closeDropdown = () => {
-      userMenuDropdown.classList.remove("is-open");
-    };
-
-    const toggleDropdown = () => {
-      userMenuDropdown.classList.toggle("is-open");
-    };
-
-    userMenuTrigger.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleDropdown();
-    });
-
-    userMenuDropdown.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
-
-    document.addEventListener("click", () => {
-      closeDropdown();
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        closeDropdown();
-      }
-    });
-  }
-
+  // ===== Switch to host mode =====
   if (switchHostModeBtn) {
     switchHostModeBtn.addEventListener("click", () => {
       window.location.href = "host.html";
@@ -113,7 +119,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const allTournaments = loadAllTournaments();
-  const tournament = allTournaments.find((t) => t && t.id === selectedId);
+
+  // Debug log so you can SEE what schedule.js is doing
+  console.log("SCHEDULE DEBUG → selectedId:", selectedId, "type:", typeof selectedId);
+  console.log(
+    "SCHEDULE DEBUG → Summary:",
+    allTournaments.map((t) => ({
+      id: t && t.id,
+      idType: t && typeof t.id,
+      name: t && t.tournamentName,
+      fixturesCount: t && Array.isArray(t.fixtures) ? t.fixtures.length : 0,
+    }))
+  );
+
+  // 🔴 THIS is the critical line: use String() comparison
+  const tournament = allTournaments.find(
+    (t) => t && String(t.id) === String(selectedId)
+  );
+
+  console.log("SCHEDULE DEBUG → Tournament found in schedule.js:", tournament);
 
   if (!tournament) {
     alert(
@@ -173,28 +197,36 @@ document.addEventListener("DOMContentLoaded", () => {
         : `Match ${index + 1}`);
 
     const playerA =
-      match.player1 ||
-      match.team1 ||
-      match.sideA ||
       match.playerA ||
+      match.player1 ||
+      match.homePlayer ||
+      match.home ||
+      match.player1Name ||
       "";
     const playerB =
-      match.player2 ||
-      match.team2 ||
-      match.sideB ||
       match.playerB ||
+      match.player2 ||
+      match.awayPlayer ||
+      match.away ||
+      match.player2Name ||
       "";
 
     const score =
       match.score ||
-      match.scoreline ||
       (match.score1 != null || match.score2 != null
-        ? `${match.score1 ?? ""} - ${match.score2 ?? ""}`
+        ? `${match.score1 ?? ""}-${match.score2 ?? ""}`
+        : "") ||
+      (match.homeScore != null || match.awayScore != null
+        ? `${match.homeScore ?? ""}-${match.awayScore ?? ""}`
         : "");
 
-    const court = match.court || match.venue || "";
+    const court = match.court || match.venue || match.location || "";
     const time =
-      match.time || match.startTime || match.slot || match.session || "";
+      match.time ||
+      match.startTime ||
+      (match.dateTime
+        ? new Date(match.dateTime).toLocaleString()
+        : "");
 
     tr.innerHTML = `
       <td>${round || "-"}</td>

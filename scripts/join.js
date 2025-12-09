@@ -144,13 +144,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // tournaments where this user is in players[]
   function getMyTournaments(list) {
     if (!storedUsername) return [];
-    return list.filter(
+    const sourceList = Array.isArray(list) ? list : allTournaments;
+    return sourceList.filter(
       (t) =>
         t &&
         Array.isArray(t.players) &&
         t.players.some((p) => p && p.joinedBy === storedUsername)
     );
   }
+
 
   function populateSportFilter() {
     if (!sportFilterSelect) return;
@@ -281,7 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // Save selection so schedule.html knows which tournament to show
           localStorage.setItem(
             "scheduleitSelectedTournamentId",
-            tournament.id
+            string(tournament.id)
           );
           window.location.href = "schedule.html";
           return;
@@ -317,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderMyTournamentList() {
     if (!myTournamentListEl) return;
 
-    const mine = getMyTournaments();
+    const mine = getMyTournaments(allTournaments);
     myTournamentListEl.innerHTML = "";
 
     if (!mine.length) {
