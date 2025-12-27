@@ -1,6 +1,6 @@
 // scripts/auth.js
 
-const API_BASE = "http://51.20.51.85";
+const API_BASE = window.location.origin;
 
 // ✅ Check if user is logged in and get user info
 export async function requireAuth() {
