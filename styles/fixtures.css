@@ -1,0 +1,218 @@
+/* Reuse look & feel from host */
+@import url("host.css");
+
+.fixtures-card {
+  width: min(900px, 100%);
+  margin: 26px auto 40px;
+  padding: 24px 22px 30px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.14), transparent 55%),
+    var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.fixtures-header h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.fixtures-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fixtures-meta span {
+  white-space: nowrap;
+}
+
+/* Toolbar */
+.fixtures-toolbar {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Toast: "Draws generated" */
+.fixtures-toast {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.55);
+  color: #bbf7d0;
+}
+
+/* Toggle buttons for male / female */
+.fixtures-toggle {
+  margin-top: 10px;
+  margin-bottom: 8px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fixtures-toggle-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.fixtures-toggle-btn.active {
+  border-color: var(--accent);
+  background: rgba(77, 208, 225, 0.18);
+  color: var(--text);
+}
+
+/* Groups are stacked vertically now */
+.fixtures-group {
+  margin-top: 18px;
+  padding: 14px 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(4, 10, 24, 0.95);
+}
+
+.fixtures-group-title {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+/* Bracket layout – rounds as branches */
+.fixtures-bracket {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.bracket-rounds {
+  display: flex;
+  gap: 24px;
+  padding-bottom: 6px;
+  min-width: 100%;
+}
+
+.bracket-round {
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+/* Subtle vertical line to suggest branching */
+.bracket-round:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 24px;
+  bottom: 8px;
+  border-left: 1px dashed rgba(148, 163, 184, 0.4);
+}
+
+.round-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.bracket-match {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 14, 30, 0.9);
+  padding: 10px 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.match-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+/* Player row (name + score + winner button) */
+.player-slot {
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(145, 163, 196, 0.5);
+  font-size: 14px;
+  margin-bottom: 6px;
+  background: rgba(4, 10, 24, 0.96);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-slot:last-child {
+  margin-bottom: 0;
+}
+
+.player-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Score input */
+.player-score-input {
+  width: 48px;
+  background: transparent;
+  border: 1px solid rgba(145, 163, 196, 0.6);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+/* Winner toggle button */
+.winner-button {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 230, 217, 0.5);
+  background: transparent;
+  color: rgba(129, 230, 217, 0.9);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Winner highlight */
+.player-slot.winner {
+  border-color: rgba(129, 230, 217, 0.9);
+  box-shadow: 0 0 0 1px rgba(129, 230, 217, 0.45);
+}
+
+/* Highlight BYE matches */
+.player-slot.bye {
+  font-style: italic;
+  color: var(--muted);
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.player-slot.bye .player-score-input,
+.player-slot.bye .winner-button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

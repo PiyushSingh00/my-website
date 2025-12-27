@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ScheduleIt – Tournament fixtures</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Fonts to match other pages -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles/fixtures.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Top bar (same structure as host) -->
+      <header class="topbar">
+        <div class="brand">ScheduleIt</div>
+
+        <div class="topbar-right">
+          <div class="user-menu">
+            <button
+              class="user-trigger"
+              id="host-user-menu-trigger"
+              type="button"
+            >
+              Signed in as <span id="username-label">Host</span>
+              <span class="caret">▾</span>
+            </button>
+
+            <div class="user-menu-dropdown" id="host-user-menu-dropdown">
+              <button
+                type="button"
+                class="dropdown-item"
+                id="switch-player-mode"
+              >
+                Switch to player mode
+              </button>
+            </div>
+          </div>
+
+          <button class="signout-btn" id="signout-btn" type="button">
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="fixtures-card">
+          <header class="fixtures-header">
+            <p class="eyebrow">Knockout fixtures</p>
+            <h1 id="fixtures-tournament-name">Tournament name</h1>
+            <p class="helper-text fixtures-meta">
+              <span id="fixtures-tournament-sport"></span>
+              <span id="fixtures-tournament-dates"></span>
+              <span>Code: <span id="fixtures-tournament-code"></span></span>
+            </p>
+          </header>
+
+          <!-- Toolbar with Back + Generate buttons -->
+          <div class="fixtures-toolbar">
+            <button
+              type="button"
+              class="btn-dark"
+              id="fixtures-back-btn"
+            >
+              ← Back to players
+            </button>
+
+            <button
+              type="button"
+              class="btn-primary"
+              id="fixtures-generate-btn"
+            >
+              Generate fixtures
+            </button>
+          </div>
+
+          <!-- Small toast for "Draws generated" -->
+          <div
+            id="fixtures-toast"
+            class="fixtures-toast"
+            style="display: none;"
+          >
+            ✓ Draws generated
+          </div>
+
+          <p class="helper-text">
+            Fixtures are auto-generated in random order for each category.
+            BYE indicates a free pass to the next round.
+          </p>
+
+          <!-- Toggle for Male / Female -->
+          <div class="fixtures-toggle">
+            <button
+              type="button"
+              class="fixtures-toggle-btn"
+              id="fixtures-toggle-male"
+              data-group="male"
+            >
+              Male fixtures
+            </button>
+            <button
+              type="button"
+              class="fixtures-toggle-btn"
+              id="fixtures-toggle-female"
+              data-group="female"
+            >
+              Female fixtures
+            </button>
+          </div>
+
+          <!-- Center message / "no fixtures" message -->
+          <div
+            id="fixtures-none-selected"
+            class="empty-state"
+            style="display: flex;"
+          >
+            <div class="feature-icon">🎯</div>
+            <h3>Choose which fixtures to view</h3>
+            <p class="muted">
+              Select <strong>Male fixtures</strong> or
+              <strong>Female fixtures</strong> above to see the bracket.
+            </p>
+          </div>
+
+          <!-- Male fixtures group (hidden by default) -->
+          <div
+            class="fixtures-group"
+            id="fixtures-group-male"
+            style="display: none;"
+          >
+            <h2 class="fixtures-group-title">Male fixtures</h2>
+
+            <div
+              id="fixtures-empty-state-male"
+              class="empty-state"
+              style="display: none;"
+            >
+              <div class="feature-icon">🧩</div>
+              <h3>No male players available</h3>
+              <p class="muted">
+                Add at least two male players to generate a knockout bracket.
+              </p>
+            </div>
+
+            <div
+              id="fixtures-bracket-male"
+              class="fixtures-bracket"
+              style="display: none;"
+            ></div>
+          </div>
+
+          <!-- Female fixtures group (hidden by default) -->
+          <div
+            class="fixtures-group"
+            id="fixtures-group-female"
+            style="display: none;"
+          >
+            <h2 class="fixtures-group-title">Female fixtures</h2>
+
+            <div
+              id="fixtures-empty-state-female"
+              class="empty-state"
+              style="display: none;"
+            >
+              <div class="feature-icon">🧩</div>
+              <h3>No female players available</h3>
+              <p class="muted">
+                Add at least two female players to generate a knockout bracket.
+              </p>
+            </div>
+
+            <div
+              id="fixtures-bracket-female"
+              class="fixtures-bracket"
+              style="display: none;"
+            ></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="scripts/fixtures.js"></script>
+  </body>
+</html>

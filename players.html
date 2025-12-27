@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ScheduleIt – Tournament players</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Fonts to match the rest of the app -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles/players.css" />
+  </head>
+  <body>
+    <!-- Same topbar structure as host page -->
+    <header class="topbar">
+      <div class="brand">ScheduleIt</div>
+
+      <div class="topbar-right">
+        <div class="user-menu">
+          <button
+            class="user-trigger"
+            id="host-user-menu-trigger"
+            type="button"
+          >
+            Signed in as <span id="username-label">Host</span>
+            <span class="caret">▾</span>
+          </button>
+
+          <div class="user-menu-dropdown" id="host-user-menu-dropdown">
+            <button
+              type="button"
+              class="dropdown-item"
+              id="switch-player-mode"
+            >
+              Switch to player mode
+            </button>
+          </div>
+        </div>
+
+        <button class="signout-btn" id="signout-btn" type="button">
+          Sign out
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="players-page-card">
+        <header class="players-header">
+          <p class="eyebrow">Tournament players</p>
+          <h1 id="players-tournament-name">Tournament name</h1>
+          <p class="helper-text players-meta">
+            <span id="players-tournament-sport"></span>
+            <span id="players-tournament-dates"></span>
+            <span>Code: <span id="players-tournament-code"></span></span>
+          </p>
+        </header>
+
+        <div class="players-toolbar">
+            <button
+                class="btn-dark"
+                type="button"
+                id="players-back-btn"
+            >
+                ← Back
+            </button>
+
+            <button
+                class="btn-primary"
+                type="button"
+                id="create-fixtures-btn"
+            >
+                Create tournament fixtures
+            </button>
+        </div>
+
+
+        <div class="players-tabs">
+          <button
+            type="button"
+            class="players-tab active"
+            data-player-filter="all"
+          >
+            All players <span class="tab-count" id="all-count">0</span>
+          </button>
+          <button
+            type="button"
+            class="players-tab"
+            data-player-filter="male"
+          >
+            Male <span class="tab-count" id="male-count">0</span>
+          </button>
+          <button
+            type="button"
+            class="players-tab"
+            data-player-filter="female"
+          >
+            Female <span class="tab-count" id="female-count">0</span>
+          </button>
+        </div>
+
+        <div id="players-empty-state" class="empty-state">
+          <div class="feature-icon">👥</div>
+          <h3>No players yet</h3>
+          <p class="muted">
+            Once players join this tournament, they will appear here.
+          </p>
+        </div>
+
+        <div
+          id="players-table-wrapper"
+          class="players-table-wrapper"
+          style="display: none;"
+        >
+          <table class="players-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Age</th>
+                <th>Gender</th>
+              </tr>
+            </thead>
+            <tbody id="players-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="scripts/players.js"></script>
+  </body>
+</html>

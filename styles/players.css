@@ -1,0 +1,107 @@
+/* Reuse host page look & feel */
+@import url("host.css");
+
+/* Card-style layout similar to host */
+.players-page-card {
+  width: min(820px, 100%);
+  margin: 0 auto;
+  padding: 24px 22px 28px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.14), transparent 55%),
+    var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.players-header h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.players-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.players-meta span {
+  white-space: nowrap;
+}
+
+/* Toolbar */
+.players-toolbar {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Tabs */
+.players-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.players-tab {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.players-tab .tab-count {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.players-tab.active {
+  border-color: var(--accent);
+  background: rgba(77, 208, 225, 0.18);
+  color: var(--text);
+}
+
+/* Table */
+.players-table-wrapper {
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+.players-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.players-table th,
+.players-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+
+.players-table th {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.players-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Empty state reuse */
+#players-empty-state {
+  margin-top: 10px;
+}
