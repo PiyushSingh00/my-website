@@ -27,17 +27,18 @@ document.addEventListener("DOMContentLoaded", () => {
      MODAL HELPERS
   =============================== */
 
-  function openModal(modal) {
-    if (!modal) return;
-    modal.style.display = "flex";
-    modal.setAttribute("aria-hidden", "false");
-  }
+function openModal(modal) {
+  if (!modal) return;
+  modal.classList.add("is-visible");
+  modal.setAttribute("aria-hidden", "false");
+}
 
-  function closeModal(modal) {
-    if (!modal) return;
-    modal.style.display = "none";
-    modal.setAttribute("aria-hidden", "true");
-  }
+function closeModal(modal) {
+  if (!modal) return;
+  modal.classList.remove("is-visible");
+  modal.setAttribute("aria-hidden", "true");
+}
+
 
   /* ===============================
      MODAL OPEN / CLOSE LOGIC
