@@ -1,4 +1,5 @@
 ﻿// scripts/home.js
+console.log("🔥 home.js loaded");
 
 document.addEventListener("DOMContentLoaded", () => {
   const signinForm = document.getElementById("signin-form");
