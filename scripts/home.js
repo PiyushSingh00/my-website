@@ -18,6 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupSigninLink = document.getElementById("signup-signin-link");
   const signinCreateLink = document.getElementById("signin-create-link");
   const closeButtons = document.querySelectorAll(".modal-close");
+  const startHostingBtn = document.getElementById("start-hosting-btn");
+  const browseTournamentsBtn = document.getElementById("browse-tournaments-btn");
 
   // Forms
   const signinForm = document.getElementById("signin-form");
@@ -72,6 +74,17 @@ function closeModal(modal) {
       closeModal(signupModal);
     });
   });
+
+  startHostingBtn?.addEventListener("click", (e) => {
+  e.preventDefault();
+  openModal(signupModal);
+  });
+
+browseTournamentsBtn?.addEventListener("click", (e) => {
+  e.preventDefault();
+  openModal(signupModal);
+  });
+
 
   /* ===============================
      SIGN IN
