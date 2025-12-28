@@ -1,5 +1,7 @@
 ﻿// scripts/home.js
 console.log("🔥 home.js loaded");
+console.log("🚨 HOME.JS VERSION = PROD_NO_8080");
+
 
 document.addEventListener("DOMContentLoaded", () => {
   /* ===============================
