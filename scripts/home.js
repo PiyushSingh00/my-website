@@ -151,4 +151,15 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+  const signinBtn = document.querySelector(
+  "#signin-form button[type='submit']"
+);
+
+if (signinBtn) {
+  signinBtn.addEventListener("click", () => {
+    console.log("🟢 SIGNIN BUTTON CLICKED");
+  });
+}
+
+
 });
