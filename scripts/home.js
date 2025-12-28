@@ -1,22 +1,88 @@
 ﻿// scripts/home.js
 console.log("🔥 home.js loaded");
-document.body.addEventListener("click", () => {
-  alert("CLICK REGISTERED");
-});
 
 document.addEventListener("DOMContentLoaded", () => {
+  /* ===============================
+     ELEMENTS
+  =============================== */
+
+  // Modals
+  const signinModal = document.getElementById("signin-modal");
+  const signupModal = document.getElementById("signup-modal");
+
+  // Buttons / links
+  const heroSigninBtn = document.getElementById("hero-signin-btn");
+  const createAccountBtn = document.getElementById("create-account-btn");
+  const signupSigninLink = document.getElementById("signup-signin-link");
+  const signinCreateLink = document.getElementById("signin-create-link");
+  const closeButtons = document.querySelectorAll(".modal-close");
+
+  // Forms
   const signinForm = document.getElementById("signin-form");
   const signupForm = document.getElementById("signup-form");
 
-  // ---------- SIGN IN ----------
+  /* ===============================
+     MODAL HELPERS
+  =============================== */
+
+  function openModal(modal) {
+    if (!modal) return;
+    modal.style.display = "flex";
+    modal.setAttribute("aria-hidden", "false");
+  }
+
+  function closeModal(modal) {
+    if (!modal) return;
+    modal.style.display = "none";
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  /* ===============================
+     MODAL OPEN / CLOSE LOGIC
+  =============================== */
+
+  heroSigninBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openModal(signinModal);
+  });
+
+  createAccountBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openModal(signupModal);
+  });
+
+  signupSigninLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeModal(signupModal);
+    openModal(signinModal);
+  });
+
+  signinCreateLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeModal(signinModal);
+    openModal(signupModal);
+  });
+
+  closeButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      closeModal(signinModal);
+      closeModal(signupModal);
+    });
+  });
+
+  /* ===============================
+     SIGN IN
+  =============================== */
+
   if (signinForm) {
     signinForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      console.log("🚀 LOGIN SUBMIT FIRED");
 
       const data = Object.fromEntries(new FormData(signinForm));
 
       try {
-        const res = await fetch("http://51.20.51.85/api/login", {
+        const res = await fetch("/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -32,27 +98,32 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        // ✅ Store ONLY token
+        // Store JWT
         localStorage.setItem("token", result.token);
 
+        // Redirect after login
         window.location.href = "join.html";
 
       } catch (err) {
-        console.error(err);
-        alert("Network error");
+        console.error("Login error:", err);
+        alert("Network error during login");
       }
     });
   }
 
-  // ---------- SIGN UP ----------
+  /* ===============================
+     SIGN UP
+  =============================== */
+
   if (signupForm) {
     signupForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      console.log("📝 SIGNUP SUBMIT FIRED");
 
       const data = Object.fromEntries(new FormData(signupForm));
 
       try {
-        const res = await fetch("http://51.20.51.85/api/register", {
+        const res = await fetch("/api/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
@@ -68,9 +139,13 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Account created! Please sign in.");
         signupForm.reset();
 
+        // Switch to sign-in modal
+        closeModal(signupModal);
+        openModal(signinModal);
+
       } catch (err) {
-        console.error(err);
-        alert("Network error");
+        console.error("Signup error:", err);
+        alert("Network error during signup");
       }
     });
   }
