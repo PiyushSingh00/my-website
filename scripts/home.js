@@ -1,5 +1,8 @@
 ﻿// scripts/home.js
 console.log("🔥 home.js loaded");
+document.body.addEventListener("click", () => {
+  alert("CLICK REGISTERED");
+});
 
 document.addEventListener("DOMContentLoaded", () => {
   const signinForm = document.getElementById("signin-form");
