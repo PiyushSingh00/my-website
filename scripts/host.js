@@ -24,7 +24,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // For now: placeholder
-  console.log("Host dashboard loaded for", user.username);
+// 🔹 Fetch tournaments created by this host
+const res = await fetch("/api/host/tournaments", {
+  headers: {
+    Authorization: "Bearer " + localStorage.getItem("token")
+  }
+});
+
+if (!res.ok) {
+  alert("Failed to load tournaments");
+  return;
+}
+
+const tournaments = await res.json();
+console.log("Host tournaments:", tournaments);
 
   // 🔜 Next step: fetch host tournaments from backend
 });
