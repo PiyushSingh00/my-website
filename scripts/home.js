@@ -114,11 +114,25 @@ browseTournamentsBtn?.addEventListener("click", (e) => {
           return;
         }
 
-        // Store JWT
         localStorage.setItem("token", result.token);
 
-        // Redirect after login
-        window.location.href = "join.html";
+        // 🔍 Ask backend who the user is
+        const meRes = await fetch("/api/me", {
+          headers: {
+            Authorization: "Bearer " + result.token
+          }
+        });
+
+        const me = await meRes.json();
+
+        // 🚦 Role-based redirect
+        if (me.role === "host") {
+          window.location.href = "host.html";
+        } else {
+          window.location.href = "join.html";
+        }
+
+        
 
       } catch (err) {
         console.error("Login error:", err);
