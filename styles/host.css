@@ -27,14 +27,14 @@ body {
 }
 
 body {
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+  font-family: "Inter", system-ui;
   color: var(--text);
   background:
     radial-gradient(circle at top left, rgba(77, 208, 225, 0.22), transparent 55%),
     radial-gradient(circle at bottom right, rgba(242, 95, 76, 0.18), transparent 60%),
     var(--bg);
 }
+
 
 /* Layout shell */
 
@@ -216,6 +216,25 @@ body {
   color: var(--text);
   font: inherit;
 }
+
+/* Make select dropdown match dark theme */
+.field-group select {
+  padding: 11px 13px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(5, 11, 24, 0.96);
+  color: var(--text);
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.field-group select option {
+  background: #050b18;
+  color: var(--text);
+}
+
 
 .field-group input::placeholder,
 .field-group textarea::placeholder {
@@ -739,3 +758,40 @@ body {
   white-space: nowrap;
 }
 
+.counter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.counter-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.counter-btn:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.category-card {
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.host-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: rgba(169, 182, 204, 0.6); /* lighter */
+  text-align: center;
+}
