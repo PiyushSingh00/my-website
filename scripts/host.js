@@ -40,4 +40,34 @@ const tournaments = await res.json();
 console.log("Host tournaments:", tournaments);
 
   // 🔜 Next step: fetch host tournaments from backend
+// -------- LOAD SPORTS FROM BACKEND --------
+async function loadSports() {
+  try {
+    const res = await fetch("/api/sports");
+    if (!res.ok) throw new Error("Failed to load sports");
+
+    const sports = await res.json();
+
+    const sportSelect = document.getElementById("sport-name");
+
+    // Clear existing options except "Select sport"
+    sportSelect.innerHTML = `<option value="">Select sport</option>`;
+
+    sports.forEach(sport => {
+      const option = document.createElement("option");
+      option.value = sport.sport_name;
+      option.textContent = sport.sport_name;
+      sportSelect.appendChild(option);
+    });
+
+  } catch (err) {
+    console.error("Error loading sports:", err);
+  }
+}
+
+// Call it
+loadSports();
+
+
+
 });
