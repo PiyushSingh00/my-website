@@ -25,16 +25,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // For now: placeholder
 // 🔹 Fetch tournaments created by this host
-const res = await fetch("/api/host/tournaments", {
-  headers: {
-    Authorization: "Bearer " + localStorage.getItem("token")
-  }
-});
+try {
+  const res = await fetch("/api/host/tournaments", {
+    headers: {
+      Authorization: "Bearer " + localStorage.getItem("token")
+    }
+  });
 
-if (!res.ok) {
-  alert("Failed to load tournaments");
-  return;
+  if (res.ok) {
+    const tournaments = await res.json();
+    console.log("Host tournaments:", tournaments);
+  }
+} catch (err) {
+  console.warn("Could not load tournaments yet");
 }
+
 
 const tournaments = await res.json();
 console.log("Host tournaments:", tournaments);
@@ -67,6 +72,32 @@ async function loadSports() {
 
 // Call it
 loadSports();
+
+// -------- HOST MODE TOGGLE (My vs New) --------
+const modeCards = document.querySelectorAll(".host-mode-card");
+const myView = document.getElementById("my-tournaments-view");
+const newView = document.getElementById("new-tournament-view");
+
+modeCards.forEach(card => {
+  card.addEventListener("click", () => {
+    // Remove active from all cards
+    modeCards.forEach(c => c.classList.remove("active"));
+
+    // Hide all views
+    myView.classList.remove("host-view--active");
+    newView.classList.remove("host-view--active");
+
+    // Activate clicked card
+    card.classList.add("active");
+
+    // Show correct view
+    if (card.dataset.hostMode === "my") {
+      myView.classList.add("host-view--active");
+    } else {
+      newView.classList.add("host-view--active");
+    }
+  });
+});
 
 
 

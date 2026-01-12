@@ -59,19 +59,20 @@
         <!-- Mode toggle cards -->
         <section class="host-mode-toggle">
         <button
-            class="host-mode-card active"
-            type="button"
-            data-host-mode="my"
+        class="host-mode-card"
+        type="button"
+        data-host-mode="my"
         >
             <h2>My tournaments</h2>
             <p>See and manage all tournaments you have hosted.</p>
         </button>
 
         <button
-            class="host-mode-card"
-            type="button"
-            data-host-mode="new"
+        class="host-mode-card active"
+        type="button"
+        data-host-mode="new"
         >
+
             <h2>Host new tournament</h2>
             <p>Create a new tournament and share the access code.</p>
         </button>
@@ -80,7 +81,7 @@
     <!-- My tournaments view -->
     <section
         id="my-tournaments-view"
-        class="host-view host-view--active"
+        class="host-view"
         aria-label="My tournaments"
         >
         <div id="my-tournaments-list" class="tournaments-list">
@@ -123,7 +124,7 @@
 
         <!-- Host new tournament view (wrap your existing card+form) -->
         <section
-        id="new-tournament-view"
+        id="new-tournament-view host-view--active"
         class="host-view"
         aria-label="Host new tournament"
         >
