@@ -41,9 +41,6 @@ try {
 }
 
 
-const tournaments = await res.json();
-console.log("Host tournaments:", tournaments);
-
   // 🔜 Next step: fetch host tournaments from backend
 // -------- LOAD SPORTS FROM BACKEND --------
 async function loadSports() {
