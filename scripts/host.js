@@ -253,7 +253,7 @@ function renderMyTournaments(tournaments) {
       ${categories ? `<p class="muted"><strong>Categories:</strong> ${categories}</p>` : ""}
 
       ${t.playerDetails && t.playerDetails.trim() !== "" ? `
-        <p class="details-heading">Details</p>
+        <p class="muted details-label">Details:</p>
         <p class="muted details-text">${t.playerDetails}</p>
       ` : ""}
 

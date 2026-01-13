@@ -763,6 +763,14 @@ body {
   transform: translateY(-1px);
 }
 
+.details-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+
 /* ===== Tournament cards readability tweaks ===== */
 
 /* Slightly larger base text inside cards */
