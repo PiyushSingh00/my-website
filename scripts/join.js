@@ -1,9 +1,77 @@
 // scripts/join.js
 import { requireAuth, logout } from "./auth.js";
 
+async function validateAccessCode(code) {
+  const res = await fetch("/api/tournaments/validate-code", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify({ code })
+  });
+
+  return res.ok ? await res.json() : null;
+}
+
+async function loadMyTournaments() {
+  const res = await fetch("/api/player/tournaments", {
+    headers: {
+      Authorization: "Bearer " + localStorage.getItem("token")
+    }
+  });
+
+  const tournaments = await res.json();
+  renderMyTournaments(tournaments);
+}
+
+
+async function submitPlayerRegistration(payload) {
+  const res = await fetch(`/api/tournaments/${payload.tournamentId}/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    alert("Registration failed");
+    return false;
+  }
+
+  return true;
+}
+
+  async function loadAllTournaments() {
+    const res = await fetch("/api/tournaments", {
+      headers: {
+        Authorization: "Bearer " + localStorage.getItem("token")
+      }
+    });
+
+    if (!res.ok) {
+      console.error("Failed to load tournaments");
+      return;
+    }
+
+    const tournaments = await res.json();
+    renderTournamentList(tournaments);
+  }
+
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
+  loadAllTournaments();
+  document.getElementById("sport-filter").addEventListener("change", e => {
+  const selected = e.target.value;
+  const filtered = selected === "all"
+    ? allTournaments
+    : allTournaments.filter(t => t.sportName === selected);
+
+  renderTournamentList(filtered);
+});
 
   const usernameLabel = document.getElementById("username-label");
   if (usernameLabel) {
@@ -40,6 +108,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   }).filter(c => c.name);
 }
+
+
+
+  function renderTournamentList(tournaments) {
+  const list = document.getElementById("tournament-list");
+  const empty = document.getElementById("empty-state");
+
+  list.innerHTML = "";
+
+  if (tournaments.length === 0) {
+    empty.style.display = "block";
+    return;
+  }
+
+  empty.style.display = "none";
+
+  tournaments.forEach(t => {
+    const card = document.createElement("div");
+    card.className = "tournament-card";
+
+    card.innerHTML = `
+      <div class="tournament-primary-line">
+        <span class="tournament-name">${t.tournamentName}</span>
+        <span class="status-pill ${t.registrationsOpen ? "status-pill--open" : "status-pill--closed"}">
+          ${t.registrationsOpen ? "Open" : "Closed"}
+        </span>
+      </div>
+
+      <div class="tournament-meta">
+        <span>${t.sportName}</span>
+        <span>${t.tournamentDates}</span>
+        <span>${t.venue}</span>
+      </div>
+    `;
+
+    card.onclick = () => openCodeModal(t);
+    list.appendChild(card);
+  });
+}
+
 
   const generateCodeBtn = document.getElementById("generate-code-btn");
   const accessCodeInput = document.getElementById("access-code");
