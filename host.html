@@ -146,26 +146,61 @@
             </div>
 
             <div class="field-group">
-                <label for="sport-name">Sport name</label>
+            <label for="sport-name">Sport</label>
+            <select id="sport-name" name="sportName" required>
+                <option value="">Select sport</option>
+                <option value="Football">Football</option>
+                <option value="Cricket">Cricket</option>
+                <option value="Badminton">Badminton</option>
+                <option value="Tennis">Tennis</option>
+                <option value="Basketball">Basketball</option>
+            </select>
+            </div>
+
+
+            <div class="field-group">
+                <label for="tournament-dates">Tournament dates</label>
                 <input
-                type="text"
-                id="sport-name"
-                name="sportName"
-                placeholder="e.g., Football"
+                type="date"
+                id="tournament-dates"
+                name="tournamentDates"
                 required
                 />
             </div>
 
             <div class="field-group">
-                <label for="tournament-dates">Tournament dates</label>
-                <input
+            <label for="tournament-venue">Venue / Location</label>
+
+            <input
                 type="text"
-                id="tournament-dates"
-                name="tournamentDates"
-                placeholder="e.g., Jan 12 – Jan 14, 2025"
-                required
-                />
+                id="tournament-venue"
+                placeholder="Location not selected"
+                readonly
+            />
+
+            <button
+                type="button"
+                id="get-location-btn"
+                class="btn-secondary"
+                style="margin-top: 6px;"
+            >
+                Use my location
+            </button>
             </div>
+            <div class="field-group">
+            <label>Categories</label>
+
+            <div id="categories-container"></div>
+
+            <button
+                type="button"
+                class="btn-secondary"
+                id="add-category-btn"
+            >
+                + Add category
+            </button>
+            </div>
+
 
             <div class="field-group">
                 <label for="access-code">Access code</label>
@@ -204,6 +239,10 @@
             </div>
 
             </form>
+            <p class="host-note">
+            To add players manually, go to <strong>“My tournaments”</strong>.
+            </p>
+
         </section>
         </section>
     </div>

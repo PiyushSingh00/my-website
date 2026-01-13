@@ -35,6 +35,11 @@ body {
     var(--bg);
 }
 
+.host-note {
+  color: rgba(255,255,255,0.55);
+  font-size: 13px;
+  text-align: center;
+}
 
 /* Layout shell */
 
