@@ -221,9 +221,11 @@ function renderMyTournaments(tournaments) {
   tournaments.forEach(t => {
     const categories = (t.categories || [])
     .map(c => {
+      const size = Number(c.teamSize);
+
       let type = "";
-      if (c.teamSize === 1) type = "Singles";
-      else if (c.teamSize === 2) type = "Doubles";
+      if (size === 1) type = "Singles";
+      else if (size === 2) type = "Doubles";
 
       const genderLabel =
         c.gender === "Male" ? "Men's" :
@@ -250,7 +252,11 @@ function renderMyTournaments(tournaments) {
 
       ${categories ? `<p class="muted"><strong>Categories:</strong> ${categories}</p>` : ""}
 
-      ${t.playerDetails ? `<p class="muted">${t.playerDetails}</p>` : ""}
+      ${t.playerDetails && t.playerDetails.trim() !== "" ? `
+        <p class="details-heading">Details</p>
+        <p class="muted details-text">${t.playerDetails}</p>
+      ` : ""}
+
 
       <div class="tournament-meta">
         <span>Status: <strong>${t.registrationsOpen ? "Open" : "Closed"}</strong></span>
