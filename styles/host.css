@@ -406,8 +406,8 @@ body {
 
 /* Tournament card (for "My tournaments" list) */
 .tournament-card {
-  cursor: pointer;  
-  padding: 14px 16px;
+  cursor: pointer;
+  padding: 12px 14px;          /* tighter card */
   border-radius: var(--radius-lg);
   background:
     radial-gradient(circle at top left, rgba(77, 208, 225, 0.12), transparent 55%),
@@ -416,8 +416,13 @@ body {
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;                   /* reduces vertical spacing */
 }
+
+.tournament-card p {
+  margin: 2px 0;
+}
+
 
 .tournament-head {
   display: flex;
@@ -428,8 +433,16 @@ body {
 
 .tournament-head h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;        /* bigger */
+  font-weight: 700;      /* bold */
 }
+
+.tournament-card .sport-date {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+
 
 .code-chip {
   padding: 4px 10px;
