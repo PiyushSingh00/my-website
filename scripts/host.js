@@ -1,6 +1,8 @@
 // scripts/host.js
 import { requireAuth, logout } from "./auth.js";
 
+let allTournaments = [];
+
   function generateAccessCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";
@@ -172,28 +174,75 @@ async function loadMyTournaments() {
     return;
   }
 
-  const tournaments = await res.json();
-  renderMyTournaments(tournaments);
+  allTournaments = await res.json();
+  populateSportFilter(allTournaments);
+  renderMyTournaments(allTournaments);
+
 }
+
+function populateSportFilter(tournaments) {
+  const filter = document.getElementById("filter-sport");
+  if (!filter) return;
+
+  const sports = [...new Set(tournaments.map(t => t.sportName))];
+
+  filter.innerHTML = `<option value="">All sports</option>`;
+  sports.forEach(sport => {
+    const opt = document.createElement("option");
+    opt.value = sport;
+    opt.textContent = sport;
+    filter.appendChild(opt);
+  });
+
+  filter.addEventListener("change", () => {
+    const selected = filter.value;
+    const filtered = selected
+      ? allTournaments.filter(t => t.sportName === selected)
+      : allTournaments;
+
+    renderMyTournaments(filtered);
+  });
+}
+
 
 function renderMyTournaments(tournaments) {
   const container = document.getElementById("my-tournaments-list");
   container.innerHTML = "";
 
-  if (tournaments.length === 0) {
-    container.innerHTML = "<p>No tournaments created yet.</p>";
+  if (!tournaments.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="feature-icon">📋</div>
+        <h3>No tournaments found</h3>
+      </div>`;
     return;
   }
 
   tournaments.forEach(t => {
+    const categories = (t.categories || [])
+      .map(c => `${c.ageGroup} ${c.gender}`)
+      .join(", ");
+
     const card = document.createElement("div");
     card.className = "tournament-card";
 
     card.innerHTML = `
-      <h3>${t.tournamentName}</h3>
-      <p>${t.sportName}</p>
-      <p>${t.venue}</p>
-      <p>Status: ${t.registrationsOpen ? "Open" : "Closed"}</p>
+      <div class="tournament-head">
+        <h3>${t.tournamentName}</h3>
+        <span class="code-chip">${t.accessCode}</span>
+      </div>
+
+      <p class="muted">${t.sportName} • ${t.tournamentDates}</p>
+
+      <p class="muted">📍 ${t.venue}</p>
+
+      ${categories ? `<p class="muted"><strong>Categories:</strong> ${categories}</p>` : ""}
+
+      ${t.playerDetails ? `<p class="muted">${t.playerDetails}</p>` : ""}
+
+      <div class="tournament-meta">
+        <span>Status: <strong>${t.registrationsOpen ? "Open" : "Closed"}</strong></span>
+      </div>
     `;
 
     card.addEventListener("click", () => {
@@ -203,6 +252,7 @@ function renderMyTournaments(tournaments) {
     container.appendChild(card);
   });
 }
+
 
 
   if (myView && newView) {
@@ -258,6 +308,7 @@ function renderMyTournaments(tournaments) {
 
       alert("Tournament created successfully");
       hostForm.reset();
+      loadMyTournaments();
     });
   }
 });
