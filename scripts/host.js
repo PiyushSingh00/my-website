@@ -4,7 +4,6 @@ import { requireAuth, logout } from "./auth.js";
 document.addEventListener("DOMContentLoaded", async () => {
   const viewPlayersBtn = document.getElementById("modalViewPlayers");
   let selectedTournamentId = null;
-  selectedTournamentId = tournament.tournamentId;
   const categoriesContainer = document.getElementById("categories-container");
   const addCategoryBtn = document.getElementById("add-category-btn");
   let categories = [];
