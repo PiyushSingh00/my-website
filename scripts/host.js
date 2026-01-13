@@ -2,6 +2,20 @@
 import { requireAuth, logout } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const viewPlayersBtn = document.getElementById("modalViewPlayers");
+  let selectedTournamentId = null;
+  selectedTournamentId = tournament.tournamentId;
+
+  viewPlayersBtn.addEventListener("click", () => {
+  if (!selectedTournamentId) {
+    alert("No tournament selected");
+    return;
+  }
+
+  window.location.href = `players.html?tournamentId=${selectedTournamentId}`;
+  });
+
+
   const user = await requireAuth();
   if (!user) return;
 
@@ -24,22 +38,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // For now: placeholder
-// 🔹 Fetch tournaments created by this host
-try {
-  const res = await fetch("/api/host/tournaments", {
-    headers: {
-      Authorization: "Bearer " + localStorage.getItem("token")
-    }
-  });
-
-  if (res.ok) {
-    const tournaments = await res.json();
-    console.log("Host tournaments:", tournaments);
-  }
-} catch (err) {
-  console.warn("Could not load tournaments yet");
-}
-
 
   // 🔜 Next step: fetch host tournaments from backend
 // -------- LOAD SPORTS FROM BACKEND --------
@@ -94,6 +92,38 @@ modeCards.forEach(card => {
       newView.classList.add("host-view--active");
     }
   });
+});
+
+const hostForm = document.getElementById("host-form");
+
+hostForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const payload = {
+    tournamentName: document.getElementById("tournament-name").value,
+    sportName: document.getElementById("sport-name").value,
+    tournamentDates: document.getElementById("tournament-dates").value,
+    accessCode: document.getElementById("access-code").value,
+    playerDetails: document.getElementById("player-details").value,
+    categories: [] // add later if needed
+  };
+
+  const res = await fetch("/api/host/tournaments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    alert("Failed to save tournament");
+    return;
+  }
+
+  alert("Tournament created successfully");
+  hostForm.reset();
 });
 
 

@@ -75,6 +75,8 @@ hostForm.addEventListener("submit", async (e) => {
   console.log("📦 Tournament payload:", data);
 });
 
+const res = await fetch("/api/tournaments");
+const tournaments = await res.json();
 
   // 🔜 Next: list tournaments from backend
 });
