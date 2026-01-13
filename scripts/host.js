@@ -68,6 +68,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderCategories();
     });
   }
+  loadMyTournaments();
 
   if (categoriesContainer) {
     categoriesContainer.addEventListener("input", (e) => {
@@ -157,6 +158,51 @@ document.addEventListener("DOMContentLoaded", async () => {
   const myView = document.getElementById("my-tournaments-view");
   const newView = document.getElementById("new-tournament-view");
 
+async function loadMyTournaments() {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch("http://51.20.51.85:8080/api/host/tournaments", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!res.ok) {
+    console.error("Failed to load tournaments");
+    return;
+  }
+
+  const tournaments = await res.json();
+  renderMyTournaments(tournaments);
+}
+
+function renderMyTournaments(tournaments) {
+  const container = document.getElementById("my-tournaments-list");
+  container.innerHTML = "";
+
+  if (tournaments.length === 0) {
+    container.innerHTML = "<p>No tournaments created yet.</p>";
+    return;
+  }
+
+  tournaments.forEach(t => {
+    const card = document.createElement("div");
+    card.className = "tournament-card";
+
+    card.innerHTML = `
+      <h3>${t.tournamentName}</h3>
+      <p>${t.sportName}</p>
+      <p>${t.venue}</p>
+      <p>Status: ${t.registrationsOpen ? "Open" : "Closed"}</p>
+    `;
+
+    card.addEventListener("click", () => {
+      window.location.href = `players.html?tournamentId=${t.tournamentId}`;
+    });
+
+    container.appendChild(card);
+  });
+}
 
 
   if (myView && newView) {
