@@ -83,6 +83,15 @@
         class="host-view host-view--active"
         aria-label="My tournaments"
         >
+
+        <!-- Sport filter -->
+        <div class="field-group" style="max-width: 260px; margin-bottom: 12px;">
+            <label for="filter-sport">Filter by sport</label>
+            <select id="filter-sport">
+                <option value="">All sports</option>
+            </select>
+        </div>
+
         <div id="my-tournaments-list" class="tournaments-list">
             <!-- initial placeholder; JS will replace when needed -->
             <div class="empty-state">
