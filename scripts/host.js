@@ -2,6 +2,8 @@
 import { requireAuth, logout } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const generateCodeBtn = document.getElementById("generate-code-btn");
+  const accessCodeInput = document.getElementById("access-code");
   const viewPlayersBtn = document.getElementById("modalViewPlayers");
   let selectedTournamentId = null;
   const categoriesContainer = document.getElementById("categories-container");
@@ -35,6 +37,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+
   addCategoryBtn.addEventListener("click", () => {
   categories.push({
     ageGroup: "",
@@ -50,16 +53,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       categories[index][field] = e.target.value;
     }
   });
-  const locationBtn = document.getElementById("get-location-btn");
   const venueInput = document.getElementById("tournament-venue");
 
-  let venueLocation = null;
 
-  locationBtn.addEventListener("click", () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported");
-      return;
-    }
+
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -90,6 +87,22 @@ categoriesContainer.addEventListener("click", (e) => {
 
   window.location.href = `players.html?tournamentId=${selectedTournamentId}`;
   });
+
+function generateAccessCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+
+  for (let i = 0; i < 8; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  return code.slice(0, 4) + "-" + code.slice(4);
+}
+
+generateCodeBtn.addEventListener("click", () => {
+  const code = generateAccessCode();
+  accessCodeInput.value = code;
+});
 
 
   const user = await requireAuth();
@@ -149,6 +162,8 @@ const modeCards = document.querySelectorAll(".host-mode-card");
 const myView = document.getElementById("my-tournaments-view");
 const newView = document.getElementById("new-tournament-view");
 
+
+
 modeCards.forEach(card => {
   card.addEventListener("click", () => {
     // Remove active from all cards
@@ -182,7 +197,7 @@ hostForm.addEventListener("submit", async (e) => {
     accessCode: document.getElementById("access-code").value,
     playerDetails: document.getElementById("player-details").value,
     categories: [], // add later if needed
-    venue: venueLocation,     // from "Use my location"
+    venue: document.getElementById("tournament-venue").value,     // from "Use my location"
     categories: categories    // from "Add category"
   };
 
@@ -202,8 +217,4 @@ hostForm.addEventListener("submit", async (e) => {
 
   alert("Tournament created successfully");
   hostForm.reset();
-});
-
-
-
 });
