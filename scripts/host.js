@@ -220,8 +220,20 @@ function renderMyTournaments(tournaments) {
 
   tournaments.forEach(t => {
     const categories = (t.categories || [])
-      .map(c => `${c.ageGroup} ${c.gender}`)
-      .join(", ");
+    .map(c => {
+      let type = "";
+      if (c.teamSize === 1) type = "Singles";
+      else if (c.teamSize === 2) type = "Doubles";
+
+      const genderLabel =
+        c.gender === "Male" ? "Men's" :
+        c.gender === "Female" ? "Women's" :
+        c.gender;
+
+      return `${c.ageGroup} ${genderLabel}${type ? " " + type : ""}`;
+    })
+    .join(", ");
+
 
     const card = document.createElement("div");
     card.className = "tournament-card";
@@ -232,7 +244,7 @@ function renderMyTournaments(tournaments) {
         <span class="code-chip">${t.accessCode}</span>
       </div>
 
-      <p class="muted">${t.sportName} • ${t.tournamentDates}</p>
+      <p class="muted sport-date">${t.sportName} • ${t.tournamentDates}</p>
 
       <p class="muted">📍 ${t.venue}</p>
 
