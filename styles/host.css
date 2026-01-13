@@ -609,6 +609,21 @@ body {
   margin-right: 4px;
 }
 
+.details-heading {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.details-text {
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+
 /* Slightly "danger" looking Stop button, reusing btn-secondary */
 .danger-btn {
   align-self: flex-start;
