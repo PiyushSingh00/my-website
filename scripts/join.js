@@ -1,123 +1,96 @@
 // scripts/join.js
 import { requireAuth, logout } from "./auth.js";
 
-async function validateAccessCode(code) {
-  const res = await fetch("/api/tournaments/validate-code", {
+let allTournaments = [];
+let selectedTournament = null;
+
+async function apiGet(path) {
+  const res = await fetch(path, {
+    headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+  });
+  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(path, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + localStorage.getItem("token")
     },
-    body: JSON.stringify({ code })
+    body: JSON.stringify(body || {})
   });
-
-  return res.ok ? await res.json() : null;
+  if (!res.ok) return null;
+  return res.json();
 }
 
-async function loadMyTournaments() {
-  const res = await fetch("/api/player/tournaments", {
-    headers: {
-      Authorization: "Bearer " + localStorage.getItem("token")
-    }
-  });
-
-  const tournaments = await res.json();
-  renderMyTournaments(tournaments);
+/* -------------------------
+   MODALS (Code + Player)
+------------------------- */
+function openModal(id) {
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
 }
 
-
-async function submitPlayerRegistration(payload) {
-  const res = await fetch(`/api/tournaments/${payload.tournamentId}/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + localStorage.getItem("token")
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    alert("Registration failed");
-    return false;
-  }
-
-  return true;
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
 }
 
-  async function loadAllTournaments() {
-    const res = await fetch("/api/tournaments", {
-      headers: {
-        Authorization: "Bearer " + localStorage.getItem("token")
-      }
+function wireModalCloseButtons() {
+  document.querySelectorAll("[data-close-modal]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      closeModal("code-modal");
+      closeModal("player-modal");
     });
-
-    if (!res.ok) {
-      console.error("Failed to load tournaments");
-      return;
-    }
-
-    const tournaments = await res.json();
-    renderTournamentList(tournaments);
-  }
-
-document.addEventListener("DOMContentLoaded", async () => {
-  const user = await requireAuth();
-  if (!user) return;
-  loadAllTournaments();
-  document.getElementById("sport-filter").addEventListener("change", e => {
-  const selected = e.target.value;
-  const filtered = selected === "all"
-    ? allTournaments
-    : allTournaments.filter(t => t.sportName === selected);
-
-  renderTournamentList(filtered);
-});
-
-  const usernameLabel = document.getElementById("username-label");
-  if (usernameLabel) {
-    usernameLabel.textContent = user.username;
-  }
-
-  const signoutBtn = document.getElementById("signout-btn");
-  if (signoutBtn) {
-    signoutBtn.addEventListener("click", logout);
-  }
-
-  console.log("Join page loaded for", user.username);
-  const addCategoryBtn = document.getElementById("add-category-btn");
-  const categoriesContainer = document.getElementById("categories-container");
-
-  addCategoryBtn.addEventListener("click", () => {
-    const div = document.createElement("div");
-    div.className = "category-card";
-
-    div.innerHTML = `
-      <input type="text" placeholder="Category name (e.g. U18 Boys)" />
-      <input type="number" placeholder="Max players" />
-    `;
-
-    categoriesContainer.appendChild(div);
   });
-  function readCategories() {
-  const cards = document.querySelectorAll(".category-card");
-  return Array.from(cards).map(card => {
-    const inputs = card.querySelectorAll("input");
-    return {
-      name: inputs[0].value,
-      maxPlayers: Number(inputs[1].value)
-    };
-  }).filter(c => c.name);
+
+  // Close on overlay click
+  ["code-modal", "player-modal"].forEach(id => {
+    const overlay = document.getElementById(id);
+    overlay?.addEventListener("click", (e) => {
+      if (e.target === overlay) closeModal(id);
+    });
+  });
 }
 
+/* -------------------------
+   TABS (All / Mine)
+------------------------- */
+function wireTabs() {
+  const tabBtns = document.querySelectorAll(".join-tab");
+  const panels = document.querySelectorAll(".tab-panel");
 
+  function setActive(tabName) {
+    tabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.tab === tabName));
+    panels.forEach(p => p.classList.toggle("is-active", p.dataset.panel === tabName));
 
-  function renderTournamentList(tournaments) {
+    if (tabName === "mine") {
+      loadMyTournaments().catch(err => console.error(err));
+    }
+  }
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener("click", () => setActive(btn.dataset.tab));
+  });
+}
+
+/* -------------------------
+   RENDER: ALL TOURNAMENTS
+------------------------- */
+function renderTournamentList(tournaments) {
   const list = document.getElementById("tournament-list");
   const empty = document.getElementById("empty-state");
+  if (!list || !empty) return;
 
   list.innerHTML = "";
 
-  if (tournaments.length === 0) {
+  if (!tournaments || tournaments.length === 0) {
     empty.style.display = "block";
     return;
   }
@@ -125,66 +98,247 @@ document.addEventListener("DOMContentLoaded", async () => {
   empty.style.display = "none";
 
   tournaments.forEach(t => {
+    const tournamentId = t.tournamentId ?? t.id; // support either field
+    const registrationsOpen = (t.registrationsOpen !== false); // default true
+
     const card = document.createElement("div");
     card.className = "tournament-card";
 
     card.innerHTML = `
       <div class="tournament-primary-line">
-        <span class="tournament-name">${t.tournamentName}</span>
-        <span class="status-pill ${t.registrationsOpen ? "status-pill--open" : "status-pill--closed"}">
-          ${t.registrationsOpen ? "Open" : "Closed"}
+        <span class="tournament-name">${t.tournamentName ?? "Unnamed tournament"}</span>
+        <span class="status-pill ${registrationsOpen ? "status-pill--open" : "status-pill--closed"}">
+          ${registrationsOpen ? "Open" : "Closed"}
         </span>
       </div>
 
       <div class="tournament-meta">
-        <span>${t.sportName}</span>
-        <span>${t.tournamentDates}</span>
-        <span>${t.venue}</span>
+        <span>${t.sportName ?? ""}</span>
+        <span>${t.tournamentDates ?? ""}</span>
+        <span>${t.venue ?? ""}</span>
       </div>
     `;
 
-    card.onclick = () => openCodeModal(t);
+    card.addEventListener("click", () => {
+      if (!registrationsOpen) {
+        alert("Registrations are closed for this tournament.");
+        return;
+      }
+      selectedTournament = { ...t, tournamentId };
+      openCodeModal(selectedTournament);
+    });
+
     list.appendChild(card);
   });
 }
 
+function populateSportFilterFromAll(all) {
+  const select = document.getElementById("sport-filter");
+  if (!select) return;
 
-  const generateCodeBtn = document.getElementById("generate-code-btn");
-  const accessCodeInput = document.getElementById("access-code");
+  const sports = [...new Set((all || []).map(t => t.sportName).filter(Boolean))];
 
-  function generateAccessCode() {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let code = "";
-    for (let i = 0; i < 8; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
+  // Keep first option "All sports"
+  select.innerHTML = `<option value="all">All sports</option>`;
+  sports.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s;
+    opt.textContent = s;
+    select.appendChild(opt);
+  });
+}
+
+function wireSportFilter() {
+  const select = document.getElementById("sport-filter");
+  if (!select) return;
+
+  select.addEventListener("change", (e) => {
+    const selected = e.target.value;
+    const filtered = selected === "all"
+      ? allTournaments
+      : allTournaments.filter(t => t.sportName === selected);
+
+    renderTournamentList(filtered);
+  });
+}
+
+async function loadAllTournaments() {
+  allTournaments = await apiGet("/api/tournaments");
+  populateSportFilterFromAll(allTournaments);
+  renderTournamentList(allTournaments);
+}
+
+/* -------------------------
+   JOIN FLOW: Code Modal -> Player Modal -> Register
+------------------------- */
+function openCodeModal(t) {
+  // Reset code UI
+  const codeInput = document.getElementById("code-input");
+  const codeError = document.getElementById("code-error");
+  if (codeInput) codeInput.value = "";
+  if (codeError) codeError.style.display = "none";
+
+  // Update modal title if you want
+  const title = document.getElementById("code-modal-title");
+  if (title) title.textContent = `Enter code for ${t.tournamentName ?? "tournament"}`;
+
+  openModal("code-modal");
+}
+
+function openPlayerModal(t) {
+  // Reset player form
+  const form = document.getElementById("player-form");
+  form?.reset();
+
+  const title = document.getElementById("player-modal-title");
+  if (title) title.textContent = `Register for ${t.tournamentName ?? "tournament"}`;
+
+  openModal("player-modal");
+}
+
+function wireCodeForm() {
+  const form = document.getElementById("code-form");
+  const codeInput = document.getElementById("code-input");
+  const codeError = document.getElementById("code-error");
+
+  if (!form) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!selectedTournament) return;
+
+    const code = (codeInput?.value || "").trim();
+    if (!code) return;
+
+    const result = await apiPost("/api/tournaments/validate-code", { code });
+    if (!result) {
+      if (codeError) codeError.style.display = "block";
+      return;
     }
-    return code.slice(0,4) + "-" + code.slice(4);
+
+    // Optional: ensure returned tournament matches selectedTournament
+    closeModal("code-modal");
+    openPlayerModal(selectedTournament);
+  });
+}
+
+function wirePlayerForm(user) {
+  const form = document.getElementById("player-form");
+  if (!form) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!selectedTournament) return;
+
+    const payload = {
+      tournamentId: selectedTournament.tournamentId,
+      playerName: document.getElementById("player-name")?.value?.trim(),
+      age: Number(document.getElementById("player-age")?.value),
+      gender: document.getElementById("player-gender")?.value,
+      phone: document.getElementById("player-phone")?.value?.trim(),
+      // optional helpful fields (backend can ignore if not needed)
+      username: user.username
+    };
+
+    const result = await apiPost(`/api/tournaments/${payload.tournamentId}/register`, payload);
+
+    if (!result) {
+      alert("Registration failed. Please try again.");
+      return;
+    }
+
+    alert("Registered successfully!");
+    closeModal("player-modal");
+
+    // Refresh "My tournaments"
+    await loadMyTournaments();
+  });
+}
+
+/* -------------------------
+   RENDER: MY TOURNAMENTS
+------------------------- */
+function renderMyTournaments(tournaments) {
+  const list = document.getElementById("my-tournament-list");
+  const empty = document.getElementById("my-empty-state");
+  if (!list || !empty) return;
+
+  list.innerHTML = "";
+
+  if (!tournaments || tournaments.length === 0) {
+    empty.style.display = "block";
+    return;
   }
 
-  generateCodeBtn.addEventListener("click", () => {
-    accessCodeInput.value = generateAccessCode();
+  empty.style.display = "none";
+
+  tournaments.forEach(t => {
+    const tournamentId = t.tournamentId ?? t.id;
+
+    const card = document.createElement("div");
+    card.className = "tournament-card";
+
+    card.innerHTML = `
+      <div class="tournament-primary-line">
+        <span class="tournament-name">${t.tournamentName ?? "Tournament"}</span>
+        <span class="status-pill status-pill--open">Joined</span>
+      </div>
+      <div class="tournament-meta">
+        <span>${t.sportName ?? ""}</span>
+        <span>${t.tournamentDates ?? ""}</span>
+        <span>${t.venue ?? ""}</span>
+      </div>
+    `;
+
+    // ✅ Click = go to schedule page (or wherever you want)
+    card.addEventListener("click", () => {
+      window.location.href = `schedule.html?tournamentId=${tournamentId}`;
+    });
+
+    list.appendChild(card);
   });
+}
 
-const hostForm = document.getElementById("host-form");
+async function loadMyTournaments() {
+  const tournaments = await apiGet("/api/player/tournaments");
+  renderMyTournaments(tournaments);
+}
 
-hostForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
+/* -------------------------
+   TOPBAR actions
+------------------------- */
+function wireTopbar(user) {
+  const usernameLabel = document.getElementById("username-label");
+  if (usernameLabel) usernameLabel.textContent = user.username;
 
-  const data = {
-    tournamentName: document.getElementById("tournament-name").value,
-    sportName: document.getElementById("sport-name").value,
-    tournamentDates: document.getElementById("tournament-dates").value,
-    venue: document.getElementById("tournament-venue").value,
-    accessCode: document.getElementById("access-code").value,
-    playerDetails: document.getElementById("player-details").value,
-    categories: readCategories()
-  };
+  const signoutBtn = document.getElementById("signout-btn");
+  signoutBtn?.addEventListener("click", logout);
 
-  console.log("📦 Tournament payload:", data);
-});
+  // user dropdown toggle (optional)
+  const trigger = document.getElementById("user-menu-trigger");
+  const dropdown = document.getElementById("user-menu-dropdown");
+  trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
 
-const res = await fetch("/api/tournaments");
-const tournaments = await res.json();
+  // switch to host
+  const switchHostModeBtn = document.getElementById("switch-host-mode");
+  switchHostModeBtn?.addEventListener("click", () => {
+    window.location.href = "host.html";
+  });
+}
 
-  // 🔜 Next: list tournaments from backend
+/* -------------------------
+   BOOT
+------------------------- */
+document.addEventListener("DOMContentLoaded", async () => {
+  const user = await requireAuth();
+  if (!user) return;
+
+  wireTopbar(user);
+  wireTabs();
+  wireSportFilter();
+  wireModalCloseButtons();
+  wireCodeForm();
+  wirePlayerForm(user);
+
+  await loadAllTournaments(); // ✅ All tournaments tab
 });
