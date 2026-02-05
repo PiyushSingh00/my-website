@@ -18,11 +18,19 @@
   box-sizing: border-box;
 }
 
-html,
+html {
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.22), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(242, 95, 76, 0.18), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;   /* keeps gradient continuous while scrolling */
+}
+
 body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
+  font-family: "Inter", system-ui;
+  color: var(--text);
+  background: transparent;
+  min-height: 100%;
 }
 
 body {
