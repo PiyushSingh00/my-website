@@ -22,21 +22,17 @@ async function apiPost(path, body) {
     body: JSON.stringify(body || {})
   });
 
-  // 👇 show backend error instead of silently returning null
+  // Read body ONCE (prevents "body stream already read")
+  const raw = await res.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
+
   if (!res.ok) {
-    let msg = "";
-    try {
-      const data = await res.json();
-      msg = data?.message || JSON.stringify(data);
-    } catch {
-      msg = await res.text();
-    }
-    console.error("❌ API POST failed:", path, res.status, msg);
-    alert(`Validate failed (${res.status}): ${msg}`);
+    console.error("❌ POST failed", path, res.status, data);
     return null;
   }
 
-  return res.json();
+  return data;
 }
 
 
@@ -200,16 +196,23 @@ function openCodeModal(t) {
   openModal("code-modal");
 }
 
-function openPlayerModal(t) {
-  // Reset player form
+function openPlayerModal(t, user) {
   const form = document.getElementById("player-form");
   form?.reset();
+
+  // ✅ Autofill from /api/me (if available)
+  const nameEl = document.getElementById("player-name");
+  const phoneEl = document.getElementById("player-phone");
+
+  if (nameEl && user?.name) nameEl.value = user.name;
+  if (phoneEl && (user?.phone || user?.phoneNumber)) phoneEl.value = user.phone || user.phoneNumber;
 
   const title = document.getElementById("player-modal-title");
   if (title) title.textContent = `Register for ${t.tournamentName ?? "tournament"}`;
 
   openModal("player-modal");
 }
+
 
 function wireCodeForm() {
   const form = document.getElementById("code-form");
@@ -249,7 +252,7 @@ if (result.tournamentId && selectedTournament?.tournamentId && String(result.tou
 
     // Optional: ensure returned tournament matches selectedTournament
     closeModal("code-modal");
-    openPlayerModal(selectedTournament);
+    openPlayerModal(selectedTournament, window.__me);
   });
 }
 
@@ -271,7 +274,10 @@ function wirePlayerForm(user) {
       username: user.username
     };
 
-    const result = await apiPost(`/api/tournaments/${payload.tournamentId}/register`, payload);
+const result =
+  (await apiPost(`/api/tournaments/${payload.tournamentId}/players`, payload)) ||
+  (await apiPost(`/api/tournaments/${payload.tournamentId}/register`, payload)) ||
+  (await apiPost(`/api/tournaments/${payload.tournamentId}/register-player`, payload));
 
     if (!result) {
       alert("Registration failed. Please try again.");
@@ -362,6 +368,7 @@ function wireTopbar(user) {
 ------------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
+  window.__me = user;
   if (!user) return;
 
   wireTopbar(user);
