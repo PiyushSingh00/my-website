@@ -114,6 +114,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Logout
   const signoutBtn = document.getElementById("signout-btn");
+  // ✅ Host topbar dropdown + switch to player
+const trigger = document.getElementById("host-user-menu-trigger") || document.getElementById("user-menu-trigger");
+const dropdown = document.getElementById("host-user-menu-dropdown") || document.getElementById("user-menu-dropdown");
+
+trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
+
+const switchPlayerBtn = document.getElementById("switch-player-mode");
+switchPlayerBtn?.addEventListener("click", () => {
+  window.location.href = "join.html";
+});
+
   if (signoutBtn) {
     signoutBtn.addEventListener("click", logout);
   }
