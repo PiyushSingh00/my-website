@@ -211,6 +211,14 @@ function openPlayerModal(t, user) {
   // ✅ Autofill from /api/me (if available)
   const nameEl = document.getElementById("player-name");
   const phoneEl = document.getElementById("player-phone");
+  const ageEl = document.getElementById("player-age");
+  const genderEl = document.getElementById("player-gender");
+
+  if (ageEl && user?.age != null) ageEl.value = user.age;
+
+  // gender could be "Male"/"Female"/"Mixed" depending on your dropdown options
+  if (genderEl && user?.gender) genderEl.value = user.gender;
+
 
   if (nameEl && user?.name) nameEl.value = user.name;
   if (phoneEl && (user?.phone || user?.phoneNumber)) phoneEl.value = user.phone || user.phoneNumber;
