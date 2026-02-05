@@ -210,11 +210,23 @@ function wireCodeForm() {
     const code = (codeInput?.value || "").trim();
     if (!code) return;
 
-    const result = await apiPost("/api/tournaments/validate-code", { code });
-    if (!result) {
-      if (codeError) codeError.style.display = "block";
-      return;
-    }
+const result = await apiPost("/api/tournaments/validate-code", { accessCode: code });
+
+if (!result) {
+  if (codeError) codeError.style.display = "block";
+  return;
+}
+
+// If backend returns tournamentId, keep it synced (safe)
+if (result.tournamentId && selectedTournament) {
+  selectedTournament.tournamentId = result.tournamentId;
+}
+
+if (result.tournamentId && selectedTournament?.tournamentId && String(result.tournamentId) !== String(selectedTournament.tournamentId)) {
+  alert("This code belongs to a different tournament card. Please select the correct tournament from the list.");
+  return;
+}
+
 
     // Optional: ensure returned tournament matches selectedTournament
     closeModal("code-modal");
