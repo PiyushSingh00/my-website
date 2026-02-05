@@ -304,13 +304,7 @@ const tid = payload.tournamentId;
 
 const result =
   // ✅ most likely: player-scoped join routes
-  (await apiPost(`/api/player/tournaments/${tid}/register`, payload)) ||
-  (await apiPost(`/api/player/tournaments/${tid}/join`, payload)) ||
-  (await apiPost(`/api/player/tournaments/join`, payload)) ||
-  (await apiPost(`/api/player/register`, payload)) ||
-
-  // fallback (in case backend later adds these)
-  (await apiPost(`/api/tournaments/${tid}/players`, payload));
+  (await apiPost(`/api/player/tournaments/${tid}/register`, payload));
 
 
     if (!result) {
