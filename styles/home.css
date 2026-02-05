@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg: #050b18;
   --panel: rgba(11, 17, 31, 0.8);
   --card: rgba(12, 20, 36, 0.9);
@@ -500,3 +500,24 @@ h1 {
 .form-footnote a:hover {
   text-decoration: underline;
 }
+
+/* --- Signup modal: shorter + scrollable form --- */
+#signup-modal .modal {
+  max-height: 80vh;          /* keeps modal short */
+  overflow: hidden;          /* prevents modal itself from overflowing */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make only the form scroll (title stays fixed) */
+#signup-modal #signup-form {
+  overflow-y: auto;
+  max-height: calc(80vh - 90px); /* adjust if needed */
+  padding-right: 6px;            /* space for scrollbar */
+}
+
+/* Optional: tighter spacing so form feels shorter */
+#signup-modal #signup-form .field-group {
+  margin-bottom: 10px;
+}
+
