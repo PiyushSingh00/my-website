@@ -41,8 +41,7 @@ a {
       rgba(5, 11, 24, 0.7) 0%,
       rgba(7, 12, 30, 0.7) 45%,
       rgba(9, 20, 40, 0.7) 100%
-    ),
-    url('stadium-dark.jpg') center/cover no-repeat;
+    );
 }
 
 .hero::before {
@@ -66,11 +65,13 @@ a {
 }
 
 .brand {
-  font-family: 'Space Grotesk', 'Barlow', system-ui, sans-serif;
+  font-family: "Space Grotesk", "Inter", system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   color: #fff;
+  text-transform: uppercase;
 }
 
 .actions {
@@ -166,6 +167,7 @@ h1 {
   letter-spacing: 0.01em;
   border: 1px solid transparent;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
 }
 
 .btn.primary {
@@ -179,6 +181,27 @@ h1 {
   box-shadow: 0 16px 40px rgba(242, 95, 76, 0.42);
 }
 
+/* Make secondary buttons look like the "Sign in" ghost button */
+.btn.secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: #fff;
+  width: auto;              /* keep compact like Sign in */
+  align-self: flex-start;   /* aligns nicely in cards */
+  box-shadow: none;
+}
+
+.btn.secondary:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
+}
+
+.btn.secondary:active {
+  transform: translateY(0px);
+}
+
+
 .btn.ghost {
   background: transparent;
   border-color: var(--border);
@@ -189,6 +212,8 @@ h1 {
   border-color: rgba(255, 255, 255, 0.35);
   background: rgba(255, 255, 255, 0.06);
 }
+
+
 
 .badges {
   display: flex;
