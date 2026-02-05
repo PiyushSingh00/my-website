@@ -35,7 +35,7 @@ async function apiPost(path, body) {
     (typeof data === "string" && data.trim()) ? data :
     `Request failed (${res.status})`;
 
-  alert(msg); // 👈 this will show the backend reason
+  alert(m`❌ ${path}\n${msg}`); // 👈 this will show the backend reason
   return null;
 }
 
@@ -292,10 +292,18 @@ function wirePlayerForm(user) {
 };
 
 
+const tid = payload.tournamentId;
+
 const result =
-  (await apiPost(`/api/tournaments/${payload.tournamentId}/players`, payload)) ||
-  (await apiPost(`/api/tournaments/${payload.tournamentId}/register`, payload)) ||
-  (await apiPost(`/api/tournaments/${payload.tournamentId}/register-player`, payload));
+  // ✅ most likely: player-scoped join routes
+  (await apiPost(`/api/player/tournaments/${tid}/register`, payload)) ||
+  (await apiPost(`/api/player/tournaments/${tid}/join`, payload)) ||
+  (await apiPost(`/api/player/tournaments/join`, payload)) ||
+  (await apiPost(`/api/player/register`, payload)) ||
+
+  // fallback (in case backend later adds these)
+  (await apiPost(`/api/tournaments/${tid}/players`, payload));
+
 
     if (!result) {
       alert("Registration failed. Please try again.");
