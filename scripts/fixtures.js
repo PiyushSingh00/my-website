@@ -116,32 +116,76 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---------- READ TOURNAMENT ----------
-  const params = new URLSearchParams(window.location.search);
-  const tournamentId = params.get("tournamentId");
 
-  const all = loadAllTournaments();
-  const tournament = all.find(t => String(t.id) === String(tournamentId));
+const params = new URLSearchParams(window.location.search);
+const tournamentId = params.get("tournamentId");
 
-  if (!tournament) {
-    if (titleEl) titleEl.textContent = "No tournament selected";
-    if (generateBtn) generateBtn.disabled = true;
-    return;
-  }
+if (!tournamentId) {
+  if (titleEl) titleEl.textContent = "Missing tournamentId";
+  if (generateBtn) generateBtn.disabled = true;
+  return;
+}
 
-  if (titleEl) titleEl.textContent = tournament.tournamentName;
-  if (sportEl) sportEl.textContent = tournament.sportName || "";
-  if (datesEl) datesEl.textContent = tournament.tournamentDates || "";
-  if (codeEl) codeEl.textContent = tournament.accessCode || "";
+async function apiGet(url) {
+  const res = await fetch(url, {
+    headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+  });
+  const raw = await res.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
+  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+  return data;
+}
 
-  const players = tournament.players || [];
+// 1) tournament meta (try host list first, fallback public)
+let tournament = null;
+try {
+  const hostList = await apiGet("/api/host/tournaments");
+  tournament = (hostList || []).find(t => String(t.tournamentId ?? t.id) === String(tournamentId)) || null;
+} catch {}
 
-  const maleNames = players
-    .filter(p => (p.gender || "").toLowerCase() === "male")
-    .map(p => p.name);
+if (!tournament) {
+  try {
+    const pubList = await apiGet("/api/tournaments");
+    tournament = (pubList || []).find(t => String(t.tournamentId ?? t.id) === String(tournamentId)) || null;
+  } catch {}
+}
 
-  const femaleNames = players
-    .filter(p => (p.gender || "").toLowerCase() === "female")
-    .map(p => p.name);
+if (!tournament) {
+  if (titleEl) titleEl.textContent = "Tournament not found";
+  if (generateBtn) generateBtn.disabled = true;
+  return;
+}
+
+if (titleEl) titleEl.textContent = tournament.tournamentName ?? "Tournament";
+if (sportEl) sportEl.textContent = tournament.sportName ?? "";
+if (datesEl) datesEl.textContent = tournament.tournamentDates ?? "";
+if (codeEl) codeEl.textContent = tournament.accessCode ?? "";
+
+// 2) players from API
+const playersRaw = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/players`);
+const players = Array.isArray(playersRaw)
+  ? playersRaw
+  : (playersRaw?.players || playersRaw?.items || []);
+
+// ✅ only accepted
+function normalizeStatus(p) {
+  const raw = p.status ?? p.registrationStatus ?? p.state ?? "accepted";
+  const s = String(raw).toLowerCase();
+  if (["rejected","reject","declined","denied"].includes(s)) return "rejected";
+  return "accepted";
+}
+const acceptedPlayers = players.filter(p => normalizeStatus(p) === "accepted");
+
+
+const maleNames = acceptedPlayers
+  .filter(p => (String(p.gender || p.playerGender || "")).toLowerCase() === "male")
+  .map(p => p.name ?? p.playerName);
+
+const femaleNames = acceptedPlayers
+  .filter(p => (String(p.gender || p.playerGender || "")).toLowerCase() === "female")
+  .map(p => p.name ?? p.playerName);
+
 
   // ---------- BRACKET LOGIC ----------
   function createBracket(names, groupKey) {

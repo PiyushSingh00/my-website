@@ -208,6 +208,28 @@ function openPlayerModal(t, user) {
   const form = document.getElementById("player-form");
   form?.reset();
 
+    // --- Category dropdown ---
+  const catSelect = document.getElementById("player-category");
+  if (catSelect) {
+    catSelect.innerHTML = `<option value="">Select category</option>`;
+
+    const cats = (t.categories || []).filter(Boolean);
+    cats.forEach((c) => {
+      const id = c.categoryId || c.id || "";
+      const labelParts = [
+        c.ageGroup,
+        c.gender,
+        c.teamSize ? `Team size ${c.teamSize}` : null
+      ].filter(Boolean);
+
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = labelParts.join(" • ") + (id ? ` (ID: ${id})` : "");
+      catSelect.appendChild(opt);
+    });
+  }
+
+
   // ✅ Autofill from /api/me (if available)
   const nameEl = document.getElementById("player-name");
   const phoneEl = document.getElementById("player-phone");
@@ -293,6 +315,7 @@ function wirePlayerForm(user) {
 
   phone: document.getElementById("player-phone")?.value?.trim(),
   playerPhone: document.getElementById("player-phone")?.value?.trim(),
+  categoryId: document.getElementById("player-category")?.value,
 
   // helpful context if backend checks it
   username: user.username,
@@ -301,6 +324,32 @@ function wirePlayerForm(user) {
 
 
 const tid = payload.tournamentId;
+
+const chosenCategoryId = payload.categoryId;
+if (!chosenCategoryId) {
+  alert("Please select a category.");
+  return;
+}
+
+// Prevent same user from joining same category more than once
+try {
+  const existing = await apiGet(`/api/tournaments/${encodeURIComponent(tid)}/players`);
+  const players = Array.isArray(existing) ? existing : (existing?.players || existing?.items || []);
+
+  const already = players.some(p => {
+    const u = p.username ?? p.userName ?? p.user ?? "";
+    const c = p.categoryId ?? p.category ?? p.categoryID ?? "";
+    return String(u) === String(user.username) && String(c) === String(chosenCategoryId);
+  });
+
+  if (already) {
+    alert("You have already joined this category. You can join other categories in the same tournament.");
+    return;
+  }
+} catch (e) {
+  console.warn("Could not validate duplicate category join. Backend should enforce this too.", e);
+}
+
 
 const result =
   // ✅ most likely: player-scoped join routes
@@ -376,7 +425,7 @@ function wireTopbar(user) {
   const usernameLabel = document.getElementById("username-label");
   if (usernameLabel) usernameLabel.textContent = user.username;
 
-  
+
   const signoutBtn = document.getElementById("signout-btn");
   signoutBtn?.addEventListener("click", logout);
 

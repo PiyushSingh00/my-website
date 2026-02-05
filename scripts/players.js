@@ -77,10 +77,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     return p.playerId ?? p.registrationId ?? p.id ?? p._id ?? p.pk ?? null;
   }
 
-  function normalizeStatus(p) {
-    const raw =
-      p.status ?? p.registrationStatus ?? p.inviteStatus ?? p.state ?? "pending";
-    const s = String(raw).toLowerCase();
+function normalizeStatus(p) {
+  const raw =
+    p.status ?? p.registrationStatus ?? p.inviteStatus ?? p.state ?? "accepted";
+  const s = String(raw).toLowerCase();
     if (["accepted", "approve", "approved"].includes(s)) return "accepted";
     if (["rejected", "reject", "declined", "denied"].includes(s))
       return "rejected";
@@ -248,7 +248,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const age = p.age ?? p.playerAge ?? "-";
       const gender = p.gender ?? "-";
 
-      const isFinal = status !== "pending";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -259,15 +258,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         status
       )}</span></td>
         <td>
-          <div class="row-actions">
-            <button type="button" class="action-btn accept" ${
-              isFinal ? "disabled" : ""
-            } data-action="accept">Accept</button>
-            <button type="button" class="action-btn reject" ${
-              isFinal ? "disabled" : ""
-            } data-action="reject">Reject</button>
-          </div>
+        <div class="row-actions">
+        ${
+        status === "rejected"
+        ? `<button type="button" class="action-btn accept" data-action="accept">Accept</button>`
+        : `<button type="button" class="action-btn reject" data-action="reject">Reject</button>`
+        }
+        </div>
         </td>
+
       `;
 
       tr.querySelectorAll("button[data-action]").forEach((btn) => {

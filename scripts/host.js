@@ -56,11 +56,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (addCategoryBtn && categoriesContainer) {
     addCategoryBtn.addEventListener("click", () => {
-      categories.push({
-        ageGroup: "",
-        gender: "",
-        teamSize: 1
-      });
+      function generateCategoryId() {
+  return "CAT-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+categories.push({
+  categoryId: generateCategoryId(),
+  ageGroup: "",
+  gender: "",
+  teamSize: 1
+});
+
       renderCategories();
     });
   }
