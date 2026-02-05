@@ -28,9 +28,17 @@ async function apiPost(path, body) {
   try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
 
   if (!res.ok) {
-    console.error("❌ POST failed", path, res.status, data);
-    return null;
-  }
+  console.error("❌ POST failed", path, res.status, data);
+
+  const msg =
+    (typeof data === "object" && data && (data.message || data.error)) ? (data.message || data.error) :
+    (typeof data === "string" && data.trim()) ? data :
+    `Request failed (${res.status})`;
+
+  alert(msg); // 👈 this will show the backend reason
+  return null;
+}
+
 
   return data;
 }
@@ -265,14 +273,24 @@ function wirePlayerForm(user) {
     if (!selectedTournament) return;
 
     const payload = {
-      tournamentId: selectedTournament.tournamentId,
-      playerName: document.getElementById("player-name")?.value?.trim(),
-      age: Number(document.getElementById("player-age")?.value),
-      gender: document.getElementById("player-gender")?.value,
-      phone: document.getElementById("player-phone")?.value?.trim(),
-      // optional helpful fields (backend can ignore if not needed)
-      username: user.username
-    };
+  // route already has tournamentId, but keep for backends that require it
+  tournamentId: selectedTournament.tournamentId,
+
+  // send both naming conventions
+  playerName: document.getElementById("player-name")?.value?.trim(),
+  name: document.getElementById("player-name")?.value?.trim(),
+
+  age: Number(document.getElementById("player-age")?.value),
+  gender: document.getElementById("player-gender")?.value,
+
+  phone: document.getElementById("player-phone")?.value?.trim(),
+  playerPhone: document.getElementById("player-phone")?.value?.trim(),
+
+  // helpful context if backend checks it
+  username: user.username,
+  accessCode: selectedTournament.accessCode
+};
+
 
 const result =
   (await apiPost(`/api/tournaments/${payload.tournamentId}/players`, payload)) ||
