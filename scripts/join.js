@@ -21,9 +21,24 @@ async function apiPost(path, body) {
     },
     body: JSON.stringify(body || {})
   });
-  if (!res.ok) return null;
+
+  // 👇 show backend error instead of silently returning null
+  if (!res.ok) {
+    let msg = "";
+    try {
+      const data = await res.json();
+      msg = data?.message || JSON.stringify(data);
+    } catch {
+      msg = await res.text();
+    }
+    console.error("❌ API POST failed:", path, res.status, msg);
+    alert(`Validate failed (${res.status}): ${msg}`);
+    return null;
+  }
+
   return res.json();
 }
+
 
 /* -------------------------
    MODALS (Code + Player)
@@ -210,7 +225,11 @@ function wireCodeForm() {
     const code = (codeInput?.value || "").trim();
     if (!code) return;
 
-const result = await apiPost("/api/tournaments/validate-code", { accessCode: code });
+const result = await apiPost("/api/tournaments/validate-code", {
+  code: code,
+  accessCode: code,
+  tournamentId: selectedTournament.tournamentId
+});
 
 if (!result) {
   if (codeError) codeError.style.display = "block";
