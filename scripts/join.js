@@ -392,6 +392,34 @@ function wireTopbar(user) {
   });
 }
 
+async function switchToHost() {
+  await fetch("/api/user/mode", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify({ mode: "host" })
+  });
+
+  window.location.href = "host.html";
+}
+
+async function switchToPlayer() {
+  await fetch("/api/user/mode", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify({ mode: "player" })
+  });
+
+  window.location.href = "join.html";
+}
+
+
+
 /* -------------------------
    BOOT
 ------------------------- */
