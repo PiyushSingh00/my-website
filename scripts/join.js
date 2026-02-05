@@ -386,10 +386,8 @@ function wireTopbar(user) {
 
   // switch to host
   const switchHostModeBtn = document.getElementById("switch-host-mode");
-  switchHostModeBtn?.addEventListener("click", () => {
-    localStorage.removeItem("token");
-    window.location.href = "host.html";
-  });
+  switchHostModeBtn?.addEventListener("click", switchToHost);
+
 }
 
 async function switchToHost() {

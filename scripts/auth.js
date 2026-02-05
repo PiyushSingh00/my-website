@@ -26,7 +26,6 @@ export async function requireAuth() {
 
   } catch (err) {
     console.error("Auth error:", err);
-    localStorage.removeItem("token");
     redirectToLogin();
     return null;
   }

@@ -54,12 +54,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
-  // Only hosts allowed
-  if (user.role !== "host") {
-    window.location.href = "join.html";
-    return;
-  }
-
   if (addCategoryBtn && categoriesContainer) {
     addCategoryBtn.addEventListener("click", () => {
       categories.push({

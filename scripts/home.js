@@ -126,11 +126,9 @@ browseTournamentsBtn?.addEventListener("click", (e) => {
         const me = await meRes.json();
 
         // 🚦 Role-based redirect
-        if (me.role === "host") {
-          window.location.href = "host.html";
-        } else {
-          window.location.href = "join.html";
-        }
+        if (me.mode === "host") window.location.href = "host.html";
+        else window.location.href = "join.html";
+
 
         
 
