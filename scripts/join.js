@@ -35,7 +35,7 @@ async function apiPost(path, body) {
     (typeof data === "string" && data.trim()) ? data :
     `Request failed (${res.status})`;
 
-  alert(m`❌ ${path}\n${msg}`); // 👈 this will show the backend reason
+  alert(`❌ ${path}\n${msg}`); // 👈 this will show the backend reason
   return null;
 }
 
