@@ -24,9 +24,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const toastEl = document.getElementById("fixtures-toast");
 
   if (switchPlayerModeBtn) {
-    switchPlayerModeBtn.addEventListener("click", () => {
-      window.location.href = "join.html";
-    });
+    switchPlayerModeBtn.addEventListener("click", async () => {
+  await fetch("/api/user/mode", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify({ mode: "player" })
+  });
+  window.location.href = "join.html";
+});
+
   }
 
   // ---------- TOAST ----------

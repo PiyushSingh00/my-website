@@ -114,6 +114,27 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Logout
   const signoutBtn = document.getElementById("signout-btn");
+  // ✅ Host topbar dropdown + switch to player
+const trigger = document.getElementById("host-user-menu-trigger") || document.getElementById("user-menu-trigger");
+const dropdown = document.getElementById("host-user-menu-dropdown") || document.getElementById("user-menu-dropdown");
+
+trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
+
+const switchPlayerBtn = document.getElementById("switch-player-mode");
+switchPlayerBtn?.addEventListener("click", async () => {
+  await fetch("/api/user/mode", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify({ mode: "player" })
+  });
+
+  window.location.href = "join.html";
+});
+
+
   if (signoutBtn) {
     signoutBtn.addEventListener("click", logout);
   }
@@ -157,11 +178,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadMyTournaments() {
   const token = localStorage.getItem("token");
 
-  const res = await fetch("http://51.20.51.85:8080/api/host/tournaments", {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
+  const res = await fetch("/api/host/tournaments", {
+  headers: { Authorization: `Bearer ${token}` }
+});
+
 
   if (!res.ok) {
     console.error("Failed to load tournaments");

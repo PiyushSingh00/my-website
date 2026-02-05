@@ -376,6 +376,7 @@ function wireTopbar(user) {
   const usernameLabel = document.getElementById("username-label");
   if (usernameLabel) usernameLabel.textContent = user.username;
 
+  
   const signoutBtn = document.getElementById("signout-btn");
   signoutBtn?.addEventListener("click", logout);
 
