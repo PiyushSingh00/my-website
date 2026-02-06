@@ -17,6 +17,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     signoutBtn.addEventListener("click", logout);
   }
 
+  document.querySelectorAll(".brand").forEach((el) => {
+    el.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+  });
+
   // ---------- TOP BAR ----------
   const switchPlayerModeBtn = document.getElementById("switch-player-mode");
   const backBtn = document.getElementById("fixtures-back-btn");
@@ -67,6 +73,40 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const toggleMaleBtn = document.getElementById("fixtures-toggle-male");
   const toggleFemaleBtn = document.getElementById("fixtures-toggle-female");
+  const toggleWrap = document.querySelector(".fixtures-toggle");
+
+  let mixedGroupEl = null;
+  let mixedEmptyEl = null;
+  let mixedBracketEl = null;
+  let toggleMixedBtn = null;
+
+  if (toggleWrap) {
+    toggleMixedBtn = document.createElement("button");
+    toggleMixedBtn.className = "fixtures-toggle-btn";
+    toggleMixedBtn.id = "fixtures-toggle-mixed";
+    toggleMixedBtn.type = "button";
+    toggleMixedBtn.textContent = "Mixed fixtures";
+    toggleWrap.appendChild(toggleMixedBtn);
+  }
+
+  if (maleGroupEl?.parentElement) {
+    mixedGroupEl = document.createElement("div");
+    mixedGroupEl.className = "fixtures-group";
+    mixedGroupEl.id = "fixtures-group-mixed";
+    mixedGroupEl.style.display = "none";
+    mixedGroupEl.innerHTML = `
+      <h2 class="fixtures-group-title">Mixed fixtures</h2>
+      <div id="fixtures-empty-state-mixed" class="empty-state">
+        <div class="feature-icon">🏳️‍🌈</div>
+        <h3>No mixed players available</h3>
+        <p>Add at least two mixed players to generate a knockout bracket.</p>
+      </div>
+      <div id="fixtures-bracket-mixed" class="fixtures-bracket"></div>
+    `;
+    maleGroupEl.parentElement.appendChild(mixedGroupEl);
+    mixedEmptyEl = mixedGroupEl.querySelector("#fixtures-empty-state-mixed");
+    mixedBracketEl = mixedGroupEl.querySelector("#fixtures-bracket-mixed");
+  }
 
   // ---------- STORAGE ----------
   const TOURNAMENT_KEY = "scheduleitTournaments";
@@ -137,10 +177,25 @@ async function apiGet(url) {
   return data;
 }
 
+async function apiPost(url, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify(body || {})
+  });
+  const raw = await res.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
+  if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
+  return data;
+}
 // 1) tournament meta (try host list first, fallback public)
 let tournament = null;
 try {
-  const hostList = await apiGet("/api/host/tournaments");
+    const hostList = await apiGet("/api/host/tournaments");
   tournament = (hostList || []).find(t => String(t.tournamentId ?? t.id) === String(tournamentId)) || null;
 } catch {}
 
@@ -178,12 +233,25 @@ function normalizeStatus(p) {
 const acceptedPlayers = players.filter(p => normalizeStatus(p) === "accepted");
 
 
+function getGroupKey(p) {
+  const categoryGender = p.categoryGender ?? p.category?.gender ?? p.categoryType;
+  const raw = categoryGender || p.gender || p.playerGender || "";
+  const s = String(raw).toLowerCase();
+  if (s === "mixed") return "mixed";
+  if (s === "female") return "female";
+  return "male";
+}
+
 const maleNames = acceptedPlayers
-  .filter(p => (String(p.gender || p.playerGender || "")).toLowerCase() === "male")
+  .filter(p => getGroupKey(p) === "male")
   .map(p => p.name ?? p.playerName);
 
 const femaleNames = acceptedPlayers
-  .filter(p => (String(p.gender || p.playerGender || "")).toLowerCase() === "female")
+  .filter(p => getGroupKey(p) === "female")
+  .map(p => p.name ?? p.playerName);
+
+const mixedNames = acceptedPlayers
+  .filter(p => getGroupKey(p) === "mixed")
   .map(p => p.name ?? p.playerName);
 
 
@@ -217,16 +285,40 @@ const femaleNames = acceptedPlayers
     return { groupKey, rounds, totalRounds };
   }
 
-  let brackets = loadFixtures(tournament.id) || {
-    male: createBracket(maleNames, "male"),
-    female: createBracket(femaleNames, "female")
-  };
+  let brackets = null;
+  try {
+    brackets = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+  } catch {}
+
+  if (!brackets) {
+    brackets = loadFixtures(tournamentId) || null;
+  }
+
+  if (!brackets) {
+    brackets = {
+      male: createBracket(maleNames, "male"),
+      female: createBracket(femaleNames, "female"),
+      mixed: createBracket(mixedNames, "mixed")
+    };
+  } else {
+    brackets.__locked = true;
+    if (generateBtn) generateBtn.disabled = true;
+  }
 
   function render(groupKey) {
     const bracket = brackets[groupKey];
-    const groupEl = groupKey === "male" ? maleGroupEl : femaleGroupEl;
-    const emptyEl = groupKey === "male" ? maleEmptyEl : femaleEmptyEl;
-    const bracketEl = groupKey === "male" ? maleBracketEl : femaleBracketEl;
+    const groupEl =
+      groupKey === "male" ? maleGroupEl :
+      groupKey === "female" ? femaleGroupEl :
+      mixedGroupEl;
+    const emptyEl =
+      groupKey === "male" ? maleEmptyEl :
+      groupKey === "female" ? femaleEmptyEl :
+      mixedEmptyEl;
+    const bracketEl =
+      groupKey === "male" ? maleBracketEl :
+      groupKey === "female" ? femaleBracketEl :
+      mixedBracketEl;
 
     if (!bracket) {
       groupEl.style.display = "block";
@@ -254,26 +346,40 @@ const femaleNames = acceptedPlayers
     noneSelectedEl.style.display = "none";
     maleGroupEl.style.display = group === "male" ? "block" : "none";
     femaleGroupEl.style.display = group === "female" ? "block" : "none";
+    if (mixedGroupEl) mixedGroupEl.style.display = group === "mixed" ? "block" : "none";
     render(group);
   }
 
   if (toggleMaleBtn) toggleMaleBtn.onclick = () => show("male");
   if (toggleFemaleBtn) toggleFemaleBtn.onclick = () => show("female");
+  if (toggleMixedBtn) toggleMixedBtn.onclick = () => show("mixed");
 
   if (generateBtn) {
-    generateBtn.onclick = () => {
+    generateBtn.onclick = async () => {
+      if (brackets && brackets.__locked) return;
+
       brackets = {
         male: createBracket(maleNames, "male"),
-        female: createBracket(femaleNames, "female")
+        female: createBracket(femaleNames, "female"),
+        mixed: createBracket(mixedNames, "mixed")
       };
-      saveFixtures(tournament.id, brackets);
+
+      try {
+        const saved = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`, brackets);
+        brackets = saved || brackets;
+        brackets.__locked = true;
+      } catch {
+        saveFixtures(tournamentId, brackets);
+      }
+
+      generateBtn.disabled = true;
       showToast("Fixtures generated");
     };
   }
 
   if (backBtn) {
     backBtn.onclick = () => {
-      window.location.href = `players.html?tournamentId=${tournament.id}`;
+      window.location.href = `players.html?tournamentId=${tournament.tournamentId ?? tournament.id}`;
     };
   }
 });

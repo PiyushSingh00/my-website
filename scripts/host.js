@@ -54,6 +54,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
+  document.querySelectorAll(".brand").forEach((el) => {
+    el.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+  });
+
+  function showCreatedToast() {
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(6, 12, 18, 0.7)";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.zIndex = "9999";
+    overlay.innerHTML = `
+      <div style="background:#0f1b26;padding:24px 32px;border-radius:14px;color:#fff;font-weight:600;letter-spacing:.2px;">
+        Tournament created successfully
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 1000);
+  }
+
   if (addCategoryBtn && categoriesContainer) {
     addCategoryBtn.addEventListener("click", () => {
       function generateCategoryId() {
@@ -277,14 +301,36 @@ function renderMyTournaments(tournaments) {
         <p class="muted details-text">${t.playerDetails}</p>
       ` : ""}
 
-
       <div class="tournament-meta">
         <span>Status: <strong>${t.registrationsOpen ? "Open" : "Closed"}</strong></span>
+      </div>
+      <div class="tournament-meta">
+        <button type="button" class="delete-btn" data-id="${t.tournamentId}">Delete tournament</button>
       </div>
     `;
 
     card.addEventListener("click", () => {
       window.location.href = `players.html?tournamentId=${t.tournamentId}`;
+    });
+
+    const deleteBtn = card.querySelector(".delete-btn");
+    deleteBtn?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const ok = confirm("Delete this tournament? This cannot be undone.");
+      if (!ok) return;
+
+      const res = await fetch(`/api/host/tournaments/${t.tournamentId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer " + localStorage.getItem("token")
+        }
+      });
+
+      if (!res.ok) {
+        alert("Failed to delete tournament");
+        return;
+      }
+      loadMyTournaments();
     });
 
     container.appendChild(card);
@@ -344,7 +390,7 @@ function renderMyTournaments(tournaments) {
         return;
       }
 
-      alert("Tournament created successfully");
+      showCreatedToast();
       hostForm.reset();
       loadMyTournaments();
     });

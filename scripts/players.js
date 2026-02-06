@@ -12,6 +12,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const signoutBtn = document.getElementById("signout-btn");
   signoutBtn?.addEventListener("click", logout);
 
+  document.querySelectorAll(".brand").forEach((el) => {
+    el.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+  });
+
   // Host dropdown (same IDs as host.html)
   const trigger =
     document.getElementById("host-user-menu-trigger") ||

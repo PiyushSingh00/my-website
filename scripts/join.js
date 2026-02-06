@@ -3,6 +3,8 @@ import { requireAuth, logout } from "./auth.js";
 
 let allTournaments = [];
 let selectedTournament = null;
+let currentSportFilter = "all";
+let currentSearchTerm = "";
 
 function normalizeTournamentList(raw) {
   if (Array.isArray(raw)) return raw;
@@ -21,6 +23,14 @@ function normalizeTournamentList(raw) {
   }
 
   return [];
+}
+
+function normalizeStatus(p) {
+  const raw = p?.status ?? p?.registrationStatus ?? p?.state ?? "accepted";
+  const s = String(raw).toLowerCase();
+  if (["rejected", "reject", "declined", "denied"].includes(s)) return "rejected";
+  if (["pending", "awaiting"].includes(s)) return "pending";
+  return "accepted";
 }
 
 async function apiGet(path) {
@@ -170,6 +180,19 @@ function renderTournamentList(tournaments) {
   });
 }
 
+function renderFilteredTournaments() {
+  const bySport = currentSportFilter === "all"
+    ? allTournaments
+    : allTournaments.filter(t => t.sportName === currentSportFilter);
+
+  const term = currentSearchTerm.trim().toLowerCase();
+  const byName = term
+    ? bySport.filter(t => String(t.tournamentName || "").toLowerCase().includes(term))
+    : bySport;
+
+  renderTournamentList(byName);
+}
+
 function populateSportFilterFromAll(all) {
   const select = document.getElementById("sport-filter");
   if (!select) return;
@@ -191,12 +214,30 @@ function wireSportFilter() {
   if (!select) return;
 
   select.addEventListener("change", (e) => {
-    const selected = e.target.value;
-    const filtered = selected === "all"
-      ? allTournaments
-      : allTournaments.filter(t => t.sportName === selected);
+    currentSportFilter = e.target.value;
+    renderFilteredTournaments();
+  });
+}
 
-    renderTournamentList(filtered);
+function wireTournamentSearch() {
+  const panel = document.querySelector('.tab-panel[data-panel="all"] .browser-header');
+  if (!panel) return;
+
+  const existing = document.getElementById("tournament-search");
+  if (existing) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "filter-group";
+  wrap.innerHTML = `
+    <label for="tournament-search">Search tournament</label>
+    <input id="tournament-search" type="text" placeholder="Search by name" />
+  `;
+  panel.appendChild(wrap);
+
+  const input = wrap.querySelector("input");
+  input?.addEventListener("input", (e) => {
+    currentSearchTerm = e.target.value || "";
+    renderFilteredTournaments();
   });
 }
 
@@ -205,12 +246,12 @@ async function loadAllTournaments() {
     const raw = await apiGet("/api/tournaments");
     allTournaments = normalizeTournamentList(raw);
     populateSportFilterFromAll(allTournaments);
-    renderTournamentList(allTournaments);
+    renderFilteredTournaments();
   } catch (err) {
     console.error("Failed to load tournaments", err);
     allTournaments = [];
     populateSportFilterFromAll(allTournaments);
-    renderTournamentList(allTournaments);
+    renderFilteredTournaments();
   }
 }
 
@@ -229,6 +270,17 @@ function openCodeModal(t) {
   if (title) title.textContent = `Enter code for ${t.tournamentName ?? "tournament"}`;
 
   openModal("code-modal");
+}
+
+async function hydrateTournamentMeta(tournamentId) {
+  if (!tournamentId) return null;
+  try {
+    const data = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}`);
+    if (data && typeof data === "object") return data;
+  } catch (err) {
+    console.warn("Failed to load tournament details", err);
+  }
+  return null;
 }
 
 function openPlayerModal(t, user) {
@@ -254,6 +306,13 @@ function openPlayerModal(t, user) {
       opt.textContent = labelParts.join(" • ") + (id ? ` (ID: ${id})` : "");
       catSelect.appendChild(opt);
     });
+
+    if (!cats.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No categories found";
+      catSelect.appendChild(opt);
+    }
   }
 
 
@@ -315,7 +374,11 @@ if (result.tournamentId && selectedTournament?.tournamentId && String(result.tou
 }
 
 
-    // Optional: ensure returned tournament matches selectedTournament
+    if ((!selectedTournament.categories || selectedTournament.categories.length === 0) && selectedTournament.tournamentId) {
+      const fresh = await hydrateTournamentMeta(selectedTournament.tournamentId);
+      if (fresh?.categories) selectedTournament.categories = fresh.categories;
+    }
+
     closeModal("code-modal");
     openPlayerModal(selectedTournament, window.__me);
   });
@@ -343,6 +406,7 @@ function wirePlayerForm(user) {
   phone: document.getElementById("player-phone")?.value?.trim(),
   playerPhone: document.getElementById("player-phone")?.value?.trim(),
   categoryId: document.getElementById("player-category")?.value,
+  category: document.getElementById("player-category")?.value,
 
   // helpful context if backend checks it
   username: user.username,
@@ -415,6 +479,7 @@ function renderMyTournaments(tournaments) {
 
   tournaments.forEach(t => {
     const tournamentId = t.tournamentId ?? t.id;
+    const status = normalizeStatus(t.myPlayer || t);
 
     const card = document.createElement("div");
     card.className = "tournament-card";
@@ -422,18 +487,40 @@ function renderMyTournaments(tournaments) {
     card.innerHTML = `
       <div class="tournament-primary-line">
         <span class="tournament-name">${t.tournamentName ?? "Tournament"}</span>
-        <span class="status-pill status-pill--open">Joined</span>
+        <span class="status-pill ${status === "rejected" ? "status-pill--closed" : "status-pill--open"}">
+          ${status === "rejected" ? "Rejected" : status === "pending" ? "Pending" : "Joined"}
+        </span>
       </div>
       <div class="tournament-meta">
         <span>${t.sportName ?? ""}</span>
         <span>${t.tournamentDates ?? ""}</span>
         <span>${t.venue ?? ""}</span>
       </div>
+      <div class="tournament-actions">
+        <button type="button" class="btn-link leave-btn">Opt out</button>
+      </div>
     `;
 
     // ✅ Click = go to schedule page (or wherever you want)
     card.addEventListener("click", () => {
+      if (status === "rejected") {
+        alert("You were rejected for this tournament.");
+        return;
+      }
       window.location.href = `schedule.html?tournamentId=${tournamentId}`;
+    });
+
+    const leaveBtn = card.querySelector(".leave-btn");
+    leaveBtn?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const ok = confirm("Leave this tournament?");
+      if (!ok) return;
+      const res = await apiPost(`/api/player/tournaments/${tournamentId}/leave`, {
+        tournamentId,
+        categoryId: t.myPlayer?.categoryId,
+      });
+      if (!res) return;
+      await loadMyTournaments();
     });
 
     list.appendChild(card);
@@ -509,9 +596,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.__me = user;
   if (!user) return;
 
+  document.querySelectorAll(".brand").forEach((el) => {
+    el.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+  });
+
   wireTopbar(user);
   wireTabs();
   wireSportFilter();
+  wireTournamentSearch();
   wireModalCloseButtons();
   wireCodeForm();
   wirePlayerForm(user);
