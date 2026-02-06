@@ -182,9 +182,19 @@ function wireSportFilter() {
 }
 
 async function loadAllTournaments() {
-  allTournaments = await apiGet("/api/tournaments");
-  populateSportFilterFromAll(allTournaments);
-  renderTournamentList(allTournaments);
+  try {
+    const raw = await apiGet("/api/tournaments");
+    allTournaments = Array.isArray(raw)
+      ? raw
+      : (raw?.tournaments || raw?.items || raw?.data || raw?.rows || []);
+    populateSportFilterFromAll(allTournaments);
+    renderTournamentList(allTournaments);
+  } catch (err) {
+    console.error("Failed to load tournaments", err);
+    allTournaments = [];
+    populateSportFilterFromAll(allTournaments);
+    renderTournamentList(allTournaments);
+  }
 }
 
 /* -------------------------
