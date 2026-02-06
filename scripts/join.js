@@ -414,8 +414,16 @@ function renderMyTournaments(tournaments) {
 }
 
 async function loadMyTournaments() {
-  const tournaments = await apiGet("/api/player/tournaments");
-  renderMyTournaments(tournaments);
+  try {
+    const raw = await apiGet("/api/player/tournaments");
+    const tournaments = Array.isArray(raw)
+      ? raw
+      : (raw?.tournaments || raw?.items || raw?.data || raw?.rows || []);
+    renderMyTournaments(tournaments);
+  } catch (err) {
+    console.error("Failed to load player tournaments", err);
+    renderMyTournaments([]);
+  }
 }
 
 /* -------------------------
