@@ -4,6 +4,25 @@ import { requireAuth, logout } from "./auth.js";
 let allTournaments = [];
 let selectedTournament = null;
 
+function normalizeTournamentList(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== "object") return [];
+
+  const keys = ["tournaments", "items", "data", "rows", "results", "list", "payload"];
+  for (const k of keys) {
+    const v = raw[k];
+    if (Array.isArray(v)) return v;
+    if (v && typeof v === "object") {
+      for (const k2 of keys) {
+        const v2 = v[k2];
+        if (Array.isArray(v2)) return v2;
+      }
+    }
+  }
+
+  return [];
+}
+
 async function apiGet(path) {
   const res = await fetch(path, {
     headers: { Authorization: "Bearer " + localStorage.getItem("token") }
@@ -184,9 +203,7 @@ function wireSportFilter() {
 async function loadAllTournaments() {
   try {
     const raw = await apiGet("/api/tournaments");
-    allTournaments = Array.isArray(raw)
-      ? raw
-      : (raw?.tournaments || raw?.items || raw?.data || raw?.rows || []);
+    allTournaments = normalizeTournamentList(raw);
     populateSportFilterFromAll(allTournaments);
     renderTournamentList(allTournaments);
   } catch (err) {
@@ -426,9 +443,7 @@ function renderMyTournaments(tournaments) {
 async function loadMyTournaments() {
   try {
     const raw = await apiGet("/api/player/tournaments");
-    const tournaments = Array.isArray(raw)
-      ? raw
-      : (raw?.tournaments || raw?.items || raw?.data || raw?.rows || []);
+    const tournaments = normalizeTournamentList(raw);
     renderMyTournaments(tournaments);
   } catch (err) {
     console.error("Failed to load player tournaments", err);
