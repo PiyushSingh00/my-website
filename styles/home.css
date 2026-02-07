@@ -72,6 +72,7 @@ a {
   letter-spacing: 0.06em;
   color: #fff;
   text-transform: uppercase;
+  cursor: pointer;
 }
 
 .actions {

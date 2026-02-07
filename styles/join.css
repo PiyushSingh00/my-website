@@ -67,6 +67,16 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 18px;
+  cursor: pointer;
+}
+
+/* Make brand link look exactly like plain text (no underline/blue) */
+.brand-link,
+.brand-link:visited,
+.brand-link:hover,
+.brand-link:active {
+  color: inherit;
+  text-decoration: none;
 }
 
 .topbar-right {
