@@ -60,6 +60,41 @@ body {
   padding: 16px clamp(20px, 5vw, 56px);
 }
 
+/* ===== Mode toggle (replaces signout button) ===== */
+
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(5, 11, 24, 0.9);
+  border: 1px solid rgba(132, 152, 185, 0.55);
+}
+
+.mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mode-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(77, 208, 225, 0.08);
+  color: var(--text);
+}
+
+.mode-btn.is-active {
+  background: rgba(77, 208, 225, 0.16);
+  border: 1px solid rgba(77, 208, 225, 0.55);
+  color: var(--text);
+}
+
+
 .brand {
   font-family: "Space Grotesk", "Inter", system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -463,6 +498,41 @@ body {
   transform: translateY(-1px);
   border-color: rgba(77, 208, 225, 0.7);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+}
+
+/* ===== My tournaments: Opt out button (themed) ===== */
+
+.tournament-actions {
+  margin-top: 6px;
+}
+
+.leave-btn {
+  appearance: none;
+  border: 1px solid rgba(242, 95, 76, 0.55);
+  background: rgba(242, 95, 76, 0.10);
+  color: #ffb4a8;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.leave-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(242, 95, 76, 0.16);
+  border-color: rgba(242, 95, 76, 0.75);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+.leave-btn:active {
+  transform: translateY(0px);
+}
+
+/* Optional: remove any "linky" styling if btn-link exists somewhere */
+.btn-link.leave-btn {
+  text-decoration: none;
 }
 
 .tournament-primary-line {

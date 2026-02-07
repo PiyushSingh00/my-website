@@ -535,17 +535,38 @@ function wireTopbar(user) {
   if (usernameLabel) usernameLabel.textContent = user.username;
 
 
-  const signoutBtn = document.getElementById("signout-btn");
-  signoutBtn?.addEventListener("click", logout);
-
-  // user dropdown toggle (optional)
+  // user dropdown toggle
   const trigger = document.getElementById("user-menu-trigger");
   const dropdown = document.getElementById("user-menu-dropdown");
   trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
 
-  // switch to host
-  const switchHostModeBtn = document.getElementById("switch-host-mode");
-  switchHostModeBtn?.addEventListener("click", switchToHost);
+  // Dropdown: Sign out
+  const dropdownSignout = document.getElementById("dropdown-signout");
+  dropdownSignout?.addEventListener("click", () => {
+    dropdown?.classList.remove("is-open");
+    logout();
+  });
+
+  // Topbar: mode toggle
+  const playerBtn = document.getElementById("mode-player-btn");
+  const hostBtn = document.getElementById("mode-host-btn");
+
+  // On join.html, Join mode is active by default
+  playerBtn?.classList.add("is-active");
+
+  playerBtn?.addEventListener("click", () => {
+    // already on join page; keep active look
+    playerBtn.classList.add("is-active");
+    hostBtn?.classList.remove("is-active");
+  });
+
+  hostBtn?.addEventListener("click", async () => {
+    // switch mode + navigate (uses your existing function)
+    playerBtn?.classList.remove("is-active");
+    hostBtn.classList.add("is-active");
+    await switchToHost();
+  });
+
 
 }
 

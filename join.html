@@ -37,16 +37,21 @@
               <button
                 type="button"
                 class="dropdown-item"
-                id="switch-host-mode"
+                id="dropdown-signout"
               >
-                Switch to host mode
+                Sign out
               </button>
             </div>
           </div>
 
-          <button class="signout-btn" id="signout-btn" type="button">
-            Sign out
-          </button>
+          <div class="mode-toggle" role="group" aria-label="Mode toggle">
+            <button class="mode-btn is-active" id="mode-player-btn" type="button">
+              Join mode
+            </button>
+            <button class="mode-btn" id="mode-host-btn" type="button">
+              Host mode
+            </button>
+          </div>
         </div>
       </header>
 
@@ -94,7 +99,7 @@
                 <input
                   id="tournament-search"
                   type="text"
-                  placeholder="Search by tournament code"
+                  placeholder="Search by tournament name"
                   autocomplete="off"
                 />
               </div>
