@@ -60,6 +60,35 @@ body {
   padding: 16px clamp(20px, 5vw, 56px);
 }
 
+/* ===== Avatar circle (replaces "Signed in as ...") ===== */
+.user-avatar-btn {
+  width: 36px;
+  height: 36px;            /* match toggle height */
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(77, 208, 225, 0.14);
+  border: 1px solid rgba(77, 208, 225, 0.55);
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.user-avatar-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(77, 208, 225, 0.20);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+.user-avatar-btn:active {
+  transform: translateY(0px);
+}
+
 /* ===== Mode toggle (replaces signout button) ===== */
 
 .mode-toggle {

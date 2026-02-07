@@ -531,13 +531,16 @@ async function loadMyTournaments() {
    TOPBAR actions
 ------------------------- */
 function wireTopbar(user) {
-  const usernameLabel = document.getElementById("username-label");
-  if (usernameLabel) usernameLabel.textContent = user.username;
-
-
-  // user dropdown toggle
   const trigger = document.getElementById("user-menu-trigger");
   const dropdown = document.getElementById("user-menu-dropdown");
+
+  // Set initial inside the circle
+  if (trigger) {
+    const label = (user?.name || user?.username || user?.email || "U").trim();
+    trigger.textContent = label.charAt(0).toUpperCase();
+  }
+
+  // Open/close dropdown
   trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
 
   // Dropdown: Sign out
@@ -551,23 +554,18 @@ function wireTopbar(user) {
   const playerBtn = document.getElementById("mode-player-btn");
   const hostBtn = document.getElementById("mode-host-btn");
 
-  // On join.html, Join mode is active by default
   playerBtn?.classList.add("is-active");
 
   playerBtn?.addEventListener("click", () => {
-    // already on join page; keep active look
     playerBtn.classList.add("is-active");
     hostBtn?.classList.remove("is-active");
   });
 
   hostBtn?.addEventListener("click", async () => {
-    // switch mode + navigate (uses your existing function)
     playerBtn?.classList.remove("is-active");
     hostBtn.classList.add("is-active");
     await switchToHost();
   });
-
-
 }
 
 async function switchToHost() {
