@@ -74,20 +74,32 @@
         <div class="tab-panel is-active" data-panel="all">
             <div class="browser-header">
             <div>
-                <h2>Available tournaments</h2>
-                <p class="helper-text">
+              <h2>Available tournaments</h2>
+              <p class="helper-text">
                 Showing tournaments created by all hosts.
-                </p>
+              </p>
             </div>
 
-            <div class="filter-group">
+            <div class="filters">
+              <div class="filter-group">
                 <label for="sport-filter">Filter by sport</label>
                 <select id="sport-filter">
-                <option value="all">All sports</option>
-                <!-- more options filled by JS -->
+                  <option value="all">All sports</option>
+                  <!-- more options filled by JS -->
                 </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="tournament-search">Search tournament</label>
+                <input
+                  id="tournament-search"
+                  type="text"
+                  placeholder="Search by tournament code"
+                  autocomplete="off"
+                />
+              </div>
             </div>
-            </div>
+          </div>
 
             <div id="tournament-list" class="tournament-list">
             <!-- Tournament cards will be injected here by JS -->

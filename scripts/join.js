@@ -220,26 +220,15 @@ function wireSportFilter() {
 }
 
 function wireTournamentSearch() {
-  const panel = document.querySelector('.tab-panel[data-panel="all"] .browser-header');
-  if (!panel) return;
+  const input = document.getElementById("tournament-search");
+  if (!input) return;
 
-  const existing = document.getElementById("tournament-search");
-  if (existing) return;
-
-  const wrap = document.createElement("div");
-  wrap.className = "filter-group";
-  wrap.innerHTML = `
-    <label for="tournament-search">Search tournament</label>
-    <input id="tournament-search" type="text" placeholder="Search by name" />
-  `;
-  panel.appendChild(wrap);
-
-  const input = wrap.querySelector("input");
-  input?.addEventListener("input", (e) => {
+  input.addEventListener("input", (e) => {
     currentSearchTerm = e.target.value || "";
     renderFilteredTournaments();
   });
 }
+
 
 async function loadAllTournaments() {
   try {

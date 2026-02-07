@@ -378,6 +378,59 @@ body {
   font: inherit;
 }
 
+.filter-group input {
+  background: rgba(5, 11, 24, 0.96);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+}
+
+.filter-group input::placeholder {
+  color: rgba(169, 182, 204, 0.75);
+}
+
+.filter-group input:focus {
+  outline: none;
+  border-color: rgba(77, 208, 225, 0.8);
+  box-shadow: 0 0 0 1px rgba(77, 208, 225, 0.3);
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .browser-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* ADD THIS */
+  .filters {
+    width: 100%;
+  }
+
+  .filter-group {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .filter-group select,
+  .filter-group input {
+    width: 100%;
+  }
+
+  .join-main {
+    padding-inline: 16px;
+  }
+}
+
+
 .tournament-list {
   display: flex;
   flex-direction: column;
