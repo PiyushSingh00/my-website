@@ -20,33 +20,34 @@
     <div class="app-shell">
       <!-- Top bar -->
       <header class="topbar">
-        <div class="brand">ScheduleIt</div>
+        <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
         <div class="topbar-right">
           <div class="user-menu">
-            <button
-              class="user-trigger"
-              id="user-menu-trigger"
-              type="button"
-            >
-              Signed in as <span id="username-label">Player</span>
-              <span class="caret">▾</span>
+            <button type="button" class="user-avatar-btn" id="user-menu-trigger" aria-label="User menu">
+              A
             </button>
+
 
             <div class="user-menu-dropdown" id="user-menu-dropdown">
               <button
                 type="button"
                 class="dropdown-item"
-                id="switch-host-mode"
+                id="dropdown-signout"
               >
-                Switch to host mode
+                Sign out
               </button>
             </div>
           </div>
 
-          <button class="signout-btn" id="signout-btn" type="button">
-            Sign out
-          </button>
+          <div class="mode-toggle" role="group" aria-label="Mode toggle">
+            <button class="mode-btn is-active" id="mode-player-btn" type="button">
+              Join mode
+            </button>
+            <button class="mode-btn" id="mode-host-btn" type="button">
+              Host mode
+            </button>
+          </div>
         </div>
       </header>
 
@@ -74,20 +75,32 @@
         <div class="tab-panel is-active" data-panel="all">
             <div class="browser-header">
             <div>
-                <h2>Available tournaments</h2>
-                <p class="helper-text">
+              <h2>Available tournaments</h2>
+              <p class="helper-text">
                 Showing tournaments created by all hosts.
-                </p>
+              </p>
             </div>
 
-            <div class="filter-group">
+            <div class="filters">
+              <div class="filter-group">
                 <label for="sport-filter">Filter by sport</label>
                 <select id="sport-filter">
-                <option value="all">All sports</option>
-                <!-- more options filled by JS -->
+                  <option value="all">All sports</option>
+                  <!-- more options filled by JS -->
                 </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="tournament-search">Search tournament</label>
+                <input
+                  id="tournament-search"
+                  type="text"
+                  placeholder="Search by tournament name"
+                  autocomplete="off"
+                />
+              </div>
             </div>
-            </div>
+          </div>
 
             <div id="tournament-list" class="tournament-list">
             <!-- Tournament cards will be injected here by JS -->
@@ -136,6 +149,10 @@
 
             <form id="code-form">
             <div class="field-group">
+                <label for="player-category">Category</label>
+                <select id="player-category" name="playerCategory" required>
+                  <option value="">Select category</option>
+                </select>
                 <label for="code-input">Tournament code</label>
                 <input
                 type="text"
@@ -220,6 +237,7 @@
 
 
     <!-- NOTE: scripts/ path -->
-    <script src="scripts/join.js"></script>
+    <script type="module" src="scripts/join.js"></script>
+
   </body>
 </html>

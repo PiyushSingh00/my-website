@@ -1,488 +1,434 @@
-// Host mode page logic
+// scripts/host.js
+import { requireAuth, logout } from "./auth.js";
 
-document.addEventListener("DOMContentLoaded", () => {
-  // --- Top bar & existing elements ---
-  const usernameLabel = document.getElementById("username-label");
-  const signoutBtn = document.getElementById("signout-btn");
+let allTournaments = [];
+
+  function generateAccessCode() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+
+    for (let i = 0; i < 8; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+
+    return code.slice(0, 4) + "-" + code.slice(4);
+  }
+
+document.addEventListener("DOMContentLoaded", async () => {
   const generateCodeBtn = document.getElementById("generate-code-btn");
   const accessCodeInput = document.getElementById("access-code");
+  const viewPlayersBtn = document.getElementById("modalViewPlayers");
+  let selectedTournamentId = null;
+  const categoriesContainer = document.getElementById("categories-container");
+  const addCategoryBtn = document.getElementById("add-category-btn");
   const hostForm = document.getElementById("host-form");
+  let categories = [];
+  function renderCategories() {
+    categoriesContainer.innerHTML = "";
 
-  const userMenuTrigger = document.getElementById("host-user-menu-trigger");
-  const userMenuDropdown = document.getElementById("host-user-menu-dropdown");
-  const userMenu = document.querySelector(".user-menu");
-  const switchPlayerModeBtn = document.getElementById("switch-player-mode");
+    categories.forEach((cat, index) => {
+      const div = document.createElement("div");
+      div.className = "category-card";
 
-  // Dashboard toggle + list elements
-  const myTab = document.querySelector('[data-host-mode="my"]');
-  const newTab = document.querySelector('[data-host-mode="new"]');
+      div.innerHTML = `
+        <input type="text" placeholder="Age group (e.g. U18 / Open)"
+          value="${cat.ageGroup}" data-index="${index}" data-field="ageGroup" />
+
+        <select data-index="${index}" data-field="gender">
+          <option value="">Gender</option>
+          <option value="Male" ${cat.gender === "Male" ? "selected" : ""}>Male</option>
+          <option value="Female" ${cat.gender === "Female" ? "selected" : ""}>Female</option>
+          <option value="Mixed" ${cat.gender === "Mixed" ? "selected" : ""}>Mixed</option>
+        </select>
+
+        <input
+          type="number"
+          min="1"
+          placeholder="Team size (e.g. 1 for singles)"
+          value="${cat.teamSize ?? ""}"
+          data-index="${index}"
+          data-field="teamSize"
+        />
+
+        <button type="button" class="delete-category-btn" data-remove="${index}">
+          Delete category
+        </button>
+
+      `;
+
+      categoriesContainer.appendChild(div);
+    });
+  }
+
+  const user = await requireAuth();
+  if (!user) return;
+
+  document.querySelectorAll(".brand").forEach((el) => {
+    el.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+  });
+
+  function showCreatedToast() {
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(6, 12, 18, 0.7)";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.zIndex = "9999";
+    overlay.innerHTML = `
+      <div style="background:#0f1b26;padding:24px 32px;border-radius:14px;color:#fff;font-weight:600;letter-spacing:.2px;">
+        Tournament created successfully
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 1000);
+  }
+
+  if (addCategoryBtn && categoriesContainer) {
+    addCategoryBtn.addEventListener("click", () => {
+      function generateCategoryId() {
+  return "CAT-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+categories.push({
+  categoryId: generateCategoryId(),
+  ageGroup: "",
+  gender: "",
+  teamSize: ""
+});
+
+      renderCategories();
+    });
+  }
+  loadMyTournaments();
+
+  if (categoriesContainer) {
+    categoriesContainer.addEventListener("input", (e) => {
+      const index = e.target.dataset.index;
+      const field = e.target.dataset.field;
+      if (index !== undefined && field) {
+        categories[index][field] = e.target.value;
+      }
+    });
+    categoriesContainer.addEventListener("click", (e) => {
+      if (e.target.dataset.remove !== undefined) {
+        categories.splice(e.target.dataset.remove, 1);
+        renderCategories();
+      }
+    });
+  }
+  if (generateCodeBtn && accessCodeInput) {
+      generateCodeBtn.addEventListener("click", () => {
+      accessCodeInput.value = generateAccessCode();
+    });
+  }
+
+
+  if (viewPlayersBtn) {
+    viewPlayersBtn.addEventListener("click", () => {
+      if (!selectedTournamentId) {
+        alert("No tournament selected");
+        return;
+      }
+      window.location.href = `players.html?tournamentId=${selectedTournamentId}`;
+    });
+  }
+
+
+
+
+  
+
+
+
+// ===== Topbar: avatar + dropdown signout + mode toggle =====
+const trigger = document.getElementById("host-user-menu-trigger");
+const dropdown = document.getElementById("host-user-menu-dropdown");
+
+// Set avatar initial
+if (trigger) {
+  const label = (user?.name || user?.username || user?.email || "U").trim();
+  trigger.textContent = label.charAt(0).toUpperCase();
+}
+
+// Dropdown open/close
+trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
+
+// Dropdown: Sign out
+const dropdownSignout = document.getElementById("dropdown-signout");
+dropdownSignout?.addEventListener("click", () => {
+  dropdown?.classList.remove("is-open");
+  logout();
+});
+
+// Mode toggle: Host active on this page
+const playerBtn = document.getElementById("mode-player-btn");
+const hostBtn = document.getElementById("mode-host-btn");
+
+hostBtn?.classList.add("is-active");
+playerBtn?.classList.remove("is-active");
+
+// Switch to Join mode (reuses your existing backend endpoint)
+playerBtn?.addEventListener("click", async () => {
+  playerBtn.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
+  await fetch("/api/user/mode", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify({ mode: "player" })
+  });
+
+  window.location.href = "join.html";
+});
+
+// Clicking Host mode here just keeps the active look
+hostBtn?.addEventListener("click", () => {
+  hostBtn.classList.add("is-active");
+  playerBtn?.classList.remove("is-active");
+});
+
+// -------- LOAD SPORTS FROM BACKEND --------
+  async function loadSports() {
+    try {
+      const res = await fetch("/api/sports");
+      if (!res.ok) throw new Error("Failed to load sports");
+
+      const sports = await res.json();
+
+      const sportSelect = document.getElementById("sport-name");
+      if (!sportSelect) return;
+
+      // Clear existing options except "Select sport"
+      sportSelect.innerHTML = `<option value="">Select sport</option>`;
+
+      sports.forEach((sport) => {
+        const option = document.createElement("option");
+        option.value = sport.sport_name;
+        option.textContent = sport.sport_name;
+        sportSelect.appendChild(option);
+      });
+    } catch (err) {
+      console.error("Error loading sports:", err);
+    }
+  }
+
+// Call it
+  loadSports();
+
+// -------- HOST MODE TOGGLE (My vs New) --------
+  const modeCards = document.querySelectorAll(".host-mode-card");
   const myView = document.getElementById("my-tournaments-view");
   const newView = document.getElementById("new-tournament-view");
-  const myList = document.getElementById("my-tournaments-list");
 
-  // NEW: details panel elements
-  const detailSection = document.getElementById("tournament-detail");
-  const detailName = document.getElementById("detail-tournament-name");
-  const detailCode = document.getElementById("detail-tournament-code");
-  const detailRegistrations = document.getElementById(
-    "detail-total-registrations"
-  );
-  const stopRegistrationsBtn = document.getElementById(
-    "stop-registrations-btn"
-  );
+async function loadMyTournaments() {
+  const token = localStorage.getItem("token");
 
-  // --- Load username from localStorage (support both key names) ---
-  const storedUsername =
-    localStorage.getItem("scheduleitUser") ||
-    localStorage.getItem("scheduleItUser");
-
-    // ----- Tournament details modal -----
-    const detailsModal = document.getElementById("tournament-details-modal");
-    const detailsName = document.getElementById("modalTournamentName");
-    const detailsCode = document.getElementById("modalTournamentCode");
-    const detailsRegistrations = document.getElementById("modalTournamentRegistrations");
-    const detailsStopBtn = document.getElementById("modalStopRegistrations");
-    const detailsViewPlayersBtn = document.getElementById("modalViewPlayers");
+  const res = await fetch("/api/host/tournaments", {
+  headers: { Authorization: `Bearer ${token}` }
+});
 
 
-
-
-    function openDetailsModal(tournament) {
-        if (!detailsModal) return;
-
-        if (detailsName) {
-            detailsName.textContent = tournament.tournamentName || "Tournament";
-        }
-        if (detailsCode) {
-            detailsCode.textContent = tournament.accessCode || "—";
-        }
-        if (detailsRegistrations) {
-            detailsRegistrations.textContent =
-            typeof tournament.totalRegistrations === "number"
-                ? tournament.totalRegistrations
-                : 0;
-        }
-
-        // Set Stop / Accept button based on current registration state
-        const isClosed = !!tournament.registrationsClosed;
-
-        if (detailsStopBtn) {
-            detailsStopBtn.dataset.tournamentId = String(tournament.id);
-            detailsStopBtn.textContent = isClosed
-            ? "Accept registrations"
-            : "Stop registrations";
-            detailsStopBtn.classList.toggle("accept-mode", isClosed);
-        }
-
-        // NEW: show "View players" only when registrations are closed
-        if (detailsViewPlayersBtn) {
-            detailsViewPlayersBtn.dataset.tournamentId = String(tournament.id);
-            detailsViewPlayersBtn.style.display = isClosed ? "inline-flex" : "none";
-        }
-
-        detailsModal.classList.add("is-visible");
-        detailsModal.setAttribute("aria-hidden", "false");
-    }
-
-
-
-
-    function closeDetailsModal() {
-        if (!detailsModal) return;
-        detailsModal.classList.remove("is-visible");
-        detailsModal.setAttribute("aria-hidden", "true");
-    }
-
-    // Close on X button
-    if (detailsModal) {
-        const closeBtn = detailsModal.querySelector(".modal-close");
-        if (closeBtn) {
-        closeBtn.addEventListener("click", closeDetailsModal);
-        }
-
-        // Close if user clicks on the dark background
-        detailsModal.addEventListener("click", (event) => {
-        if (event.target === detailsModal) {
-            closeDetailsModal();
-        }
-        });
-    }
-
-    if (detailsStopBtn) {
-        detailsStopBtn.addEventListener("click", () => {
-            const id = Number(detailsStopBtn.dataset.tournamentId);
-            if (!id) return;
-
-            const all = loadAllTournaments();
-            const idx = all.findIndex((t) => t.id === id);
-            if (idx === -1) return;
-
-            const t = all[idx];
-
-            // Toggle closed/open
-            const newClosed = !t.registrationsClosed;
-            t.registrationsClosed = newClosed;
-
-            // Save back to localStorage
-            saveAllTournaments(all);
-
-            // Update button text + style in the modal
-            detailsStopBtn.textContent = newClosed
-            ? "Accept registrations"
-            : "Stop registrations";
-            detailsStopBtn.classList.toggle("accept-mode", newClosed);
-
-            // NEW: show / hide "View players" based on closed state
-            if (detailsViewPlayersBtn) {
-            detailsViewPlayersBtn.style.display = newClosed
-                ? "inline-flex"
-                : "none";
-            }
-
-            // 🔄 Refresh list so status text updates on the cards
-            renderMyTournaments();
-        });
-    }
-
-    // --- View players for this tournament ---
-    if (detailsViewPlayersBtn) {
-        detailsViewPlayersBtn.addEventListener("click", () => {
-            const id = detailsViewPlayersBtn.dataset.tournamentId;
-            if (!id) return;
-
-            // Go to the players page, passing the tournament id in the URL
-            window.location.href = `players.html?tournamentId=${encodeURIComponent(id)}`;
-        });
-    }
-
-
-  if (!storedUsername) {
-    // Not signed in -> go back to landing
-    window.location.href = "index.html";
+  if (!res.ok) {
+    console.error("Failed to load tournaments");
     return;
   }
 
-  if (usernameLabel) {
-    usernameLabel.textContent = storedUsername;
+  allTournaments = await res.json();
+  populateSportFilter(allTournaments);
+  renderMyTournaments(allTournaments);
+
+}
+
+function populateSportFilter(tournaments) {
+  const filter = document.getElementById("filter-sport");
+  if (!filter) return;
+
+  const sports = [...new Set(tournaments.map(t => t.sportName))];
+
+  filter.innerHTML = `<option value="">All sports</option>`;
+  sports.forEach(sport => {
+    const opt = document.createElement("option");
+    opt.value = sport;
+    opt.textContent = sport;
+    filter.appendChild(opt);
+  });
+
+  filter.addEventListener("change", () => {
+    const selected = filter.value;
+    const filtered = selected
+      ? allTournaments.filter(t => t.sportName === selected)
+      : allTournaments;
+
+    renderMyTournaments(filtered);
+  });
+}
+
+
+function renderMyTournaments(tournaments) {
+  const container = document.getElementById("my-tournaments-list");
+  container.innerHTML = "";
+
+  if (!tournaments.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="feature-icon">📋</div>
+        <h3>No tournaments found</h3>
+      </div>`;
+    return;
   }
 
-  // --- User menu dropdown (click-only) ---
+  tournaments.forEach(t => {
+    const categories = (t.categories || [])
+    .map(c => {
+      const size = Number(c.teamSize);
 
-  const closeDropdown = () => {
-    if (userMenuDropdown) {
-      userMenuDropdown.classList.remove("is-open");
-    }
-  };
+      let type = "";
+      if (size === 1) type = "Singles";
+      else if (size === 2) type = "Doubles";
 
-  const toggleDropdown = () => {
-    if (userMenuDropdown) {
-      userMenuDropdown.classList.toggle("is-open");
-    }
-  };
+      const genderLabel =
+        c.gender === "Male" ? "Men's" :
+        c.gender === "Female" ? "Women's" :
+        c.gender;
 
-  if (userMenuTrigger && userMenuDropdown) {
-    // Click to toggle
-    userMenuTrigger.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleDropdown();
+      return `${c.ageGroup} ${genderLabel}${type ? " " + type : ""}`;
+    })
+    .join(", ");
+
+
+    const card = document.createElement("div");
+    card.className = "tournament-card";
+
+    card.innerHTML = `
+      <div class="tournament-head">
+        <h3>${t.tournamentName}</h3>
+        <span class="code-chip">${t.accessCode}</span>
+      </div>
+
+      <p class="muted sport-date">${t.sportName} • ${t.tournamentDates}</p>
+
+      <p class="muted">📍 ${t.venue}</p>
+
+      ${categories ? `<p class="muted"><strong>Categories:</strong> ${categories}</p>` : ""}
+
+      ${(() => {
+      const details =
+      typeof t.playerDetails === "string"
+          ? t.playerDetails
+          : Array.isArray(t.playerDetails)
+            ? t.playerDetails.join(", ")
+            : (t.playerDetails ?? "");
+
+      const detailsStr = String(details);
+
+      return detailsStr.trim() !== ""
+        ? `
+          <p class="muted details-label">Details:</p>
+          <p class="muted details-text">${detailsStr}</p>
+        `
+        : "";
+      })()}
+
+
+      <div class="tournament-meta">
+        <span>Status: <strong>${t.registrationsOpen ? "Open" : "Closed"}</strong></span>
+      </div>
+      <div class="tournament-meta">
+        <button type="button" class="delete-btn" data-id="${t.tournamentId}">Delete tournament</button>
+      </div>
+    `;
+
+    card.addEventListener("click", () => {
+      window.location.href = `players.html?tournamentId=${t.tournamentId}`;
     });
 
-    // Close when clicking outside
-    document.addEventListener("click", () => {
-      closeDropdown();
-    });
+    const deleteBtn = card.querySelector(".delete-btn");
+    deleteBtn?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const ok = confirm("Delete this tournament? This cannot be undone.");
+      if (!ok) return;
 
-    // Prevent closing when clicking inside dropdown
-    userMenuDropdown.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
-
-    // Close on Esc
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        closeDropdown();
-      }
-    });
-  }
-
-  // --- Switch to player mode (e.g. Join page) ---
-  if (switchPlayerModeBtn) {
-    switchPlayerModeBtn.addEventListener("click", () => {
-      closeDropdown();
-      window.location.href = "join.html";
-    });
-  }
-
-  // --- Generate access code ---
-  function generateCode() {
-    const letters = "ABCDEFGHJKMNPQRSTUVWXYZ";
-    const digits = "23456789";
-
-    let part1 = "";
-    let part2 = "";
-
-    for (let i = 0; i < 4; i++) {
-      part1 += letters[Math.floor(Math.random() * letters.length)];
-      part2 += digits[Math.floor(Math.random() * digits.length)];
-    }
-
-    return `${part1}-${part2}`;
-  }
-
-  if (generateCodeBtn && accessCodeInput) {
-    generateCodeBtn.addEventListener("click", () => {
-      const code = generateCode();
-      accessCodeInput.value = code;
-      accessCodeInput.focus();
-      accessCodeInput.select();
-    });
-  }
-
-  // ===== Tournament storage + helpers ============================
-
-  const TOURNAMENT_KEY = "scheduleitTournaments";
-
-  function loadAllTournaments() {
-    const raw = localStorage.getItem(TOURNAMENT_KEY);
-    if (!raw) return [];
-    try {
-      return JSON.parse(raw);
-    } catch (e) {
-      console.error("Failed to parse tournaments", e);
-      return [];
-    }
-  }
-
-  function saveAllTournaments(list) {
-    localStorage.setItem(TOURNAMENT_KEY, JSON.stringify(list));
-  }
-
-  function saveTournament(tournament) {
-    const list = loadAllTournaments();
-    list.push(tournament);
-    saveAllTournaments(list);
-  }
-
-  function setRegistrationsClosed(id) {
-    const list = loadAllTournaments();
-    const index = list.findIndex((t) => t.id === id);
-    if (index === -1) return null;
-
-    list[index].registrationsClosed = true;
-    saveAllTournaments(list);
-    return list[index];
-  }
-
-  // ===== My tournaments list + details ===========================
-
-  function showTournamentDetails(tournament) {
-    if (!detailSection) return;
-
-    detailSection.classList.remove("hidden");
-
-    if (detailName) {
-      detailName.textContent =
-        tournament.tournamentName || "Untitled tournament";
-    }
-    if (detailCode) {
-      detailCode.textContent = tournament.accessCode || "";
-    }
-    if (detailRegistrations) {
-      detailRegistrations.textContent =
-        tournament.totalRegistrations ?? 0;
-    }
-
-    if (stopRegistrationsBtn) {
-      const closed = !!tournament.registrationsClosed;
-      stopRegistrationsBtn.disabled = closed;
-      stopRegistrationsBtn.textContent = closed
-        ? "Registrations stopped"
-        : "Stop registrations";
-
-      stopRegistrationsBtn.onclick = () => {
-        if (closed) return;
-        const updated = setRegistrationsClosed(tournament.id);
-        if (updated) {
-          renderMyTournaments();
-          showTournamentDetails(updated);
+      const res = await fetch(`/api/host/tournaments/${t.tournamentId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer " + localStorage.getItem("token")
         }
-      };
-    }
-  }
+      });
 
-  function renderMyTournaments() {
-    if (!myList) return;
-
-    const all = loadAllTournaments();
-    const mine = all.filter((t) => t.hostUsername === storedUsername);
-
-    if (!storedUsername) {
-      myList.innerHTML = `
-        <div class="empty-state">
-          <div class="feature-icon">🔑</div>
-          <h3>Sign in to see your tournaments</h3>
-          <p class="muted">Once you are signed in and host tournaments, they will appear here.</p>
-        </div>
-      `;
-      if (detailSection) detailSection.classList.add("hidden");
-      return;
-    }
-
-    if (!mine.length) {
-      myList.innerHTML = `
-        <div class="empty-state">
-          <div class="feature-icon">📋</div>
-          <h3>No tournaments yet</h3>
-          <p class="muted">Use "Host new tournament" to create your first tournament.</p>
-        </div>
-      `;
-      if (detailSection) detailSection.classList.add("hidden");
-      return;
-    }
-
-    myList.innerHTML = mine
-      .map(
-        (t, index) => `
-        <article class="tournament-card" data-index="${index}">
-          <header class="tournament-head">
-            <div>
-              <p class="eyebrow">${t.sportName || "Sport"}</p>
-              <h3>${t.tournamentName || "Untitled tournament"}</h3>
-            </div>
-            <span class="code-chip">${t.accessCode || ""}</span>
-          </header>
-
-          <p class="muted">
-            ${t.playerDetails || "Player details and fixtures will show here."}
-          </p>
-
-        <div class="tournament-meta">
-            ${
-                t.tournamentDates
-                ? `<span>Dates: ${t.tournamentDates}</span>`
-                : ""
-            }
-            <span>
-            ${
-                t.registrationsClosed
-                ? "Registrations closed"
-                : "Registrations open"
-            }
-            </span>
-            <span>Total registrations: ${t.totalRegistrations ?? 0}</span>
-        </div>
-
-        </article>
-      `
-      )
-      .join("");
-
-    // Make each card clickable – open details popup
-    myList.querySelectorAll(".tournament-card").forEach((card) => {
-        const index = Number(card.dataset.index);
-        const tournament = mine[index];
-        if (!tournament) return;
-
-        card.addEventListener("click", () => {
-            openDetailsModal(tournament);
-        });
+      if (!res.ok) {
+        alert("Failed to delete tournament");
+        return;
+      }
+      loadMyTournaments();
     });
 
-  }
+    container.appendChild(card);
+  });
+}
 
-  // ===== Host form behaviour =====================================
+
+
+  if (myView && newView) {
+    modeCards.forEach((card) => {
+      card.addEventListener("click", () => {
+        // Remove active from all cards
+        modeCards.forEach((c) => c.classList.remove("active"));
+
+        // Hide all views
+        myView.classList.remove("host-view--active");
+        newView.classList.remove("host-view--active");
+
+        // Activate clicked card
+        card.classList.add("active");
+
+        // Show correct view
+        if (card.dataset.hostMode === "my") {
+          myView.classList.add("host-view--active");
+        } else {
+          newView.classList.add("host-view--active");
+        }
+      });
+    });
+  }
 
   if (hostForm) {
-    hostForm.addEventListener("submit", (event) => {
-      event.preventDefault();
+    hostForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-      const formData = new FormData(hostForm);
-      const data = Object.fromEntries(formData.entries());
+      const payload = {
+        tournamentName: document.getElementById("tournament-name").value,
+        sportName: document.getElementById("sport-name").value,
+        tournamentDates: document.getElementById("tournament-dates").value,
+        accessCode: document.getElementById("access-code").value,
+        playerDetails: document.getElementById("player-details").value,
+        venue: document.getElementById("tournament-venue").value,
+        categories: categories
+      };
 
-      let tournamentName = (data.tournamentName || "").trim();
-      let sportName = (data.sportName || "").trim();
-      let tournamentDates =
-        (data.tournamentDates || data.tournamentDate || "").trim();
-      let accessCode = (data.accessCode || "").trim();
-      const playerDetails = (data.playerDetails || "").trim();
+      const res = await fetch("/api/host/tournaments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token")
+        },
+        body: JSON.stringify(payload)
+      });
 
-      if (!tournamentName || !sportName || !tournamentDates) {
-        alert(
-          "Please fill tournament name, sport name and tournament dates."
-        );
+      if (!res.ok) {
+        alert("Failed to save tournament");
         return;
       }
 
-      if (!accessCode) {
-        accessCode = generateCode();
-        if (accessCodeInput) accessCodeInput.value = accessCode;
-      }
-
-      const tournament = {
-        id: Date.now(),
-        hostUsername: storedUsername,
-        tournamentName,
-        sportName,
-        tournamentDates,
-        accessCode,
-        playerDetails,
-        createdAt: new Date().toISOString(),
-        totalRegistrations: 0,
-        registrationsClosed: false,
-      };
-
-      saveTournament(tournament);
-
-      alert(
-        `Tournament saved!\n\nShare this access code with players:\n${accessCode}`
-      );
-
+      showCreatedToast();
       hostForm.reset();
-      if (accessCodeInput) {
-        accessCodeInput.value = accessCode;
-      }
-
-      // Refresh list so new tournament appears
-      renderMyTournaments();
+      loadMyTournaments();
     });
   }
-
-  // --- Sign out ---
-  if (signoutBtn) {
-    signoutBtn.addEventListener("click", () => {
-      localStorage.removeItem("scheduleitUser");
-      localStorage.removeItem("scheduleItUser");
-      window.location.href = "index.html";
-    });
-  }
-
-  // ===== Tab switching logic =====================================
-
-  function switchMode(mode) {
-    if (!myTab || !newTab || !myView || !newView) return;
-
-    if (mode === "my") {
-      myTab.classList.add("active");
-      newTab.classList.remove("active");
-
-      myView.classList.add("host-view--active");
-      newView.classList.remove("host-view--active");
-
-      renderMyTournaments();
-    } else {
-      newTab.classList.add("active");
-      myTab.classList.remove("active");
-
-      newView.classList.add("host-view--active");
-      myView.classList.remove("host-view--active");
-    }
-  }
-
-  if (myTab && newTab) {
-    myTab.addEventListener("click", () => switchMode("my"));
-    newTab.addEventListener("click", () => switchMode("new"));
-  }
-
-  // Default view when entering host mode = My tournaments
-  switchMode("my");
 });

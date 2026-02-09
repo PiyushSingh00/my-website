@@ -18,7 +18,7 @@
   <body>
     <!-- Same topbar structure as host page -->
     <header class="topbar">
-      <div class="brand">ScheduleIt</div>
+      <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
       <div class="topbar-right">
         <div class="user-menu">
@@ -122,6 +122,8 @@
                 <th>Name</th>
                 <th>Age</th>
                 <th>Gender</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="players-table-body"></tbody>
@@ -130,6 +132,6 @@
       </section>
     </main>
 
-    <script src="scripts/players.js"></script>
+    <script type="module" src="scripts/players.js"></script>
   </body>
 </html>

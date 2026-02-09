@@ -18,11 +18,19 @@
   box-sizing: border-box;
 }
 
-html,
+html {
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.22), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(242, 95, 76, 0.18), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;   /* keeps gradient continuous while scrolling */
+}
+
 body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
+  font-family: "Inter", system-ui;
+  color: var(--text);
+  background: transparent;
+  min-height: 100%;
 }
 
 body {
@@ -52,6 +60,70 @@ body {
   padding: 16px clamp(20px, 5vw, 56px);
 }
 
+/* ===== Avatar circle (replaces "Signed in as ...") ===== */
+.user-avatar-btn {
+  width: 36px;
+  height: 36px;            /* match toggle height */
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(77, 208, 225, 0.14);
+  border: 1px solid rgba(77, 208, 225, 0.55);
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.user-avatar-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(77, 208, 225, 0.20);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+.user-avatar-btn:active {
+  transform: translateY(0px);
+}
+
+/* ===== Mode toggle (replaces signout button) ===== */
+
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(5, 11, 24, 0.9);
+  border: 1px solid rgba(132, 152, 185, 0.55);
+}
+
+.mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mode-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(77, 208, 225, 0.08);
+  color: var(--text);
+}
+
+.mode-btn.is-active {
+  background: rgba(77, 208, 225, 0.16);
+  border: 1px solid rgba(77, 208, 225, 0.55);
+  color: var(--text);
+}
+
+
 .brand {
   font-family: "Space Grotesk", "Inter", system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -59,6 +131,16 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 18px;
+  cursor: pointer;
+}
+
+/* Make brand link look exactly like plain text (no underline/blue) */
+.brand-link,
+.brand-link:visited,
+.brand-link:hover,
+.brand-link:active {
+  color: inherit;
+  text-decoration: none;
 }
 
 .topbar-right {
@@ -360,6 +442,59 @@ body {
   font: inherit;
 }
 
+.filter-group input {
+  background: rgba(5, 11, 24, 0.96);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+}
+
+.filter-group input::placeholder {
+  color: rgba(169, 182, 204, 0.75);
+}
+
+.filter-group input:focus {
+  outline: none;
+  border-color: rgba(77, 208, 225, 0.8);
+  box-shadow: 0 0 0 1px rgba(77, 208, 225, 0.3);
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .browser-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* ADD THIS */
+  .filters {
+    width: 100%;
+  }
+
+  .filter-group {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .filter-group select,
+  .filter-group input {
+    width: 100%;
+  }
+
+  .join-main {
+    padding-inline: 16px;
+  }
+}
+
+
 .tournament-list {
   display: flex;
   flex-direction: column;
@@ -392,6 +527,41 @@ body {
   transform: translateY(-1px);
   border-color: rgba(77, 208, 225, 0.7);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+}
+
+/* ===== My tournaments: Opt out button (themed) ===== */
+
+.tournament-actions {
+  margin-top: 6px;
+}
+
+.leave-btn {
+  appearance: none;
+  border: 1px solid rgba(242, 95, 76, 0.55);
+  background: rgba(242, 95, 76, 0.10);
+  color: #ffb4a8;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.leave-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(242, 95, 76, 0.16);
+  border-color: rgba(242, 95, 76, 0.75);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+.leave-btn:active {
+  transform: translateY(0px);
+}
+
+/* Optional: remove any "linky" styling if btn-link exists somewhere */
+.btn-link.leave-btn {
+  text-decoration: none;
 }
 
 .tournament-primary-line {

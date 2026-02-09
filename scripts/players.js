@@ -1,236 +1,340 @@
-// Tournament players page logic
+// scripts/players.js
+import { requireAuth, logout } from "./auth.js";
 
-document.addEventListener("DOMContentLoaded", () => {
-  // --- Top bar & auth ---
+document.addEventListener("DOMContentLoaded", async () => {
+  const user = await requireAuth();
+  if (!user) return;
+
+  // ---------- TOPBAR ----------
   const usernameLabel = document.getElementById("username-label");
+  if (usernameLabel) usernameLabel.textContent = user.username;
+
   const signoutBtn = document.getElementById("signout-btn");
-  const userMenuTrigger = document.getElementById("host-user-menu-trigger");
-  const userMenuDropdown = document.getElementById("host-user-menu-dropdown");
-  const switchPlayerModeBtn = document.getElementById("switch-player-mode");
-  const backBtn = document.getElementById("players-back-btn");
-  const createFixturesBtn = document.getElementById("create-fixtures-btn");
+  signoutBtn?.addEventListener("click", logout);
 
+  document.querySelectorAll(".brand").forEach((el) => {
+    el.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+  });
 
-  const storedUsername =
-    localStorage.getItem("scheduleItUser") ||
-    localStorage.getItem("scheduleitUser");
+  // Host dropdown (same IDs as host.html)
+  const trigger =
+    document.getElementById("host-user-menu-trigger") ||
+    document.getElementById("user-menu-trigger");
+  const dropdown =
+    document.getElementById("host-user-menu-dropdown") ||
+    document.getElementById("user-menu-dropdown");
+  trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
 
-  if (!storedUsername) {
-    window.location.href = "index.html";
+  const switchPlayerBtn = document.getElementById("switch-player-mode");
+  switchPlayerBtn?.addEventListener("click", async () => {
+    await fetch("/api/user/mode", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + localStorage.getItem("token"),
+      },
+      body: JSON.stringify({ mode: "player" }),
+    });
+    window.location.href = "join.html";
+  });
+
+  // ---------- READ TOURNAMENT ID ----------
+  const params = new URLSearchParams(window.location.search);
+  const tournamentId = params.get("tournamentId");
+
+  if (!tournamentId) {
+    console.warn("No tournamentId in URL");
+    alert("Missing tournamentId in URL");
     return;
   }
 
-  if (usernameLabel) {
-    usernameLabel.textContent = storedUsername;
-  }
+  // ---------- ELEMENTS ----------
+  const tableWrapper = document.getElementById("players-table-wrapper");
+  const tableBody = document.getElementById("players-table-body");
+  const emptyState = document.getElementById("players-empty-state");
 
-  const closeDropdown = () => {
-    if (userMenuDropdown) {
-      userMenuDropdown.classList.remove("is-open");
-    }
-  };
+  const allCount = document.getElementById("all-count");
+  const maleCount = document.getElementById("male-count");
+  const femaleCount = document.getElementById("female-count");
 
-  const toggleDropdown = () => {
-    if (userMenuDropdown) {
-      userMenuDropdown.classList.toggle("is-open");
-    }
-  };
-
-  if (userMenuTrigger && userMenuDropdown) {
-    userMenuTrigger.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleDropdown();
-    });
-
-    document.addEventListener("click", () => {
-      closeDropdown();
-    });
-  }
-
-  if (switchPlayerModeBtn) {
-    switchPlayerModeBtn.addEventListener("click", () => {
-      closeDropdown();
-      window.location.href = "join.html";
-    });
-  }
-
-  if (signoutBtn) {
-    signoutBtn.addEventListener("click", () => {
-      localStorage.removeItem("scheduleItUser");
-      localStorage.removeItem("scheduleitUser");
-      window.location.href = "index.html";
-    });
-  }
-
-    // --- Back to host page ---
-  if (backBtn) {
-    backBtn.addEventListener("click", () => {
-      window.location.href = "host.html";
-    });
-  }
-
-  // --- Tournament header elements ---
   const titleEl = document.getElementById("players-tournament-name");
   const sportEl = document.getElementById("players-tournament-sport");
   const datesEl = document.getElementById("players-tournament-dates");
   const codeEl = document.getElementById("players-tournament-code");
 
-  // --- Players + UI elements ---
-  const tabs = document.querySelectorAll(".players-tab");
-  const allCountEl = document.getElementById("all-count");
-  const maleCountEl = document.getElementById("male-count");
-  const femaleCountEl = document.getElementById("female-count");
-  const emptyStateEl = document.getElementById("players-empty-state");
-  const tableWrapper = document.getElementById("players-table-wrapper");
-  const tableBody = document.getElementById("players-table-body");
+  const backBtn = document.getElementById("players-back-btn");
+  backBtn?.addEventListener("click", () => (window.location.href = "host.html"));
 
-  const TOURNAMENT_KEY = "scheduleitTournaments";
+  const fixturesBtn = document.getElementById("create-fixtures-btn");
+  fixturesBtn?.addEventListener("click", () => {
+    window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(
+      tournamentId
+    )}`;
+  });
 
-  function loadAllTournaments() {
-    const raw = localStorage.getItem(TOURNAMENT_KEY);
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (err) {
-      console.error("Failed to parse tournaments", err);
-      return [];
-    }
+  // ---------- STATE ----------
+  let allPlayers = [];
+  let activeFilter = "all";
+
+  // ---------- HELPERS ----------
+  function getPlayerId(p) {
+    return p.playerId ?? p.registrationId ?? p.id ?? p._id ?? p.pk ?? null;
   }
 
-  // --- Read tournament id from URL ---
-  const params = new URLSearchParams(window.location.search);
-  const idParam = params.get("tournamentId");
-
-  const allTournaments = loadAllTournaments();
-  const tournament = idParam
-    ? allTournaments.find((t) => String(t.id) === String(idParam))
-    : null;
-
-  if (!tournament) {
-    if (titleEl) titleEl.textContent = "No tournament selected";
-    if (emptyStateEl) {
-      const heading = emptyStateEl.querySelector("h3");
-      const body = emptyStateEl.querySelector(".muted");
-      if (heading) heading.textContent = "No tournament selected";
-      if (body)
-        body.textContent =
-          "Open this page from the Host dashboard to see players.";
-      emptyStateEl.style.display = "flex";
-    }
-    if (tableWrapper) {
-      tableWrapper.style.display = "none";
-    }
-    return;
+function normalizeStatus(p) {
+  const raw =
+    p.status ?? p.registrationStatus ?? p.inviteStatus ?? p.state ?? "accepted";
+  const s = String(raw).toLowerCase();
+    if (["accepted", "approve", "approved"].includes(s)) return "accepted";
+    if (["rejected", "reject", "declined", "denied"].includes(s))
+      return "rejected";
+    return "pending";
   }
 
-    // --- Open fixtures page for this tournament ---
-  if (createFixturesBtn && tournament) {
-    createFixturesBtn.addEventListener("click", () => {
-      const id = tournament.id;
-      if (!id && id !== 0) return;
+  function statusLabel(status) {
+    if (status === "accepted") return "Accepted";
+    if (status === "rejected") return "Rejected";
+    return "Pending";
+  }
 
-      window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(
-        id
-      )}`;
+  function statusClass(status) {
+    if (status === "accepted") return "status-pill--accepted";
+    if (status === "rejected") return "status-pill--rejected";
+    return "status-pill--pending";
+  }
+
+  async function apiJson(url, options = {}) {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: "Bearer " + localStorage.getItem("token"),
+      },
     });
-  }
 
-
-  // --- Fill header with tournament info ---
-  if (titleEl) {
-    titleEl.textContent = tournament.tournamentName || "Tournament";
-  }
-  if (sportEl) {
-    sportEl.textContent = tournament.sportName
-      ? tournament.sportName
-      : "";
-  }
-  if (datesEl) {
-    datesEl.textContent = tournament.tournamentDates
-      ? `• ${tournament.tournamentDates}`
-      : "";
-  }
-  if (codeEl) {
-    codeEl.textContent = tournament.accessCode || "—";
-  }
-
-  const players = Array.isArray(tournament.players) ? tournament.players : [];
-
-  const totalCount = players.length;
-  const maleCount = players.filter(
-    (p) => (p.gender || "").toLowerCase() === "male"
-  ).length;
-  const femaleCount = players.filter(
-    (p) => (p.gender || "").toLowerCase() === "female"
-  ).length;
-
-  if (allCountEl) allCountEl.textContent = String(totalCount);
-  if (maleCountEl) maleCountEl.textContent = String(maleCount);
-  if (femaleCountEl) femaleCountEl.textContent = String(femaleCount);
-
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  function renderPlayers(filter) {
-    if (!tableBody || !emptyStateEl || !tableWrapper) return;
-
-    let filtered = players;
-    const f = (filter || "all").toLowerCase();
-
-    if (f === "male") {
-      filtered = players.filter(
-        (p) => (p.gender || "").toLowerCase() === "male"
-      );
-    } else if (f === "female") {
-      filtered = players.filter(
-        (p) => (p.gender || "").toLowerCase() === "female"
-      );
+    const raw = await res.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = raw;
     }
+
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  // Try multiple possible backend routes so it works across versions.
+  async function updateRegistrationStatus(player, nextStatus) {
+    const playerId = getPlayerId(player);
+    const body = JSON.stringify({ status: nextStatus });
+
+    const candidates = [
+      { method: "PATCH", url: `/api/host/tournaments/${tournamentId}/players/${playerId}`, body },
+      { method: "POST",  url: `/api/host/tournaments/${tournamentId}/players/${playerId}/${nextStatus}`, body: null },
+      { method: "PATCH", url: `/api/tournaments/${tournamentId}/players/${playerId}`, body },
+      { method: "PATCH", url: `/api/host/tournaments/${tournamentId}/registrations/${playerId}`, body },
+      { method: "POST",  url: `/api/host/tournaments/${tournamentId}/registrations/${playerId}/${nextStatus}`, body: null },
+    ].filter(
+      (c) =>
+        c.url &&
+        !c.url.includes("null") &&
+        !c.url.includes("undefined")
+    );
+
+    // If no ID exists, try a generic endpoint with player identifying info
+    if (!playerId) {
+      candidates.unshift({
+        method: "PATCH",
+        url: `/api/host/tournaments/${tournamentId}/players`,
+        body: JSON.stringify({
+          status: nextStatus,
+          playerName: player.playerName ?? player.name,
+          phone: player.phone ?? player.playerPhone,
+          username: player.username,
+        }),
+      });
+    }
+
+    for (const c of candidates) {
+      const opts = {
+        method: c.method,
+        headers: c.body ? { "Content-Type": "application/json" } : undefined,
+        body: c.body || undefined,
+      };
+      const r = await apiJson(c.url, opts);
+      if (r.ok) return r.data;
+    }
+
+    throw new Error(
+      "No matching accept/reject API route responded successfully."
+    );
+  }
+
+  // ---------- LOAD TOURNAMENT META ----------
+  async function loadTournamentMeta() {
+    // Host tournaments list
+    const host = await apiJson("/api/host/tournaments");
+    if (host.ok && Array.isArray(host.data)) {
+      const t = host.data.find(
+        (x) => String(x.tournamentId ?? x.id) === String(tournamentId)
+      );
+      if (t) {
+        titleEl && (titleEl.textContent = t.tournamentName ?? "Tournament");
+        sportEl && (sportEl.textContent = t.sportName ?? "");
+        datesEl && (datesEl.textContent = t.tournamentDates ?? "");
+        codeEl && (codeEl.textContent = t.accessCode ?? "");
+        return;
+      }
+    }
+
+    // Fallback: public list
+    const pub = await apiJson("/api/tournaments");
+    if (pub.ok && Array.isArray(pub.data)) {
+      const t = pub.data.find(
+        (x) => String(x.tournamentId ?? x.id) === String(tournamentId)
+      );
+      if (t) {
+        titleEl && (titleEl.textContent = t.tournamentName ?? "Tournament");
+        sportEl && (sportEl.textContent = t.sportName ?? "");
+        datesEl && (datesEl.textContent = t.tournamentDates ?? "");
+        codeEl && (codeEl.textContent = t.accessCode ?? "");
+      }
+    }
+  }
+
+  // ---------- RENDER ----------
+  function computeCounts(players) {
+    const male = players.filter(
+      (p) => String(p.gender || "").toLowerCase() === "male"
+    ).length;
+    const female = players.filter(
+      (p) => String(p.gender || "").toLowerCase() === "female"
+    ).length;
+    return { all: players.length, male, female };
+  }
+
+  function applyFilter(players) {
+    if (activeFilter === "male")
+      return players.filter(
+        (p) => String(p.gender || "").toLowerCase() === "male"
+      );
+    if (activeFilter === "female")
+      return players.filter(
+        (p) => String(p.gender || "").toLowerCase() === "female"
+      );
+    return players;
+  }
+
+  function render() {
+    const filtered = applyFilter(allPlayers);
+    const counts = computeCounts(allPlayers);
+
+    allCount && (allCount.textContent = String(counts.all));
+    maleCount && (maleCount.textContent = String(counts.male));
+    femaleCount && (femaleCount.textContent = String(counts.female));
 
     if (!filtered.length) {
-      tableWrapper.style.display = "none";
-      emptyStateEl.style.display = "flex";
+      emptyState && (emptyState.style.display = "block");
+      tableWrapper && (tableWrapper.style.display = "none");
       return;
     }
 
-    emptyStateEl.style.display = "none";
-    tableWrapper.style.display = "block";
+    emptyState && (emptyState.style.display = "none");
+    tableWrapper && (tableWrapper.style.display = "block");
 
-    tableBody.innerHTML = filtered
-      .map((p) => {
-        const name = p.name || "";
-        const age = p.age || "";
-        const gender = p.gender || "";
-        return `
-          <tr>
-            <td>${escapeHtml(name)}</td>
-            <td>${escapeHtml(age)}</td>
-            <td>${escapeHtml(gender)}</td>
-          </tr>
-        `;
-      })
-      .join("");
+    if (!tableBody) return;
+    tableBody.innerHTML = "";
+
+    filtered.forEach((p) => {
+      const status = normalizeStatus(p);
+
+      const name = p.playerName ?? p.name ?? p.fullName ?? "-";
+      const age = p.age ?? p.playerAge ?? "-";
+      const gender = p.gender ?? "-";
+
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${name}</td>
+        <td>${age}</td>
+        <td>${gender}</td>
+        <td><span class="status-pill ${statusClass(status)}">${statusLabel(
+        status
+      )}</span></td>
+        <td>
+        <div class="row-actions">
+        ${
+        status === "rejected"
+        ? `<button type="button" class="action-btn accept" data-action="accept">Accept</button>`
+        : `<button type="button" class="action-btn reject" data-action="reject">Reject</button>`
+        }
+        </div>
+        </td>
+
+      `;
+
+      tr.querySelectorAll("button[data-action]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const action = btn.getAttribute("data-action");
+          const nextStatus = action === "accept" ? "accepted" : "rejected";
+
+          btn.disabled = true;
+          try {
+            await updateRegistrationStatus(p, nextStatus);
+            // Update local state and re-render
+            p.status = nextStatus;
+            p.registrationStatus = nextStatus;
+            render();
+          } catch (e) {
+            console.error(e);
+            alert(
+              "Could not update player status. If this keeps happening, the backend accept/reject route is missing."
+            );
+            btn.disabled = false;
+          }
+        });
+      });
+
+      tableBody.appendChild(tr);
+    });
   }
 
-  // --- Tab switching ---
-  if (tabs && tabs.length) {
+  function wireTabs() {
+    const tabs = Array.from(document.querySelectorAll(".players-tab"));
     tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
         tabs.forEach((t) => t.classList.remove("active"));
         tab.classList.add("active");
-        const filter = tab.getAttribute("data-player-filter") || "all";
-        renderPlayers(filter);
+        activeFilter = tab.dataset.playerFilter || "all";
+        render();
       });
     });
   }
 
-  // Initial render
-  renderPlayers("all");
+  // ---------- FETCH PLAYERS ----------
+  async function loadPlayers() {
+    // This is the route your app already uses historically:
+    const primary = await apiJson(`/api/tournaments/${tournamentId}/players`);
+
+    if (!primary.ok) {
+      console.error("Failed to fetch players", primary.status, primary.data);
+      alert("Could not load players for this tournament.");
+      allPlayers = [];
+      render();
+      return;
+    }
+
+    const players = Array.isArray(primary.data)
+      ? primary.data
+      : primary.data?.players || primary.data?.items || [];
+
+    allPlayers = players;
+    render();
+  }
+
+  wireTabs();
+  await loadTournamentMeta();
+  await loadPlayers();
 });

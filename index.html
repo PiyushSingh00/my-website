@@ -12,13 +12,13 @@
 <body>
   <header class="hero">
     <nav class="topbar">
-      <div class="brand">ScheduleIt</div>
+      <a class="brand" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
     </nav>
 
     <div class="hero-grid">
       <div class="hero-copy">
         <p class="eyebrow">Tournament HQ</p>
-        <h1>Host and join sports tournaments with confidence.</h1>
+        <h1>One stop platform to record all your games.</h1>
         <p class="lede">
           ScheduleIt brings brackets, fixtures, and live scores into one streamlined
           place so clubs can focus on the game.
@@ -40,7 +40,7 @@
             <li>Automated scheduling and score capture</li>
             <li>Share live standings with one link</li>
           </ul>
-          <a class="text-link" href="#">Start hosting</a>
+          <a id="start-hosting-btn" class="btn secondary">Start Hosting</a>
         </article>
 
         <article class="feature-card">
@@ -51,7 +51,7 @@
             <li>Join solo or register your full squad</li>
             <li>Instant notifications for fixtures</li>
           </ul>
-          <a class="text-link" href="#">Browse tournaments</a>
+          <a id="browse-tournaments-btn" class="btn secondary">Browse Tournaments</a>
         </article>
       </div>
     </div>
@@ -231,6 +231,6 @@
     </div>
   </div>
 
-  <script src="scripts/home.js"></script>
+  <script type="module" src="scripts/home.js"></script>
 </body>
 </html>
