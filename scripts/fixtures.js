@@ -63,22 +63,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const codeEl = document.getElementById("fixtures-tournament-code");
 
   // ---------- GROUP ELEMENTS ----------
-  const maleGroupEl = document.getElementById("fixtures-group-male");
-  const femaleGroupEl = document.getElementById("fixtures-group-female");
-  const maleEmptyEl = document.getElementById("fixtures-empty-state-male");
-  const femaleEmptyEl = document.getElementById("fixtures-empty-state-female");
-  const maleBracketEl = document.getElementById("fixtures-bracket-male");
-  const femaleBracketEl = document.getElementById("fixtures-bracket-female");
+// ---------- GROUP ELEMENTS (dynamic categories) ----------
   const noneSelectedEl = document.getElementById("fixtures-none-selected");
+  const toggleWrap = document.getElementById("fixtures-toggle"); // NEW in fixtures.html
+  const groupsWrap = document.getElementById("fixtures-groups"); // NEW in fixtures.html
 
-  const toggleMaleBtn = document.getElementById("fixtures-toggle-male");
-  const toggleFemaleBtn = document.getElementById("fixtures-toggle-female");
-  const toggleWrap = document.querySelector(".fixtures-toggle");
-
-  let mixedGroupEl = null;
-  let mixedEmptyEl = null;
-  let mixedBracketEl = null;
-  let toggleMixedBtn = null;
 
   if (toggleWrap) {
     toggleMixedBtn = document.createElement("button");
@@ -233,149 +222,229 @@ function normalizeStatus(p) {
 const acceptedPlayers = players.filter(p => normalizeStatus(p) === "accepted");
 
 
-function getGroupKey(p) {
-  const categoryGender = p.categoryGender ?? p.category?.gender ?? p.categoryType;
-  const raw = categoryGender || p.gender || p.playerGender || "";
-  const s = String(raw).toLowerCase();
-  if (s === "mixed") return "mixed";
-  if (s === "female") return "female";
-  return "male";
+// ---------- CATEGORIES ----------
+function normalizeCategories(cats) {
+  if (!cats) return [];
+  if (Array.isArray(cats)) return cats;
+  if (typeof cats === "string") {
+    try {
+      const parsed = JSON.parse(cats);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
-const maleNames = acceptedPlayers
-  .filter(p => getGroupKey(p) === "male")
-  .map(p => p.name ?? p.playerName);
+function categoryLabel(c) {
+  const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
+  const gender = c?.gender ? String(c.gender).trim() : "";
+  const size = c?.teamSize ? Number(c.teamSize) : null;
 
-const femaleNames = acceptedPlayers
-  .filter(p => getGroupKey(p) === "female")
-  .map(p => p.name ?? p.playerName);
+  const type =
+    size === 1 ? "Singles" :
+    size === 2 ? "Doubles" :
+    size ? `Team ${size}` : "";
 
-const mixedNames = acceptedPlayers
-  .filter(p => getGroupKey(p) === "mixed")
-  .map(p => p.name ?? p.playerName);
+  const parts = [age, gender, type].filter(Boolean);
+  return parts.length ? parts.join(" • ") : (c?.categoryId || "Category");
+}
+
+function getPlayerCategoryId(p) {
+  return p.categoryId ?? p.category ?? p.categoryID ?? p.category_id ?? null;
+}
+
+const categories = normalizeCategories(tournament.categories);
+
+// group accepted players by categoryId
+const acceptedByCategory = {};
+acceptedPlayers.forEach((p) => {
+  const cid = getPlayerCategoryId(p);
+  if (!cid) return;
+  const name = p.name ?? p.playerName ?? p.username ?? "Player";
+  if (!acceptedByCategory[cid]) acceptedByCategory[cid] = [];
+  acceptedByCategory[cid].push(name);
+});
+
 
 
   // ---------- BRACKET LOGIC ----------
-  function createBracket(names, groupKey) {
-    if (names.length < 2) return null;
 
-    const shuffled = shuffle(names);
-    let P = 1;
-    while (P < shuffled.length) P *= 2;
+function createBracket(names) {
+  if (!names || names.length < 2) return null;
 
-    const totalRounds = Math.log2(P);
-    const rounds = [];
+  const shuffled = shuffle(names);
+  let P = 1;
+  while (P < shuffled.length) P *= 2;
 
-    const slots = Array(P).fill("BYE");
-    shuffled.forEach((n, i) => slots[i] = n);
+  const totalRounds = Math.log2(P);
+  const rounds = [];
 
-    rounds.push(
-      Array.from({ length: P / 2 }, (_, i) => ({
-        round: 0,
-        match: i,
-        home: slots[i * 2],
-        away: slots[i * 2 + 1],
-      }))
-    );
+  const slots = Array(P).fill("BYE");
+  shuffled.forEach((n, i) => slots[i] = n);
 
-    for (let r = 1; r < totalRounds; r++) {
-      rounds.push(Array.from({ length: rounds[r - 1].length / 2 }));
-    }
+  rounds.push(
+    Array.from({ length: P / 2 }, (_, i) => ({
+      round: 0,
+      match: i,
+      home: slots[i * 2],
+      away: slots[i * 2 + 1],
+    }))
+  );
 
-    return { groupKey, rounds, totalRounds };
+  for (let r = 1; r < totalRounds; r++) {
+    rounds.push(Array.from({ length: rounds[r - 1].length / 2 }));
   }
 
-  let brackets = null;
-  try {
-    brackets = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-  } catch {}
+  return { rounds, totalRounds };
+}
 
-  if (!brackets) {
-    brackets = loadFixtures(tournamentId) || null;
-  }
 
-  if (!brackets) {
-    brackets = {
-      male: createBracket(maleNames, "male"),
-      female: createBracket(femaleNames, "female"),
-      mixed: createBracket(mixedNames, "mixed")
+let fixtures = null;
+try {
+  fixtures = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+} catch {}
+
+if (!fixtures) {
+  fixtures = loadFixtures(tournamentId) || null;
+}
+
+// build new fixtures if none saved
+if (!fixtures) {
+  fixtures = { categories: {} };
+
+  categories.forEach((c) => {
+    const cid = c.categoryId || c.id;
+    if (!cid) return;
+
+    const names = acceptedByCategory[cid] || [];
+    const bracket = createBracket(names);
+    if (!bracket) return;
+
+    fixtures.categories[cid] = {
+      categoryId: cid,
+      label: categoryLabel(c),
+      ...bracket
     };
-  } else {
-    brackets.__locked = true;
-    if (generateBtn) generateBtn.disabled = true;
-  }
+  });
+} else {
+  fixtures.__locked = true;
+  if (generateBtn) generateBtn.disabled = true;
+}
 
-  function render(groupKey) {
-    const bracket = brackets[groupKey];
-    const groupEl =
-      groupKey === "male" ? maleGroupEl :
-      groupKey === "female" ? femaleGroupEl :
-      mixedGroupEl;
-    const emptyEl =
-      groupKey === "male" ? maleEmptyEl :
-      groupKey === "female" ? femaleEmptyEl :
-      mixedEmptyEl;
-    const bracketEl =
-      groupKey === "male" ? maleBracketEl :
-      groupKey === "female" ? femaleBracketEl :
-      mixedBracketEl;
+function renderCategoryBracket(categoryId) {
+  if (!groupsWrap) return;
+  groupsWrap.innerHTML = "";
 
-    if (!bracket) {
-      groupEl.style.display = "block";
-      emptyEl.style.display = "flex";
-      bracketEl.style.display = "none";
-      return;
-    }
+  const cat = fixtures?.categories?.[categoryId];
+  if (!cat) return;
 
-    emptyEl.style.display = "none";
-    bracketEl.style.display = "block";
+  const group = document.createElement("div");
+  group.className = "fixtures-group";
+  group.style.display = "block";
 
-    bracketEl.innerHTML = bracket.rounds.map((round, r) => `
-      <div class="round">
-        <h4>${getRoundLabel(r, bracket.totalRounds)}</h4>
-        ${round.map(m => `
-          <div class="match">
-            <span>${m?.home || "-"}</span> vs <span>${m?.away || "-"}</span>
-          </div>
-        `).join("")}
+  // if bracket missing (less than 2 players)
+  if (!cat.rounds || cat.rounds.length === 0) {
+    group.innerHTML = `
+      <h2 class="fixtures-group-title">${cat.label || categoryId}</h2>
+      <div class="empty-state" style="display:flex;">
+        <div class="feature-icon">🧩</div>
+        <h3>Not enough players</h3>
+        <p class="muted">Add at least two accepted players in this category.</p>
       </div>
-    `).join("");
+    `;
+    groupsWrap.appendChild(group);
+    return;
   }
 
-  function show(group) {
-    noneSelectedEl.style.display = "none";
-    maleGroupEl.style.display = group === "male" ? "block" : "none";
-    femaleGroupEl.style.display = group === "female" ? "block" : "none";
-    if (mixedGroupEl) mixedGroupEl.style.display = group === "mixed" ? "block" : "none";
-    render(group);
-  }
+  group.innerHTML = `
+    <h2 class="fixtures-group-title">${cat.label || categoryId}</h2>
+    <div class="fixtures-bracket">
+      ${cat.rounds.map((round, r) => `
+        <div class="round">
+          <h4>${getRoundLabel(r, cat.totalRounds)}</h4>
+          ${round.map((m, i) => `
+            <div class="match">
+              <span>${m?.home || "-"}</span> vs <span>${m?.away || "-"}</span>
+            </div>
+          `).join("")}
+        </div>
+      `).join("")}
+    </div>
+  `;
 
-  if (toggleMaleBtn) toggleMaleBtn.onclick = () => show("male");
-  if (toggleFemaleBtn) toggleFemaleBtn.onclick = () => show("female");
-  if (toggleMixedBtn) toggleMixedBtn.onclick = () => show("mixed");
+  groupsWrap.appendChild(group);
+}
 
-  if (generateBtn) {
-    generateBtn.onclick = async () => {
-      if (brackets && brackets.__locked) return;
+function renderCategoryToggles() {
+  if (!toggleWrap) return;
+  toggleWrap.innerHTML = "";
 
-      brackets = {
-        male: createBracket(maleNames, "male"),
-        female: createBracket(femaleNames, "female"),
-        mixed: createBracket(mixedNames, "mixed")
+  const ids = Object.keys(fixtures?.categories || {});
+  if (!ids.length) return;
+
+  ids.forEach((cid, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fixtures-toggle-btn";
+    btn.textContent = fixtures.categories[cid].label || cid;
+
+    btn.addEventListener("click", () => {
+      if (noneSelectedEl) noneSelectedEl.style.display = "none";
+      toggleWrap.querySelectorAll(".fixtures-toggle-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderCategoryBracket(cid);
+    });
+
+    toggleWrap.appendChild(btn);
+
+    // auto-open first tab
+    if (idx === 0) btn.click();
+  });
+}
+
+renderCategoryToggles();
+
+
+if (generateBtn) {
+  generateBtn.onclick = async () => {
+    if (fixtures && fixtures.__locked) return;
+
+    fixtures = { categories: {} };
+
+    categories.forEach((c) => {
+      const cid = c.categoryId || c.id;
+      if (!cid) return;
+
+      const names = acceptedByCategory[cid] || [];
+      const bracket = createBracket(names);
+      if (!bracket) return;
+
+      fixtures.categories[cid] = {
+        categoryId: cid,
+        label: categoryLabel(c),
+        ...bracket
       };
+    });
 
-      try {
-        const saved = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`, brackets);
-        brackets = saved || brackets;
-        brackets.__locked = true;
-      } catch {
-        saveFixtures(tournamentId, brackets);
-      }
+    try {
+      const saved = await apiPost(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+        fixtures
+      );
+      fixtures = saved || fixtures;
+      fixtures.__locked = true;
+    } catch {
+      saveFixtures(tournamentId, fixtures);
+    }
 
-      generateBtn.disabled = true;
-      showToast("Fixtures generated");
-    };
-  }
+    generateBtn.disabled = true;
+    showToast("Fixtures generated");
+    renderCategoryToggles();
+  };
+}
+
 
   if (backBtn) {
     backBtn.onclick = () => {

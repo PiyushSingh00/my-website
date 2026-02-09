@@ -59,44 +59,50 @@ document.addEventListener("DOMContentLoaded", async () => {
     return { ok: res.ok, data };
   }
 
-  function renderRows(fixtures) {
-    if (!tableBody) return;
-    tableBody.innerHTML = "";
+function renderRows(fixtures) {
+  if (!tableBody) return;
+  tableBody.innerHTML = "";
 
-    const groups = ["male", "female", "mixed"].filter((k) => fixtures?.[k]);
-    const rows = [];
+  const cats = fixtures?.categories || {};
+  const catIds = Object.keys(cats);
 
-    groups.forEach((groupKey) => {
-      const bracket = fixtures[groupKey];
-      if (!bracket?.rounds) return;
-      bracket.rounds.forEach((round, r) => {
-        round.forEach((match, i) => {
-          rows.push({
-            roundLabel: `${groupKey.toUpperCase()} • ${r + 1}`,
-            matchLabel: `Match ${i + 1}`,
-            home: match?.home || "-",
-            away: match?.away || "-"
-          });
+  const rows = [];
+
+  catIds.forEach((cid) => {
+    const bracket = cats[cid];
+    if (!bracket?.rounds) return;
+
+    const label = bracket.label || cid;
+
+    bracket.rounds.forEach((round, r) => {
+      round.forEach((match, i) => {
+        rows.push({
+          roundLabel: `${label} • ${r + 1}`,
+          matchLabel: `Match ${i + 1}`,
+          home: match?.home || "-",
+          away: match?.away || "-",
         });
       });
     });
+  });
 
-    if (!rows.length) return;
+  if (!rows.length) return;
 
-    rows.forEach((row) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${row.roundLabel}</td>
-        <td>${row.matchLabel}</td>
-        <td>${row.home}</td>
-        <td>${row.away}</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  }
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${row.roundLabel}</td>
+      <td>${row.matchLabel}</td>
+      <td>${row.home}</td>
+      <td>${row.away}</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    `;
+    tableBody.appendChild(tr);
+  });
+}
+
 
   async function loadMeta() {
     const res = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}`);
