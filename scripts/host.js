@@ -41,10 +41,19 @@ document.addEventListener("DOMContentLoaded", async () => {
           <option value="Mixed" ${cat.gender === "Mixed" ? "selected" : ""}>Mixed</option>
         </select>
 
-        <input type="number" min="1" placeholder="Team size"
-          value="${cat.teamSize}" data-index="${index}" data-field="teamSize" />
+        <input
+          type="number"
+          min="1"
+          placeholder="Team size (e.g. 1 for singles)"
+          value="${cat.teamSize ?? ""}"
+          data-index="${index}"
+          data-field="teamSize"
+        />
 
-        <button type="button" data-remove="${index}">✕</button>
+        <button type="button" class="delete-category-btn" data-remove="${index}">
+          Delete category
+        </button>
+
       `;
 
       categoriesContainer.appendChild(div);
@@ -88,7 +97,7 @@ categories.push({
   categoryId: generateCategoryId(),
   ageGroup: "",
   gender: "",
-  teamSize: 1
+  teamSize: ""
 });
 
       renderCategories();
