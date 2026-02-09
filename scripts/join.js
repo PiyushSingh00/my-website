@@ -6,6 +6,53 @@ let selectedTournament = null;
 let currentSportFilter = "all";
 let currentSearchTerm = "";
 
+function normalizeCategories(cats) {
+  if (!cats) return [];
+  if (Array.isArray(cats)) return cats;
+
+  if (typeof cats === "string") {
+    try {
+      const parsed = JSON.parse(cats);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function fillCategoryDropdown(t) {
+  const catSelect = document.getElementById("player-category");
+  if (!catSelect) return;
+
+  catSelect.innerHTML = `<option value="">Select category</option>`;
+
+  const cats = normalizeCategories(t?.categories).filter(Boolean);
+
+  cats.forEach((c) => {
+    const id = c.categoryId || c.id || "";
+    const labelParts = [
+      c.ageGroup,
+      c.gender,
+      c.teamSize ? `Team size ${c.teamSize}` : null
+    ].filter(Boolean);
+
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent =
+      (labelParts.join(" • ") || "Category") + (id ? ` (ID: ${id})` : "");
+    catSelect.appendChild(opt);
+  });
+
+  if (!cats.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No categories found";
+    catSelect.appendChild(opt);
+  }
+}
+
+
 function normalizeTournamentList(raw) {
   if (Array.isArray(raw)) return raw;
   if (!raw || typeof raw !== "object") return [];
@@ -248,18 +295,22 @@ async function loadAllTournaments() {
    JOIN FLOW: Code Modal -> Player Modal -> Register
 ------------------------- */
 function openCodeModal(t) {
-  // Reset code UI
+  // reset code UI
   const codeInput = document.getElementById("code-input");
   const codeError = document.getElementById("code-error");
   if (codeInput) codeInput.value = "";
   if (codeError) codeError.style.display = "none";
 
-  // Update modal title if you want
+  // ✅ Populate categories in CODE modal (this dropdown is inside code-modal)
+  fillCategoryDropdown(t);
+
+  // update title
   const title = document.getElementById("code-modal-title");
   if (title) title.textContent = `Enter code for ${t.tournamentName ?? "tournament"}`;
 
   openModal("code-modal");
 }
+
 
 async function hydrateTournamentMeta(tournamentId) {
   if (!tournamentId) return null;
@@ -278,31 +329,6 @@ function openPlayerModal(t, user) {
 
     // --- Category dropdown ---
   const catSelect = document.getElementById("player-category");
-  if (catSelect) {
-    catSelect.innerHTML = `<option value="">Select category</option>`;
-
-    const cats = (t.categories || []).filter(Boolean);
-    cats.forEach((c) => {
-      const id = c.categoryId || c.id || "";
-      const labelParts = [
-        c.ageGroup,
-        c.gender,
-        c.teamSize ? `Team size ${c.teamSize}` : null
-      ].filter(Boolean);
-
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = labelParts.join(" • ") + (id ? ` (ID: ${id})` : "");
-      catSelect.appendChild(opt);
-    });
-
-    if (!cats.length) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "No categories found";
-      catSelect.appendChild(opt);
-    }
-  }
 
 
   // ✅ Autofill from /api/me (if available)
