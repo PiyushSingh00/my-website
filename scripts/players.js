@@ -6,119 +6,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!user) return;
 
   // ---------- TOPBAR ----------
+  const usernameLabel = document.getElementById("username-label");
+  if (usernameLabel) usernameLabel.textContent = user.username;
+
+  const signoutBtn = document.getElementById("signout-btn");
+  signoutBtn?.addEventListener("click", logout);
+
   document.querySelectorAll(".brand").forEach((el) => {
     el.addEventListener("click", () => {
       window.location.href = "index.html";
     });
   });
-
-  // ===== Topbar: avatar + dropdown signout + mode toggle =====
-const trigger = document.getElementById("players-user-menu-trigger");
-const dropdown = document.getElementById("players-user-menu-dropdown");
-
-// Set avatar initial
-if (trigger) {
-  const label = (user?.name || user?.username || user?.email || "U").trim();
-  trigger.textContent = label.charAt(0).toUpperCase();
-}
-
-// Dropdown open/close
-trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
-
-// Dropdown: Sign out
-document.getElementById("dropdown-signout")?.addEventListener("click", () => {
-  dropdown?.classList.remove("is-open");
-  logout();
-});
-
-// Mode toggle
-const playerBtn = document.getElementById("mode-player-btn");
-const hostBtn = document.getElementById("mode-host-btn");
-
-playerBtn?.classList.add("is-active");
-hostBtn?.classList.remove("is-active");
-
-// clicking Join mode stays here
-playerBtn?.addEventListener("click", () => {
-  playerBtn.classList.add("is-active");
-  hostBtn?.classList.remove("is-active");
-});
-
-// clicking Host mode: set mode + go host page
-hostBtn?.addEventListener("click", async () => {
-  hostBtn.classList.add("is-active");
-  playerBtn?.classList.remove("is-active");
-
-  await fetch("/api/user/mode", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + localStorage.getItem("token"),
-    },
-    body: JSON.stringify({ mode: "host" }),
-  });
-
-  window.location.href = "host.html";
-});
-
-function formatCategoryLabel(c) {
-  const size = Number(c.teamSize);
-  let type = "";
-  if (size === 1) type = "Singles";
-  else if (size === 2) type = "Doubles";
-
-  const genderLabel =
-    c.gender === "Male" ? "Men's" :
-    c.gender === "Female" ? "Women's" :
-    (c.gender || "");
-
-  // e.g. "U18 Men's Singles"
-  return `${c.ageGroup || ""} ${genderLabel}${type ? " " + type : ""}`.trim().replace(/\s+/g, " ");
-}
-
-function renderCategoryTabs(categories, players) {
-  const tabs = document.getElementById("players-tabs");
-  if (!tabs) return;
-
-  tabs.innerHTML = "";
-
-  // "All categories" tab
-  const allBtn = document.createElement("button");
-  allBtn.className = "players-tab active";
-  allBtn.dataset.cat = "all";
-  allBtn.innerHTML = `All categories <span class="tab-count">${players.length}</span>`;
-  tabs.appendChild(allBtn);
-
-  // One tab per category from host setup
-  categories.forEach((c) => {
-    const catId = c.categoryId;
-    const label = formatCategoryLabel(c);
-
-    const count = players.filter(p => String(p.categoryId) === String(catId)).length;
-
-    const btn = document.createElement("button");
-    btn.className = "players-tab";
-    btn.dataset.cat = catId;
-    btn.innerHTML = `${label} <span class="tab-count">${count}</span>`;
-    tabs.appendChild(btn);
-  });
-
-  // click behavior
-  tabs.addEventListener("click", (e) => {
-    const btn = e.target.closest(".players-tab");
-    if (!btn) return;
-
-    tabs.querySelectorAll(".players-tab").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-
-    const cat = btn.dataset.cat;
-    const filtered = (cat === "all")
-      ? players
-      : players.filter(p => String(p.categoryId) === String(cat));
-
-    renderPlayersTable(filtered); // use your existing table render function
-  }, { once: true });
-}
 
   // Host dropdown (same IDs as host.html)
   const trigger =
