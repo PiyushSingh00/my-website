@@ -157,9 +157,6 @@ function renderCategoryTabs(categories, players) {
   const tableBody = document.getElementById("players-table-body");
   const emptyState = document.getElementById("players-empty-state");
 
-  const allCount = document.getElementById("all-count");
-  const maleCount = document.getElementById("male-count");
-  const femaleCount = document.getElementById("female-count");
 
   const titleEl = document.getElementById("players-tournament-name");
   const sportEl = document.getElementById("players-tournament-sport");
@@ -179,8 +176,41 @@ function renderCategoryTabs(categories, players) {
   // ---------- STATE ----------
   let allPlayers = [];
   let activeFilter = "all";
+  let tournamentCategories = []; // [{categoryId, ageGroup, gender, teamSize}]
+
 
   // ---------- HELPERS ----------
+  function normalizeCategories(cats) {
+  if (!cats) return [];
+  if (Array.isArray(cats)) return cats;
+  if (typeof cats === "string") {
+    try {
+      const parsed = JSON.parse(cats);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }
+  return [];
+}
+
+function categoryLabel(c) {
+  const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
+  const gender = c?.gender ? String(c.gender).trim() : "";
+  const size = c?.teamSize ? Number(c.teamSize) : null;
+
+  const type =
+    size === 1 ? "Singles" :
+    size === 2 ? "Doubles" :
+    size ? `Team ${size}` : "";
+
+  const parts = [age, gender, type].filter(Boolean);
+  return parts.length ? parts.join(" • ") : (c?.categoryId || "Category");
+}
+
+function getPlayerCategoryId(p) {
+  return p.categoryId ?? p.categoryID ?? p.category ?? p.category_id ?? null;
+}
+
+  
   function getPlayerId(p) {
     return p.playerId ?? p.registrationId ?? p.id ?? p._id ?? p.pk ?? null;
   }
@@ -287,6 +317,7 @@ function normalizeStatus(p) {
         sportEl && (sportEl.textContent = t.sportName ?? "");
         datesEl && (datesEl.textContent = t.tournamentDates ?? "");
         codeEl && (codeEl.textContent = t.accessCode ?? "");
+        tournamentCategories = normalizeCategories(t.categories);
         return;
       }
     }
@@ -302,40 +333,40 @@ function normalizeStatus(p) {
         sportEl && (sportEl.textContent = t.sportName ?? "");
         datesEl && (datesEl.textContent = t.tournamentDates ?? "");
         codeEl && (codeEl.textContent = t.accessCode ?? "");
+        tournamentCategories = normalizeCategories(t.categories);
+
       }
     }
   }
 
   // ---------- RENDER ----------
-  function computeCounts(players) {
-    const male = players.filter(
-      (p) => String(p.gender || "").toLowerCase() === "male"
-    ).length;
-    const female = players.filter(
-      (p) => String(p.gender || "").toLowerCase() === "female"
-    ).length;
-    return { all: players.length, male, female };
-  }
+function computeCounts(players) {
+  const counts = { all: players.length, byCategory: {} };
 
-  function applyFilter(players) {
-    if (activeFilter === "male")
-      return players.filter(
-        (p) => String(p.gender || "").toLowerCase() === "male"
-      );
-    if (activeFilter === "female")
-      return players.filter(
-        (p) => String(p.gender || "").toLowerCase() === "female"
-      );
-    return players;
-  }
+  players.forEach((p) => {
+    const cid = getPlayerCategoryId(p) || "uncategorized";
+    counts.byCategory[cid] = (counts.byCategory[cid] || 0) + 1;
+  });
+
+  return counts;
+}
+
+function applyFilter(players) {
+  if (activeFilter === "all") return players;
+  return players.filter((p) => String(getPlayerCategoryId(p) || "") === String(activeFilter));
+}
+
 
   function render() {
     const filtered = applyFilter(allPlayers);
     const counts = computeCounts(allPlayers);
+    const allCountEl = document.getElementById("tab-count-all");
+    if (allCountEl) allCountEl.textContent = String(counts.all);
 
-    allCount && (allCount.textContent = String(counts.all));
-    maleCount && (maleCount.textContent = String(counts.male));
-    femaleCount && (femaleCount.textContent = String(counts.female));
+    document.querySelectorAll("[data-count-for]").forEach((el) => {
+      const cid = el.getAttribute("data-count-for");
+      el.textContent = String(counts.byCategory[cid] || 0);
+    });
 
     if (!filtered.length) {
       emptyState && (emptyState.style.display = "block");
@@ -403,17 +434,46 @@ function normalizeStatus(p) {
     });
   }
 
-  function wireTabs() {
-    const tabs = Array.from(document.querySelectorAll(".players-tab"));
-    tabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        tabs.forEach((t) => t.classList.remove("active"));
-        tab.classList.add("active");
-        activeFilter = tab.dataset.playerFilter || "all";
-        render();
-      });
+ function wireTabs() {
+  const tabsWrap = document.getElementById("players-tabs");
+  if (!tabsWrap) return;
+
+  tabsWrap.innerHTML = "";
+
+  // All tab
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = "players-tab active";
+  allBtn.dataset.playerFilter = "all";
+  allBtn.innerHTML = `All players <span class="tab-count" id="tab-count-all">0</span>`;
+  tabsWrap.appendChild(allBtn);
+
+  // Category tabs
+  (tournamentCategories || []).forEach((c) => {
+    const id = c.categoryId || c.id;
+    if (!id) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "players-tab";
+    btn.dataset.playerFilter = id;
+    btn.innerHTML = `${categoryLabel(c)} <span class="tab-count" data-count-for="${id}">0</span>`;
+    tabsWrap.appendChild(btn);
+  });
+
+  // Click wiring
+  const tabs = Array.from(tabsWrap.querySelectorAll(".players-tab"));
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      activeFilter = tab.dataset.playerFilter || "all";
+      render();
     });
-  }
+  });
+}
+
+
 
   // ---------- FETCH PLAYERS ----------
   async function loadPlayers() {
@@ -436,7 +496,8 @@ function normalizeStatus(p) {
     render();
   }
 
-  wireTabs();
-  await loadTournamentMeta();
-  await loadPlayers();
+await loadTournamentMeta();
+wireTabs();
+await loadPlayers();
+
 });
