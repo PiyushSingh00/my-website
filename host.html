@@ -23,32 +23,22 @@
 
         <div class="topbar-right">
             <div class="user-menu">
-            <button
-                class="user-trigger"
-                id="host-user-menu-trigger"
-                type="button"
-            >
-                Signed in as <span id="username-label">Host</span>
-                <span class="caret">▾</span>
+            <button type="button" class="user-avatar-btn" id="host-user-menu-trigger" aria-label="User menu">
+                U
             </button>
 
-            <div
-                class="user-menu-dropdown"
-                id="host-user-menu-dropdown"
-            >
-                <button
-                type="button"
-                class="dropdown-item"
-                id="switch-player-mode"
-                >
-                Switch to player mode
+            <div class="user-menu-dropdown" id="host-user-menu-dropdown">
+                <button type="button" class="dropdown-item" id="dropdown-signout">
+                    Sign out
                 </button>
             </div>
             </div>
 
-            <button class="signout-btn" id="signout-btn" type="button">
-            Sign out
-            </button>
+            <div class="mode-toggle" role="group" aria-label="Mode toggle">
+                <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
+                <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
+            </div>
+
         </div>
     </header>
 

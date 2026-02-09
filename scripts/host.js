@@ -41,10 +41,19 @@ document.addEventListener("DOMContentLoaded", async () => {
           <option value="Mixed" ${cat.gender === "Mixed" ? "selected" : ""}>Mixed</option>
         </select>
 
-        <input type="number" min="1" placeholder="Team size"
-          value="${cat.teamSize}" data-index="${index}" data-field="teamSize" />
+        <input
+          type="number"
+          min="1"
+          placeholder="Team size (e.g. 1 for singles)"
+          value="${cat.teamSize ?? ""}"
+          data-index="${index}"
+          data-field="teamSize"
+        />
 
-        <button type="button" data-remove="${index}">✕</button>
+        <button type="button" class="delete-category-btn" data-remove="${index}">
+          Delete category
+        </button>
+
       `;
 
       categoriesContainer.appendChild(div);
@@ -88,7 +97,7 @@ categories.push({
   categoryId: generateCategoryId(),
   ageGroup: "",
   gender: "",
-  teamSize: 1
+  teamSize: ""
 });
 
       renderCategories();
@@ -135,23 +144,38 @@ categories.push({
 
 
 
+// ===== Topbar: avatar + dropdown signout + mode toggle =====
+const trigger = document.getElementById("host-user-menu-trigger");
+const dropdown = document.getElementById("host-user-menu-dropdown");
 
-  // Show username
-  const usernameLabel = document.getElementById("username-label");
-  if (usernameLabel) {
-    usernameLabel.textContent = user.username;
-  }
+// Set avatar initial
+if (trigger) {
+  const label = (user?.name || user?.username || user?.email || "U").trim();
+  trigger.textContent = label.charAt(0).toUpperCase();
+}
 
-  // Logout
-  const signoutBtn = document.getElementById("signout-btn");
-  // ✅ Host topbar dropdown + switch to player
-const trigger = document.getElementById("host-user-menu-trigger") || document.getElementById("user-menu-trigger");
-const dropdown = document.getElementById("host-user-menu-dropdown") || document.getElementById("user-menu-dropdown");
-
+// Dropdown open/close
 trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
 
-const switchPlayerBtn = document.getElementById("switch-player-mode");
-switchPlayerBtn?.addEventListener("click", async () => {
+// Dropdown: Sign out
+const dropdownSignout = document.getElementById("dropdown-signout");
+dropdownSignout?.addEventListener("click", () => {
+  dropdown?.classList.remove("is-open");
+  logout();
+});
+
+// Mode toggle: Host active on this page
+const playerBtn = document.getElementById("mode-player-btn");
+const hostBtn = document.getElementById("mode-host-btn");
+
+hostBtn?.classList.add("is-active");
+playerBtn?.classList.remove("is-active");
+
+// Switch to Join mode (reuses your existing backend endpoint)
+playerBtn?.addEventListener("click", async () => {
+  playerBtn.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
   await fetch("/api/user/mode", {
     method: "POST",
     headers: {
@@ -164,15 +188,13 @@ switchPlayerBtn?.addEventListener("click", async () => {
   window.location.href = "join.html";
 });
 
+// Clicking Host mode here just keeps the active look
+hostBtn?.addEventListener("click", () => {
+  hostBtn.classList.add("is-active");
+  playerBtn?.classList.remove("is-active");
+});
 
-  if (signoutBtn) {
-    signoutBtn.addEventListener("click", logout);
-  }
-
-  // For now: placeholder
-
-  // 🔜 Next step: fetch host tournaments from backend
-  // -------- LOAD SPORTS FROM BACKEND --------
+// -------- LOAD SPORTS FROM BACKEND --------
   async function loadSports() {
     try {
       const res = await fetch("/api/sports");
