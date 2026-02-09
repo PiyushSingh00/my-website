@@ -296,10 +296,24 @@ function renderMyTournaments(tournaments) {
 
       ${categories ? `<p class="muted"><strong>Categories:</strong> ${categories}</p>` : ""}
 
-      ${t.playerDetails && t.playerDetails.trim() !== "" ? `
-        <p class="muted details-label">Details:</p>
-        <p class="muted details-text">${t.playerDetails}</p>
-      ` : ""}
+      ${(() => {
+      const details =
+      typeof t.playerDetails === "string"
+          ? t.playerDetails
+          : Array.isArray(t.playerDetails)
+            ? t.playerDetails.join(", ")
+            : (t.playerDetails ?? "");
+
+      const detailsStr = String(details);
+
+      return detailsStr.trim() !== ""
+        ? `
+          <p class="muted details-label">Details:</p>
+          <p class="muted details-text">${detailsStr}</p>
+        `
+        : "";
+      })()}
+
 
       <div class="tournament-meta">
         <span>Status: <strong>${t.registrationsOpen ? "Open" : "Closed"}</strong></span>
