@@ -22,30 +22,18 @@
 
       <div class="topbar-right">
         <div class="user-menu">
-          <button
-            class="user-trigger"
-            id="host-user-menu-trigger"
-            type="button"
-          >
-            Signed in as <span id="username-label">Host</span>
-            <span class="caret">▾</span>
-          </button>
-
-          <div class="user-menu-dropdown" id="host-user-menu-dropdown">
-            <button
-              type="button"
-              class="dropdown-item"
-              id="switch-player-mode"
-            >
-              Switch to player mode
-            </button>
+          <button type="button" class="user-avatar-btn" id="players-user-menu-trigger" aria-label="User menu">U</button>
+          <div class="user-menu-dropdown" id="players-user-menu-dropdown">
+            <button type="button" class="dropdown-item" id="dropdown-signout">Sign out</button>
           </div>
         </div>
 
-        <button class="signout-btn" id="signout-btn" type="button">
-          Sign out
-        </button>
+        <div class="mode-toggle" role="group" aria-label="Mode toggle">
+          <button class="mode-btn is-active" id="mode-player-btn" type="button">Host mode</button>
+          <button class="mode-btn" id="mode-join-btn" type="button">Join mode</button>
+        </div>
       </div>
+
     </header>
 
     <main class="main">
@@ -79,29 +67,7 @@
         </div>
 
 
-        <div class="players-tabs">
-          <button
-            type="button"
-            class="players-tab active"
-            data-player-filter="all"
-          >
-            All players <span class="tab-count" id="all-count">0</span>
-          </button>
-          <button
-            type="button"
-            class="players-tab"
-            data-player-filter="male"
-          >
-            Male <span class="tab-count" id="male-count">0</span>
-          </button>
-          <button
-            type="button"
-            class="players-tab"
-            data-player-filter="female"
-          >
-            Female <span class="tab-count" id="female-count">0</span>
-          </button>
-        </div>
+        <div class="players-tabs" id="players-tabs"></div>
 
         <div id="players-empty-state" class="empty-state">
           <div class="feature-icon">👥</div>
