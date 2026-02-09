@@ -9,39 +9,55 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
-  if (usernameLabel) {
-    usernameLabel.textContent = user.username;
-  }
+  if (usernameLabel) usernameLabel.textContent = user.username;
+  if (signoutBtn) signoutBtn.addEventListener("click", logout);
 
-  if (signoutBtn) {
-    signoutBtn.addEventListener("click", logout);
-  }
-
+  // Brand click -> index
   document.querySelectorAll(".brand").forEach((el) => {
-    el.addEventListener("click", () => {
-      window.location.href = "index.html";
-    });
+    el.style.cursor = "pointer";
+    el.addEventListener("click", () => (window.location.href = "index.html"));
   });
 
-  // ---------- TOP BAR ----------
+  // Switch to player mode
   const switchPlayerModeBtn = document.getElementById("switch-player-mode");
+  if (switchPlayerModeBtn) {
+    switchPlayerModeBtn.addEventListener("click", async () => {
+      try {
+        await fetch("/api/user/mode", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + localStorage.getItem("token"),
+          },
+          body: JSON.stringify({ mode: "player" }),
+        });
+      } catch {}
+      window.location.href = "join.html";
+    });
+  }
+
+  // ---------- ELEMENTS ----------
   const backBtn = document.getElementById("fixtures-back-btn");
   const generateBtn = document.getElementById("fixtures-generate-btn");
   const toastEl = document.getElementById("fixtures-toast");
 
-  if (switchPlayerModeBtn) {
-    switchPlayerModeBtn.addEventListener("click", async () => {
-  await fetch("/api/user/mode", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + localStorage.getItem("token")
-    },
-    body: JSON.stringify({ mode: "player" })
-  });
-  window.location.href = "join.html";
-});
+  const titleEl = document.getElementById("fixtures-tournament-name");
+  const sportEl = document.getElementById("fixtures-tournament-sport");
+  const datesEl = document.getElementById("fixtures-tournament-dates");
+  const codeEl = document.getElementById("fixtures-tournament-code");
 
+  const noneSelectedEl = document.getElementById("fixtures-none-selected");
+  const toggleWrap = document.getElementById("fixtures-toggle");
+  const groupsWrap = document.getElementById("fixtures-groups");
+
+  // ---------- TOURNAMENT ID ----------
+  const params = new URLSearchParams(window.location.search);
+  const tournamentId = params.get("tournamentId");
+
+  if (!tournamentId) {
+    if (titleEl) titleEl.textContent = "Missing tournamentId";
+    if (generateBtn) generateBtn.disabled = true;
+    return;
   }
 
   // ---------- TOAST ----------
@@ -97,26 +113,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     mixedBracketEl = mixedGroupEl.querySelector("#fixtures-bracket-mixed");
   }
 
-  // ---------- STORAGE ----------
-  const TOURNAMENT_KEY = "scheduleitTournaments";
-  const FIXTURES_KEY_PREFIX = "scheduleitFixtures_";
-
-  function loadAllTournaments() {
+  async function apiPost(url, body) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + localStorage.getItem("token"),
+      },
+      body: JSON.stringify(body || {}),
+    });
+    const raw = await res.text();
+    let data = null;
     try {
-      return JSON.parse(localStorage.getItem(TOURNAMENT_KEY)) || [];
+      data = raw ? JSON.parse(raw) : null;
     } catch {
-      return [];
+      data = raw;
     }
+    if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
+    return data;
   }
 
+  // ---------- LOCAL STORAGE ----------
+  const FIXTURES_KEY_PREFIX = "scheduleitFixtures_";
   function getFixturesKey(tid) {
     return `${FIXTURES_KEY_PREFIX}${String(tid)}`;
   }
-
   function saveFixtures(tid, data) {
     localStorage.setItem(getFixturesKey(tid), JSON.stringify(data));
   }
-
   function loadFixtures(tid) {
     const raw = localStorage.getItem(getFixturesKey(tid));
     if (!raw) return null;
@@ -135,6 +159,43 @@ document.addEventListener("DOMContentLoaded", async () => {
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
+  }
+
+  function normalizeCategories(cats) {
+    if (!cats) return [];
+    if (Array.isArray(cats)) return cats;
+    if (typeof cats === "string") {
+      try {
+        const parsed = JSON.parse(cats);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  function categoryLabel(c) {
+    const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
+    const gender = c?.gender ? String(c.gender).trim() : "";
+    const size = c?.teamSize ? Number(c.teamSize) : null;
+
+    const type =
+      size === 1 ? "Singles" : size === 2 ? "Doubles" : size ? `Team ${size}` : "";
+
+    const parts = [age, gender, type].filter(Boolean);
+    return parts.length ? parts.join(" • ") : c?.categoryId || c?.id || "Category";
+  }
+
+  function getPlayerCategoryId(p) {
+    return p.categoryId ?? p.category ?? p.categoryID ?? p.category_id ?? null;
+  }
+
+  function normalizeStatus(p) {
+    const raw = p.status ?? p.registrationStatus ?? p.state ?? "accepted";
+    const s = String(raw).toLowerCase();
+    if (["rejected", "reject", "declined", "denied"].includes(s)) return "rejected";
+    return "accepted"; // default accepted
   }
 
   function getRoundLabel(r, total) {
@@ -446,9 +507,12 @@ if (generateBtn) {
 }
 
 
+  // ---------- BACK BUTTON ----------
   if (backBtn) {
     backBtn.onclick = () => {
-      window.location.href = `players.html?tournamentId=${tournament.tournamentId ?? tournament.id}`;
+      window.location.href = `players.html?tournamentId=${encodeURIComponent(
+        tournament.tournamentId ?? tournament.id ?? tournamentId
+      )}`;
     };
   }
 });
