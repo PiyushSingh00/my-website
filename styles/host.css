@@ -927,30 +927,49 @@ body {
   border: 1px dashed var(--border);
   border-radius: 12px;
   margin-bottom: 10px;
+
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
+
+  align-items: center; /* key: vertically aligns items */
 }
 
-/* ===== Categories: Delete category (themed danger pill) ===== */
+/* Compact inputs ONLY inside Categories */
+.category-card input,
+.category-card select {
+  padding: 9px 12px;         /* reduced height */
+  border-radius: 14px;
+  font-size: 13px;
+}
+
+
+/* Categories: Delete category button placement + theme */
 .delete-category-btn {
-  grid-column: 1 / -1;            /* spans full row in the grid */
-  justify-self: end;              /* align to right */
+  grid-column: 2;            /* force right column */
+  justify-self: end;         /* align to the right */
+  align-self: center;        /* align with input vertically */
+
+  height: 38px;              /* match compact inputs */
+  display: inline-flex;
+  align-items: center;
+
   appearance: none;
   border: 1px solid rgba(248, 113, 113, 0.75);
-  background: rgba(248, 113, 113, 0.12);
+  background: rgba(248, 113, 113, 0.10);
   color: #fecaca;
   font-weight: 600;
   font-size: 13px;
-  padding: 7px 12px;
+  padding: 0 12px;
   border-radius: 999px;
   cursor: pointer;
+
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
 .delete-category-btn:hover {
   transform: translateY(-1px);
-  background: rgba(248, 113, 113, 0.20);
+  background: rgba(248, 113, 113, 0.18);
   border-color: rgba(248, 113, 113, 0.95);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
 }
