@@ -95,24 +95,9 @@
           </p>
 
           <!-- Toggle for Male / Female -->
-          <div class="fixtures-toggle">
-            <button
-              type="button"
-              class="fixtures-toggle-btn"
-              id="fixtures-toggle-male"
-              data-group="male"
-            >
-              Male fixtures
-            </button>
-            <button
-              type="button"
-              class="fixtures-toggle-btn"
-              id="fixtures-toggle-female"
-              data-group="female"
-            >
-              Female fixtures
-            </button>
-          </div>
+          <!-- Toggle for Categories (dynamic) -->
+<div class="fixtures-toggle" id="fixtures-toggle"></div>
+
 
           <!-- Center message / "no fixtures" message -->
           <div
@@ -129,58 +114,8 @@
           </div>
 
           <!-- Male fixtures group (hidden by default) -->
-          <div
-            class="fixtures-group"
-            id="fixtures-group-male"
-            style="display: none;"
-          >
-            <h2 class="fixtures-group-title">Male fixtures</h2>
-
-            <div
-              id="fixtures-empty-state-male"
-              class="empty-state"
-              style="display: none;"
-            >
-              <div class="feature-icon">🧩</div>
-              <h3>No male players available</h3>
-              <p class="muted">
-                Add at least two male players to generate a knockout bracket.
-              </p>
-            </div>
-
-            <div
-              id="fixtures-bracket-male"
-              class="fixtures-bracket"
-              style="display: none;"
-            ></div>
-          </div>
-
-          <!-- Female fixtures group (hidden by default) -->
-          <div
-            class="fixtures-group"
-            id="fixtures-group-female"
-            style="display: none;"
-          >
-            <h2 class="fixtures-group-title">Female fixtures</h2>
-
-            <div
-              id="fixtures-empty-state-female"
-              class="empty-state"
-              style="display: none;"
-            >
-              <div class="feature-icon">🧩</div>
-              <h3>No female players available</h3>
-              <p class="muted">
-                Add at least two female players to generate a knockout bracket.
-              </p>
-            </div>
-
-            <div
-              id="fixtures-bracket-female"
-              class="fixtures-bracket"
-              style="display: none;"
-            ></div>
-          </div>
+          <!-- Fixtures groups will be injected here dynamically -->
+          <div id="fixtures-groups"></div>
         </section>
       </main>
     </div>
