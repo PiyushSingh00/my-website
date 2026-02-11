@@ -49,6 +49,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const noneSelectedEl = document.getElementById("fixtures-none-selected");
   const toggleWrap = document.getElementById("fixtures-toggle");
   const groupsWrap = document.getElementById("fixtures-groups");
+  const editBtn = document.getElementById("fixtures-edit-btn");
+  const saveBtn = document.getElementById("fixtures-save-btn");
+  let editMode = false;
+  let activeCategoryId = null;
 
   // ---------- TOURNAMENT ID ----------
   const params = new URLSearchParams(window.location.search);
@@ -57,6 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!tournamentId) {
     if (titleEl) titleEl.textContent = "Missing tournamentId";
     if (generateBtn) generateBtn.disabled = true;
+
     return;
   }
 
@@ -134,22 +139,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---------- LOCAL STORAGE ----------
-  const FIXTURES_KEY_PREFIX = "scheduleitFixtures_";
-  function getFixturesKey(tid) {
-    return `${FIXTURES_KEY_PREFIX}${String(tid)}`;
-  }
-  function saveFixtures(tid, data) {
-    localStorage.setItem(getFixturesKey(tid), JSON.stringify(data));
-  }
-  function loadFixtures(tid) {
-    const raw = localStorage.getItem(getFixturesKey(tid));
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
+
 
   // ---------- HELPERS ----------
   function shuffle(arr) {
@@ -192,11 +182,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function normalizeStatus(p) {
-    const raw = p.status ?? p.registrationStatus ?? p.state ?? "accepted";
-    const s = String(raw).toLowerCase();
-    if (["rejected", "reject", "declined", "denied"].includes(s)) return "rejected";
-    return "accepted"; // default accepted
-  }
+  const raw =
+    p?.status ??
+    p?.registrationStatus ??
+    p?.inviteStatus ??
+    p?.registration_status ??
+    p?.playerStatus ??
+    p?.state ??
+    "accepted";
+
+  const s = String(raw).trim().toLowerCase();
+
+  if (["rejected", "reject", "declined", "denied"].includes(s)) return "rejected";
+  if (["pending", "awaiting"].includes(s)) return "pending";
+  return "accepted";
+}
+
 
   function getRoundLabel(r, total) {
     if (total === 1) return "Final";
@@ -465,6 +466,7 @@ function renderCategoryToggles() {
   });
 }
 
+<<<<<<< HEAD
 renderCategoryToggles();
 
 
@@ -506,6 +508,269 @@ if (generateBtn) {
   };
 }
 
+=======
+  // ---------- LOAD EXISTING FIXTURES ----------
+  let fixtures = null;
+  try {
+    fixtures = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`
+    );
+  } catch {}
+  // If fixtures exist, lock generation
+  if (fixtures) {
+    fixtures.__locked = true;
+    if (generateBtn) generateBtn.disabled = true;
+    if (editBtn) editBtn.style.display = "inline-flex";
+    setEditUI();
+  } else {
+  fixtures = { categories: {} };
+
+  // Only show categories; do NOT randomize until user clicks Generate
+  categories.forEach((c) => {
+    const cid = c.categoryId || c.id;
+    if (!cid) return;
+
+    fixtures.categories[cid] = {
+      categoryId: cid,
+      label: categoryLabel(c),
+      rounds: [],
+      totalRounds: 0,
+    };
+  });
+}
+
+
+  // ---------- RENDER ----------
+  function renderCategoryToggles() {
+    if (!toggleWrap) return;
+    toggleWrap.innerHTML = "";
+
+    const ids = Object.keys(fixtures?.categories || {});
+    if (!ids.length) return;
+
+    ids.forEach((cid, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "fixtures-toggle-btn";
+      btn.textContent = fixtures.categories[cid].label || cid;
+
+      btn.addEventListener("click", () => {
+        activeCategoryId = cid;
+        if (noneSelectedEl) noneSelectedEl.style.display = "none";
+        toggleWrap
+          .querySelectorAll(".fixtures-toggle-btn")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        renderCategoryBracket(cid);
+      });
+
+      toggleWrap.appendChild(btn);
+
+      // Auto-open first
+      if (idx === 0) btn.click();
+    });
+  }
+
+  function renderCategoryBracket(categoryId) {
+    if (!groupsWrap) return;
+    groupsWrap.innerHTML = "";
+
+    const cat = fixtures?.categories?.[categoryId];
+    if (!cat) return;
+
+    const group = document.createElement("div");
+    group.className = "fixtures-group";
+
+    // Not enough players / no bracket
+    if (!cat.rounds || cat.rounds.length === 0) {
+      group.innerHTML = `
+        <h2 class="fixtures-group-title">${cat.label || categoryId}</h2>
+        <div class="empty-state" style="display:flex;">
+          <div class="feature-icon">🧩</div>
+          <h3>Not enough players</h3>
+          <p class="muted">Add at least two accepted players in this category.</p>
+        </div>
+      `;
+      groupsWrap.appendChild(group);
+      return;
+    }
+    const allowedNames = acceptedByCategory[categoryId] || [];
+    const options = ["BYE", ...allowedNames];
+    const roundsHtml = cat.rounds
+  .map((round, r) => {
+    const isRound1 = r === 0;
+
+    const matchesHtml = round
+      .map((m, i) => {
+        const home = m?.home ?? "BYE";
+        const away = m?.away ?? "BYE";
+
+        const homeBye = String(home).toUpperCase() === "BYE";
+        const awayBye = String(away).toUpperCase() === "BYE";
+
+        const homeCell =
+          fixtures.__locked && editMode && isRound1
+            ? `<select class="fixture-select" data-side="home" data-round="${r}" data-match="${i}">
+                ${options
+                  .map(
+                    (n) =>
+                      `<option value="${n}" ${
+                        n === home ? "selected" : ""
+                      }>${n}</option>`
+                  )
+                  .join("")}
+              </select>`
+            : `<span class="player-name">${home}</span>`;
+
+        const awayCell =
+          fixtures.__locked && editMode && isRound1
+            ? `<select class="fixture-select" data-side="away" data-round="${r}" data-match="${i}">
+                ${options
+                  .map(
+                    (n) =>
+                      `<option value="${n}" ${
+                        n === away ? "selected" : ""
+                      }>${n}</option>`
+                  )
+                  .join("")}
+              </select>`
+            : `<span class="player-name">${away}</span>`;
+
+        return `
+          <div class="bracket-match">
+            <div class="match-label">Match ${i + 1}</div>
+
+            <div class="player-slot ${homeBye ? "bye" : ""}">
+              ${homeCell}
+            </div>
+
+            <div class="player-slot ${awayBye ? "bye" : ""}">
+              ${awayCell}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    return `
+      <div class="bracket-round">
+        <div class="round-title">${getRoundLabel(r, cat.totalRounds)}</div>
+        ${matchesHtml}
+      </div>
+    `;
+  })
+  .join("");
+
+
+    group.innerHTML = `
+      <h2 class="fixtures-group-title">${cat.label || categoryId}</h2>
+      <div class="fixtures-bracket">
+        <div class="bracket-rounds">
+          ${roundsHtml}
+        </div>
+      </div>
+    `;
+
+    groupsWrap.appendChild(group);
+  }
+
+  renderCategoryToggles();
+function setEditUI() {
+  if (!editBtn || !saveBtn) return;
+
+  if (!fixtures?.__locked) {
+    editBtn.style.display = "none";
+    saveBtn.style.display = "none";
+    return;
+  }
+  editBtn.style.display = "inline-flex";
+  saveBtn.style.display = editMode ? "inline-flex" : "none";
+}
+
+editBtn?.addEventListener("click", () => {
+  if (!fixtures?.__locked) return;
+  editMode = !editMode;
+  setEditUI();
+  if (activeCategoryId) renderCategoryBracket(activeCategoryId);
+});
+
+saveBtn?.addEventListener("click", async () => {
+  if (!fixtures?.__locked || !activeCategoryId) return;
+
+  // Apply dropdown selections to fixtures object (Round 1 only)
+  document.querySelectorAll(".fixture-select").forEach((sel) => {
+    const side = sel.getAttribute("data-side");
+    const r = Number(sel.getAttribute("data-round"));
+    const m = Number(sel.getAttribute("data-match"));
+    if (r !== 0) return;
+
+    fixtures.categories[activeCategoryId].rounds[r][m][side] = sel.value;
+  });
+
+  // ✅ Save overwrite to DB
+  try {
+    const saved = await apiPost(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
+      fixtures
+    );
+    fixtures = saved || fixtures;
+  } catch (e) {
+    showToast("Failed to save changes to DB");
+    return;
+  }
+
+  editMode = false;
+  setEditUI();
+  showToast("Fixtures updated");
+  renderCategoryBracket(activeCategoryId);
+});
+
+setEditUI();
+
+  // ---------- GENERATE FIXTURES (LOCK + SAVE) ----------
+  if (generateBtn) {
+    generateBtn.onclick = async () => {
+      if (fixtures && fixtures.__locked) return;
+
+      const newFixtures = { categories: {} };
+
+      categories.forEach((c) => {
+        const cid = c.categoryId || c.id;
+        if (!cid) return;
+
+        const names = acceptedByCategory[cid] || [];
+        const bracket = createBracket(names);
+
+        newFixtures.categories[cid] = {
+          categoryId: cid,
+          label: categoryLabel(c),
+          ...(bracket ? bracket : { rounds: [], totalRounds: 0 }),
+        };
+      });
+
+      // Try saving to backend; fallback to localStorage
+      try {
+  const saved = await apiPost(
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+    newFixtures
+  );
+  fixtures = saved || newFixtures;
+} catch (e) {
+  showToast("Failed to save fixtures to DB");
+  return; // do NOT lock if save failed
+}
+
+
+      fixtures.__locked = true;
+      generateBtn.disabled = true;
+      showToast("Fixtures generated");
+      renderCategoryToggles();
+      if (editBtn) editBtn.style.display = "inline-flex";
+      setEditUI();
+
+    };
+  }
+>>>>>>> a18b4c1 (fixtures update)
 
   // ---------- BACK BUTTON ----------
   if (backBtn) {

@@ -112,16 +112,12 @@ function renderRows(fixtures) {
     if (metaEl) metaEl.textContent = [t.sportName, t.tournamentDates].filter(Boolean).join(" • ");
   }
 
-  async function loadFixtures() {
-    const res = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-    if (res.ok && res.data) return res.data;
-    try {
-      const raw = localStorage.getItem(`scheduleitFixtures_${tournamentId}`);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  }
+async function loadFixtures() {
+  const res = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+  if (res.ok && res.data) return res.data;
+  return null; // ✅ DB only
+}
+
 
   await loadMeta();
   const fixtures = await loadFixtures();
