@@ -92,8 +92,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   let fixtures = null;
 
   try {
-  schema = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
-  fixtures = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+ const schemaResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
+schema = schemaResp?.ok ? schemaResp.data : schemaResp; // supports both wrapped + direct
+
+const fixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
 
   } catch (e) {
     console.error(e);
