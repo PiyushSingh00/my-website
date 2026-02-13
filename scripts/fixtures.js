@@ -397,70 +397,77 @@ hostBtn?.addEventListener("click", async () => {
     const allowedNames = acceptedByCategory[categoryId] || [];
     const options = ["BYE", ...allowedNames];
 
-    const roundsHtml = cat.rounds
-      .map((round, r) => {
-        const isRound1 = r === 0;
+    const baseGap = 16; // controls how "tall" the tree looks
 
-        const matchesHtml = round
-          .map((m, i) => {
-            const home = m?.home ?? "BYE";
-            const away = m?.away ?? "BYE";
+const roundsHtml = cat.rounds
+  .map((round, r) => {
+    const isRound1 = r === 0;
 
-            const homeBye = String(home).toUpperCase() === "BYE";
-            const awayBye = String(away).toUpperCase() === "BYE";
+    // Increase vertical spacing per round so it looks like a tree
+    const gap = baseGap * Math.pow(2, r);        // 16, 32, 64, ...
+    const offset = r === 0 ? 0 : gap / 2;        // push later rounds down a bit
 
-            const homeCell =
-              fixtures.__locked && editMode && isRound1
-                ? `<select class="fixture-select" data-side="home" data-round="${r}" data-match="${i}">
-                    ${options
-                      .map((n) => `<option value="${n}" ${n === home ? "selected" : ""}>${n}</option>`)
-                      .join("")}
-                  </select>`
-                : `<span class="player-name">${home}</span>`;
+    const matchesHtml = round
+      .map((m, i) => {
+        const home = m?.home ?? "BYE";
+        const away = m?.away ?? "BYE";
 
-            const awayCell =
-              fixtures.__locked && editMode && isRound1
-                ? `<select class="fixture-select" data-side="away" data-round="${r}" data-match="${i}">
-                    ${options
-                      .map((n) => `<option value="${n}" ${n === away ? "selected" : ""}>${n}</option>`)
-                      .join("")}
-                  </select>`
-                : `<span class="player-name">${away}</span>`;
+        const homeBye = String(home).toUpperCase() === "BYE";
+        const awayBye = String(away).toUpperCase() === "BYE";
 
-            return `
-              <div class="bracket-match">
-                <div class="match-label">Match ${i + 1}</div>
+        const homeCell =
+          fixtures.__locked && editMode && isRound1
+            ? `<select class="fixture-select" data-side="home" data-round="${r}" data-match="${i}">
+                ${options
+                  .map((n) => `<option value="${n}" ${n === home ? "selected" : ""}>${n}</option>`)
+                  .join("")}
+              </select>`
+            : `<span class="player-name">${home}</span>`;
 
-                <div class="player-slot ${homeBye ? "bye" : ""}">
-                  ${homeCell}
-                </div>
-
-                <div class="player-slot ${awayBye ? "bye" : ""}">
-                  ${awayCell}
-                </div>
-              </div>
-            `;
-          })
-          .join("");
+        const awayCell =
+          fixtures.__locked && editMode && isRound1
+            ? `<select class="fixture-select" data-side="away" data-round="${r}" data-match="${i}">
+                ${options
+                  .map((n) => `<option value="${n}" ${n === away ? "selected" : ""}>${n}</option>`)
+                  .join("")}
+              </select>`
+            : `<span class="player-name">${away}</span>`;
 
         return `
-          <div class="bracket-round">
-            <div class="round-title">${getRoundLabel(r, cat.totalRounds || cat.total_rounds || 0)}</div>
-            ${matchesHtml}
+          <div class="bracket-match">
+            <div class="match-label">Match ${i + 1}</div>
+
+            <div class="player-slot ${homeBye ? "bye" : ""}">${homeCell}</div>
+            <div class="player-slot ${awayBye ? "bye" : ""}">${awayCell}</div>
           </div>
         `;
       })
       .join("");
 
-    const wrapper = document.createElement("div");
-    wrapper.className = "fixtures-group";
-    wrapper.innerHTML = `
-      <div class="fixtures-group-header">
-        <h2>${cat.label || "Fixtures"}</h2>
-        ${fixtures.__locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
+    return `
+      <div class="bracket-round" style="--round-gap:${gap}px; --round-offset:${offset}px" data-round="${r}">
+        <div class="round-title">${getRoundLabel(r, cat.totalRounds || cat.total_rounds || 0)}</div>
+        ${matchesHtml}
       </div>
-      <div class="bracket-grid">${roundsHtml}</div>
     `;
+  })
+  .join("");
+
+const wrapper = document.createElement("div");
+wrapper.className = "fixtures-group";
+wrapper.innerHTML = `
+  <div class="fixtures-group-header">
+    <h2>${cat.label || "Fixtures"}</h2>
+    ${fixtures.__locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
+  </div>
+
+  <div class="fixtures-bracket">
+    <div class="bracket-rounds">
+      ${roundsHtml}
+    </div>
+  </div>
+`;
+
 
     groupsEl.appendChild(wrapper);
   }

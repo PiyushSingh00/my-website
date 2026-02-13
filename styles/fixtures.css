@@ -268,3 +268,73 @@
   background: rgba(4, 10, 24, 0.98);
   color: var(--text);
 }
+
+/* ---------- Bracket Tree Layout (Left -> Right) ---------- */
+.fixtures-bracket {
+  margin-top: 14px;
+  overflow-x: auto;       /* horizontal scroll */
+  overflow-y: hidden;
+  padding-bottom: 10px;   /* room for scrollbar */
+  border-radius: var(--radius-md);
+}
+
+/* Make content wider than container so scrollbar appears */
+.bracket-rounds {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 8px 8px 14px;
+  min-width: max-content; /* key: enables horizontal scroll */
+}
+
+/* Each round is a column */
+.bracket-round {
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--round-gap, 12px);
+  padding-top: var(--round-offset, 0px);
+  position: relative;
+}
+
+/* Subtle vertical guide inside each round */
+.bracket-round::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 28px;
+  bottom: 10px;
+  border-left: 1px dashed rgba(148, 163, 184, 0.28);
+}
+
+/* Connector line to next round (visual tree) */
+.bracket-round:not(:last-child) .bracket-match::after {
+  content: "";
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  width: 28px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.35);
+  transform: translateY(-50%);
+}
+
+/* Match block needs positioning for connectors */
+.bracket-match {
+  position: relative;
+}
+
+/* nicer scrollbar (chrome/edge) */
+.fixtures-bracket::-webkit-scrollbar {
+  height: 10px;
+}
+.fixtures-bracket::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+.fixtures-bracket::-webkit-scrollbar-thumb {
+  background: rgba(77, 208, 225, 0.35);
+  border-radius: 999px;
+}
+.fixtures-bracket::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 208, 225, 0.55);
+}
