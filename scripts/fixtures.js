@@ -100,6 +100,20 @@ hostBtn?.addEventListener("click", async () => {
   const toggleWrap = document.getElementById("fixtures-toggle");
   const groupsEl = document.getElementById("fixtures-groups");
 
+  // Start scoring -> scoring.html (placeholder)
+  groupsEl?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".start-scoring-btn");
+    if (!btn) return;
+
+    const tId = btn.dataset.tournamentId || "";
+    const cId = btn.dataset.categoryId || "";
+    const round = btn.dataset.round || "0";
+    const match = btn.dataset.match || "0";
+
+    window.location.href =
+      `scoring.html?tournamentId=${tId}&categoryId=${cId}&round=${round}&match=${match}`;
+  });
+
   backBtn?.addEventListener("click", () => {
     window.location.href = `players.html?tournamentId=${encodeURIComponent(tournamentId)}`;
   });
@@ -439,8 +453,22 @@ const roundsHtml = cat.rounds
 
             <div class="player-slot ${homeBye ? "bye" : ""}">${homeCell}</div>
             <div class="player-slot ${awayBye ? "bye" : ""}">${awayCell}</div>
+
+            <div class="match-actions">
+              <button
+                type="button"
+                class="btn-dark start-scoring-btn"
+                data-tournament-id="${encodeURIComponent(tournamentId)}"
+                data-category-id="${encodeURIComponent(categoryId)}"
+                data-round="${r}"
+                data-match="${i}"
+              >
+                Start scoring
+              </button>
+            </div>
           </div>
         `;
+
       })
       .join("");
 
@@ -468,9 +496,9 @@ wrapper.innerHTML = `
   </div>
 `;
 
-
     groupsEl.appendChild(wrapper);
   }
+
 
   // ---------- Build accepted-by-category ----------
   function rebuildAcceptedByCategory() {

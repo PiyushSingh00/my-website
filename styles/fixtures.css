@@ -338,3 +338,18 @@
 .fixtures-bracket::-webkit-scrollbar-thumb:hover {
   background: rgba(77, 208, 225, 0.55);
 }
+
+/* Start scoring button under each match */
+.match-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.start-scoring-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
