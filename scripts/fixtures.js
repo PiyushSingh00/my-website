@@ -535,44 +535,76 @@ wrapper.innerHTML = `
     });
   }
 
-  // ---------- INIT LOAD ----------
-  tournamentMeta = await loadTournamentMeta();
-  if (tournamentMeta) {
-    titleEl && (titleEl.textContent = tournamentMeta.tournamentName ?? "Tournament");
-    sportEl && (sportEl.textContent = tournamentMeta.sportName ?? "");
-    datesEl && (datesEl.textContent = tournamentMeta.tournamentDates ?? "");
-    codeEl && (codeEl.textContent = tournamentMeta.accessCode ?? "");
-    categories = normalizeCategories(tournamentMeta.categories);
-  } else {
-    titleEl && (titleEl.textContent = "Tournament");
-  }
+function rebuildAcceptedFromFixturesRound1() {
+  acceptedByCategory = {};
+  const cats = fixtures?.categories || {};
 
+  Object.keys(cats).forEach((cid) => {
+    const round1 = cats[cid]?.rounds?.[0] || [];
+    const set = new Set();
+
+    round1.forEach((m) => {
+      const h = m?.home;
+      const a = m?.away;
+      [h, a].forEach((name) => {
+        const n = String(name || "").trim();
+        if (!n) return;
+        const up = n.toUpperCase();
+        if (up === "BYE" || up === "TBD") return;
+        set.add(n);
+      });
+    });
+
+    acceptedByCategory[cid] = Array.from(set);
+  });
+}
+
+// ---------- INIT LOAD ----------
+tournamentMeta = await loadTournamentMeta();
+if (tournamentMeta) {
+  titleEl && (titleEl.textContent = tournamentMeta.tournamentName ?? "Tournament");
+  sportEl && (sportEl.textContent = tournamentMeta.sportName ?? "");
+  datesEl && (datesEl.textContent = tournamentMeta.tournamentDates ?? "");
+  codeEl && (codeEl.textContent = tournamentMeta.accessCode ?? "");
+  categories = normalizeCategories(tournamentMeta.categories);
+} else {
+  titleEl && (titleEl.textContent = "Tournament");
+}
+
+// Load fixtures from DB FIRST
+const existing = await loadFixturesFromDb();
+
+if (existing) {
+  fixtures = existing;
+  fixtures.__locked = true;
+  generateBtn && (generateBtn.disabled = true);
+  setEditUI();
+
+  // ✅ NEW: build accepted list from fixtures Round 1 (no players API needed)
+  rebuildAcceptedFromFixturesRound1();
+
+} else {
+  // Only if fixtures do NOT exist, load players (needed to generate fixtures)
   players = await loadPlayers();
   rebuildAcceptedByCategory();
 
-  // Load fixtures from DB
-  const existing = await loadFixturesFromDb();
-  if (existing) {
-    fixtures = existing;
-    fixtures.__locked = true;
-    generateBtn && (generateBtn.disabled = true);
-    setEditUI();
-  } else {
-    // Create empty shells (do NOT randomize until Generate)
-    fixtures = { categories: {} };
-    categories.forEach((c) => {
-      const cid = c.categoryId || c.id;
-      if (!cid) return;
-      fixtures.categories[cid] = {
-        categoryId: cid,
-        label: categoryLabel(c),
-        rounds: [],
-        totalRounds: 0,
-      };
-    });
-    fixtures.__locked = false;
-    setEditUI();
-  }
+  // Create empty shells (do NOT randomize until Generate)
+  fixtures = { categories: {} };
+  categories.forEach((c) => {
+    const cid = c.categoryId || c.id;
+    if (!cid) return;
+    fixtures.categories[cid] = {
+      categoryId: cid,
+      label: categoryLabel(c),
+      rounds: [],
+      totalRounds: 0,
+    };
+  });
+  fixtures.__locked = false;
+  setEditUI();
+}
+
+
   // ✅ NEW: Load scoring schema (optional; may be null if not set yet)
   const schemaResp = await apiGet(
     `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`
