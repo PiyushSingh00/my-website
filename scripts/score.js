@@ -11,8 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.addEventListener("click", () => (window.location.href = "index.html"));
   });
 
-  const signoutBtn = document.getElementById("signout-btn");
-  signoutBtn?.addEventListener("click", logout);
+  document.getElementById("signout-btn")?.addEventListener("click", logout);
 
   const titleEl = document.getElementById("score-title");
   const subEl = document.getElementById("score-sub");
@@ -44,32 +43,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(tournamentId)}`;
   });
 
+  function getToken() {
+    return (
+      localStorage.getItem("token") ||
+      localStorage.getItem("authToken") ||
+      ""
+    );
+  }
+
   async function apiGet(url) {
     const res = await fetch(url, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") },
+      headers: { Authorization: "Bearer " + getToken() },
     });
-    async function apiGet(url) {
-  const res = await fetch(url, {
-    headers: { Authorization: "Bearer " + localStorage.getItem("token") },
-  });
 
-  const raw = await res.text();
+    const raw = await res.text();
 
-  let data = null;
-  try {
-    data = raw ? JSON.parse(raw) : null;
-  } catch {
-    // If backend returns HTML error pages, keep raw for debugging
-    data = { _nonJson: true, raw };
-  }
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = { _nonJson: true, raw };
+    }
 
-  if (!res.ok) {
-    const extra = data?._nonJson ? " (non-JSON response)" : "";
-    throw new Error(`GET ${url} failed: ${res.status}${extra}`);
-  }
-  return data;
-}
-
+    if (!res.ok) {
+      const extra = data?._nonJson ? " (non-JSON response)" : "";
+      throw new Error(`GET ${url} failed: ${res.status}${extra}`);
+    }
+    return data;
   }
 
   async function apiPut(url, body) {
@@ -77,27 +77,41 @@ document.addEventListener("DOMContentLoaded", async () => {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + localStorage.getItem("token"),
+        Authorization: "Bearer " + getToken(),
       },
       body: JSON.stringify(body || {}),
     });
+
     const raw = await res.text();
-    const data = raw ? JSON.parse(raw) : null;
-    if (!res.ok) throw new Error(`PUT ${url} failed: ${res.status}`);
+
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = { _nonJson: true, raw };
+    }
+
+    if (!res.ok) {
+      const extra = data?._nonJson ? " (non-JSON response)" : "";
+      throw new Error(`PUT ${url} failed: ${res.status}${extra}`);
+    }
     return data;
   }
 
-  // ---- Load required data ----
+  // ---- Load schema + fixtures ----
   let schema = null;
   let fixtures = null;
 
   try {
- const schemaResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
-schema = schemaResp?.ok ? schemaResp.data : schemaResp; // supports both wrapped + direct
+    const schemaResp = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`
+    );
+    schema = schemaResp?.ok ? schemaResp.data : schemaResp; // supports both styles
 
-const fixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
-
+    const fixturesResp = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`
+    );
+    fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
   } catch (e) {
     console.error(e);
     titleEl.textContent = "Failed to load scoring data";
@@ -108,15 +122,16 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
   if (!schema) {
     titleEl.textContent = "No scoring schema found";
     subEl.textContent = "Set scoring schema first (you already did).";
+    saveBtn.disabled = true;
     return;
   }
 
-  const match =
-    fixtures?.categories?.[categoryId]?.rounds?.[roundIndex]?.[matchIndex] || null;
+  const match = fixtures?.categories?.[categoryId]?.rounds?.[roundIndex]?.[matchIndex] || null;
 
   if (!match) {
     titleEl.textContent = "Match not found";
     subEl.textContent = "Invalid categoryId/round/match index.";
+    saveBtn.disabled = true;
     return;
   }
 
@@ -136,8 +151,7 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
     return;
   }
 
-  // ---- Local state initialization ----
-  // Existing score (if already saved)
+  // ---- Local state ----
   const existing = match.score || null;
 
   const state = {
@@ -145,7 +159,6 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
     state: { A: {}, B: {} },
   };
 
-  // Apply defaults from schema
   (schema.inputs || []).forEach((f) => {
     state.config[f.key] = existing?.config?.[f.key] ?? f.default ?? null;
   });
@@ -155,10 +168,8 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
     state.state.B[f.key] = existing?.state?.B?.[f.key] ?? f.default ?? 0;
   });
 
-  // ---- Client-side compute (for instant UI preview; backend recomputes anyway) ----
-  function compute(schema, scoreObj) {
-    const out = { status: "pending", winnerName: null, reason: "" };
-    const logic = schema?.winnerLogic || {};
+  function compute(schemaObj, scoreObj) {
+    const logic = schemaObj?.winnerLogic || {};
     const A = scoreObj.state?.A || {};
     const B = scoreObj.state?.B || {};
     const cfg = scoreObj.config || {};
@@ -186,13 +197,10 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
       const diffA = a - b;
       const diffB = b - a;
 
-      const AReached = a >= target;
-      const BReached = b >= target;
-
-      if (AReached && (!winByTwo || diffA >= 2)) {
+      if (a >= target && (!winByTwo || diffA >= 2)) {
         return { status: "completed", winnerName: homeName, reason: `Reached ${a}/${target}` };
       }
-      if (BReached && (!winByTwo || diffB >= 2)) {
+      if (b >= target && (!winByTwo || diffB >= 2)) {
         return { status: "completed", winnerName: awayName, reason: `Reached ${b}/${target}` };
       }
       return { status: "pending", winnerName: null, reason: "Ongoing" };
@@ -208,7 +216,6 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
     reasonPill.innerHTML = `Reason: <strong>${c.reason || "-"}</strong>`;
   }
 
-  // ---- Render helpers ----
   function clear(el) {
     if (el) el.innerHTML = "";
   }
@@ -228,7 +235,7 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
       const label = document.createElement("label");
       label.textContent = f.label || f.key;
 
-      let inputEl = null;
+      let inputEl;
 
       if (f.type === "number") {
         inputEl = document.createElement("input");
@@ -242,14 +249,7 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
         });
       } else if (f.type === "boolean") {
         inputEl = document.createElement("select");
-        const optT = document.createElement("option");
-        optT.value = "true";
-        optT.textContent = "True";
-        const optF = document.createElement("option");
-        optF.value = "false";
-        optF.textContent = "False";
-        inputEl.appendChild(optT);
-        inputEl.appendChild(optF);
+        inputEl.innerHTML = `<option value="true">True</option><option value="false">False</option>`;
         inputEl.value = String(Boolean(state.config[f.key]));
         inputEl.addEventListener("change", () => {
           state.config[f.key] = inputEl.value === "true";
@@ -293,7 +293,6 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
 
       const label = document.createElement("label");
       label.textContent = `${playerName} — ${f.label || f.key}`;
-
       wrap.appendChild(label);
 
       if (f.type === "counter") {
@@ -340,8 +339,6 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
         const inputEl = document.createElement("input");
         inputEl.type = "number";
         inputEl.value = state.state[side][f.key] ?? 0;
-        if (typeof f.min === "number") inputEl.min = String(f.min);
-        if (typeof f.max === "number") inputEl.max = String(f.max);
         inputEl.addEventListener("input", () => {
           state.state[side][f.key] = inputEl.value === "" ? 0 : Number(inputEl.value);
           renderPills();
@@ -404,7 +401,6 @@ fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
         saveMsg.style.display = "inline-flex";
       }
 
-      // Update pills using server response (source of truth)
       const serverMatch = resp?.match || null;
       const computed = serverMatch?.score?.computed || null;
       if (computed) {
