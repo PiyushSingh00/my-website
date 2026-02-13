@@ -48,10 +48,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     const res = await fetch(url, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") },
     });
-    const raw = await res.text();
-    const data = raw ? JSON.parse(raw) : null;
-    if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
-    return data;
+    async function apiGet(url) {
+  const res = await fetch(url, {
+    headers: { Authorization: "Bearer " + localStorage.getItem("token") },
+  });
+
+  const raw = await res.text();
+
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    // If backend returns HTML error pages, keep raw for debugging
+    data = { _nonJson: true, raw };
+  }
+
+  if (!res.ok) {
+    const extra = data?._nonJson ? " (non-JSON response)" : "";
+    throw new Error(`GET ${url} failed: ${res.status}${extra}`);
+  }
+  return data;
+}
+
   }
 
   async function apiPut(url, body) {
@@ -70,14 +88,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---- Load required data ----
-  let tournament = null;
   let schema = null;
   let fixtures = null;
 
   try {
-    tournament = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}`);
-    schema = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
-    fixtures = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+  schema = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
+  fixtures = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+
   } catch (e) {
     console.error(e);
     titleEl.textContent = "Failed to load scoring data";
@@ -104,7 +121,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const awayName = match.away ?? "Player B";
 
   titleEl.textContent = `${homeName} vs ${awayName}`;
-  subEl.textContent = `${tournament?.tournamentName || "Tournament"} • ${tournament?.sportName || schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
+  subEl.textContent = `${schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
 
   // Prevent scoring BYE matches
   if (String(homeName).toUpperCase() === "BYE" || String(awayName).toUpperCase() === "BYE") {
