@@ -91,6 +91,7 @@ hostBtn?.addEventListener("click", async () => {
   const sportEl = document.getElementById("fixtures-tournament-sport");
   const datesEl = document.getElementById("fixtures-tournament-dates");
   const codeEl = document.getElementById("fixtures-tournament-code");
+const genSchemaBtn = document.getElementById("fixtures-generate-schema-btn");
 
   const backBtn = document.getElementById("fixtures-back-btn");
   const generateBtn = document.getElementById("fixtures-generate-btn");
@@ -210,6 +211,28 @@ hostBtn?.addEventListener("click", async () => {
     }
     return a;
   }
+
+  function buildEntrants(names, teamSize) {
+  const size = Math.max(1, Number(teamSize || 1));
+  const shuffled = shuffle(names);
+
+  if (size === 1) return { entrants: shuffled, dropped: [] };
+
+  const entrants = [];
+  const dropped = [];
+
+  for (let i = 0; i < shuffled.length; i += size) {
+    const chunk = shuffled.slice(i, i + size);
+    if (chunk.length < size) {
+      dropped.push(...chunk);
+      continue;
+    }
+    entrants.push(chunk.join(" + "));
+  }
+
+  return { entrants, dropped };
+}
+
 
   function nextPow2(n) {
     let p = 1;
@@ -626,7 +649,15 @@ if (existing) {
       if (!cid) return;
 
       const names = acceptedByCategory[cid] || [];
-      const bracket = createBracket(names);
+const teamSize = Number(c.teamSize || 1);
+
+const { entrants, dropped } = buildEntrants(names, teamSize);
+if (dropped.length) {
+  showToast(`⚠️ ${dropped.length} player(s) left out (need teams of ${teamSize})`);
+}
+
+const bracket = createBracket(entrants);
+
 
       newFixtures.categories[cid] = {
         categoryId: cid,
@@ -675,6 +706,22 @@ if (existing) {
     renderCategoryToggles();
     if (activeCategoryId) renderCategoryBracket(activeCategoryId);
   });
+
+
+genSchemaBtn?.addEventListener("click", async () => {
+  genSchemaBtn.disabled = true;
+  try {
+    const resp = await apiPost(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/auto`,
+      { context: { matchType: "auto" } }
+    );
+    showToast(`Scoring schema generated ✅ (${resp?.scoringSchema?.sport || "sport"})`);
+  } catch (e) {
+    alert("Failed to generate schema: " + (e?.message || e));
+  } finally {
+    genSchemaBtn.disabled = false;
+  }
+});
 
   // ---------- EDIT / SAVE (Round 1 only) ----------
   editBtn?.addEventListener("click", async () => {
