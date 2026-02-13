@@ -107,7 +107,6 @@ hostBtn?.addEventListener("click", async () => {
   // Inject Edit/Save buttons into toolbar (so you don’t have to edit fixtures.html)
   const toolbar = document.querySelector(".fixtures-toolbar");
   let editBtn = document.getElementById("fixtures-edit-btn");
-  let saveBtn = document.getElementById("fixtures-save-btn");
 
   if (toolbar && !editBtn) {
     editBtn = document.createElement("button");
@@ -117,16 +116,6 @@ hostBtn?.addEventListener("click", async () => {
     editBtn.style.display = "none";
     editBtn.textContent = "Edit fixtures";
     toolbar.appendChild(editBtn);
-  }
-
-  if (toolbar && !saveBtn) {
-    saveBtn = document.createElement("button");
-    saveBtn.type = "button";
-    saveBtn.className = "btn-primary";
-    saveBtn.id = "fixtures-save-btn";
-    saveBtn.style.display = "none";
-    saveBtn.textContent = "Save changes";
-    toolbar.appendChild(saveBtn);
   }
 
   // ---------- STATE ----------
@@ -335,17 +324,18 @@ hostBtn?.addEventListener("click", async () => {
   }
 
   function setEditUI() {
-    if (!editBtn || !saveBtn) return;
+    if (!editBtn) return;
 
     if (!fixtures?.__locked) {
       editBtn.style.display = "none";
-      saveBtn.style.display = "none";
       return;
     }
 
     editBtn.style.display = "inline-flex";
-    saveBtn.style.display = editMode ? "inline-flex" : "none";
+    editBtn.textContent = editMode ? "Save changes" : "Edit fixtures";
+    editBtn.className = editMode ? "btn-primary" : "btn-dark";
   }
+
 
   function renderCategoryToggles() {
     if (!toggleWrap) return;
@@ -597,44 +587,49 @@ hostBtn?.addEventListener("click", async () => {
   });
 
   // ---------- EDIT / SAVE (Round 1 only) ----------
-  editBtn?.addEventListener("click", () => {
-    if (!fixtures?.__locked) return;
-    editMode = !editMode;
+  editBtn?.addEventListener("click", async () => {
+  if (!fixtures?.__locked) return;
+
+  // If currently not editing -> enter edit mode
+  if (!editMode) {
+    editMode = true;
     setEditUI();
     if (activeCategoryId) renderCategoryBracket(activeCategoryId);
+    return;
+  }
+
+  // If currently editing -> SAVE
+  if (!activeCategoryId) return;
+
+  // Apply dropdown selections to fixtures object (Round 1 only)
+  document.querySelectorAll(".fixture-select").forEach((sel) => {
+    const side = sel.getAttribute("data-side");
+    const r = Number(sel.getAttribute("data-round"));
+    const m = Number(sel.getAttribute("data-match"));
+    if (r !== 0) return;
+
+    const val = sel.value;
+    fixtures.categories[activeCategoryId].rounds[r][m][side] = val;
   });
 
-  saveBtn?.addEventListener("click", async () => {
-    if (!fixtures?.__locked || !activeCategoryId) return;
+  const r = await apiPost(
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
+    fixtures
+  );
 
-    // Apply dropdown selections to fixtures object (Round 1 only)
-    document.querySelectorAll(".fixture-select").forEach((sel) => {
-      const side = sel.getAttribute("data-side");
-      const r = Number(sel.getAttribute("data-round"));
-      const m = Number(sel.getAttribute("data-match"));
-      if (r !== 0) return;
+  if (!r.ok) {
+    showToast("Failed to save changes to DB");
+    console.error("Update fixtures failed:", r);
+    return;
+  }
 
-      const val = sel.value;
-      fixtures.categories[activeCategoryId].rounds[r][m][side] = val;
-    });
+  fixtures = r.data || fixtures;
+  fixtures.__locked = true;
 
-    const r = await apiPost(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
-      fixtures
-    );
-
-    if (!r.ok) {
-      showToast("Failed to save changes to DB");
-      console.error("Update fixtures failed:", r);
-      return;
-    }
-
-    fixtures = r.data || fixtures;
-    fixtures.__locked = true;
-
-    editMode = false;
-    setEditUI();
-    showToast("Fixtures updated");
-    renderCategoryBracket(activeCategoryId);
-  });
+  editMode = false;
+  setEditUI();
+  showToast("Fixtures updated");
+  renderCategoryBracket(activeCategoryId);
+});
+  
 });

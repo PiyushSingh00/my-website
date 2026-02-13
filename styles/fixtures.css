@@ -241,3 +241,30 @@
   background: rgba(77, 208, 225, 0.18);
   color: var(--text);
 }
+
+/* Edit fixtures dropdown (player select) – match dark theme */
+.fixture-select {
+  width: 100%;
+  background: rgba(4, 10, 24, 0.96);
+  color: var(--text);
+  border: 1px solid rgba(145, 163, 196, 0.6);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.fixture-select:hover {
+  border-color: rgba(77, 208, 225, 0.45);
+}
+
+.fixture-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(77, 208, 225, 0.18);
+}
+
+/* Options inside dropdown */
+.fixture-select option {
+  background: rgba(4, 10, 24, 0.98);
+  color: var(--text);
+}
