@@ -111,7 +111,7 @@ hostBtn?.addEventListener("click", async () => {
     const match = btn.dataset.match || "0";
 
     window.location.href =
-      `scoring.html?tournamentId=${tId}&categoryId=${cId}&round=${round}&match=${match}`;
+      `score.html?tournamentId=${tId}&categoryId=${cId}&round=${round}&match=${match}`;
   });
 
   backBtn?.addEventListener("click", () => {
@@ -141,6 +141,7 @@ hostBtn?.addEventListener("click", async () => {
   let fixtures = null; // { categories: { [cid]: {rounds,totalRounds,label,...}} }
   let activeCategoryId = null;
   let editMode = false;
+  let scoringSchema = null; // ✅ NEW: will store schema fetched from backend
 
   // ---------- HELPERS ----------
   function showToast(msg) {
@@ -447,6 +448,18 @@ const roundsHtml = cat.rounds
               </select>`
             : `<span class="player-name">${away}</span>`;
 
+        const scoreKey = scoringSchema?.winnerLogic?.field || "points";
+        const aVal = m?.score?.state?.A?.[scoreKey];
+        const bVal = m?.score?.state?.B?.[scoreKey];
+
+        const scoreLine =
+          aVal !== undefined && bVal !== undefined
+            ? `Score: <strong>${aVal}</strong> - <strong>${bVal}</strong>`
+            : `Score: <strong>-</strong>`;
+
+        const winnerLine =
+          m?.winner ? `Winner: <strong>${m.winner}</strong>` : `Winner: <strong>-</strong>`;
+
         return `
           <div class="bracket-match">
             <div class="match-label">Match ${i + 1}</div>
@@ -454,7 +467,7 @@ const roundsHtml = cat.rounds
             <div class="player-slot ${homeBye ? "bye" : ""}">${homeCell}</div>
             <div class="player-slot ${awayBye ? "bye" : ""}">${awayCell}</div>
 
-            <div class="match-actions">
+            <div class="match-actions" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
               <button
                 type="button"
                 class="btn-dark start-scoring-btn"
@@ -462,12 +475,17 @@ const roundsHtml = cat.rounds
                 data-category-id="${encodeURIComponent(categoryId)}"
                 data-round="${r}"
                 data-match="${i}"
+                ${homeBye || awayBye ? "disabled" : ""}
               >
                 Start scoring
               </button>
+
+              <div class="muted" style="font-size:13px;">${scoreLine}</div>
+              <div class="muted" style="font-size:13px;">${winnerLine}</div>
             </div>
           </div>
         `;
+
 
       })
       .join("");
@@ -555,6 +573,11 @@ wrapper.innerHTML = `
     fixtures.__locked = false;
     setEditUI();
   }
+  // ✅ NEW: Load scoring schema (optional; may be null if not set yet)
+  const schemaResp = await apiGet(
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`
+  );
+  scoringSchema = schemaResp.ok ? schemaResp.data : null;
 
   renderCategoryToggles();
   ensureEmptyState(true);
