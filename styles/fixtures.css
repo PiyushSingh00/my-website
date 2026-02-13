@@ -217,3 +217,27 @@
   cursor: not-allowed;
 }
 /*reupload*/
+
+/* Category tabs (match dark theme) */
+.fixtures-toggle .toggle-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.fixtures-toggle .toggle-btn:hover {
+  border-color: rgba(77, 208, 225, 0.45);
+  color: var(--text);
+}
+
+.fixtures-toggle .toggle-btn.active {
+  border-color: var(--accent);
+  background: rgba(77, 208, 225, 0.18);
+  color: var(--text);
+}

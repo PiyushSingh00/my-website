@@ -5,25 +5,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
-  // ---------- TOPBAR ----------
-  const usernameLabel = document.getElementById("username-label");
-  if (usernameLabel) usernameLabel.textContent = user.username;
+// ---------- TOPBAR (aligned with host.html) ----------
+const brandLink = document.querySelector(".brand-link");
+brandLink?.addEventListener("click", (e) => {
+  // keep anchor behavior, but ensure consistent navigation
+  e.preventDefault();
+  window.location.href = "index.html";
+});
 
-  document.getElementById("signout-btn")?.addEventListener("click", logout);
+// Avatar initial + dropdown
+const trigger = document.getElementById("host-user-menu-trigger");
+const dropdown = document.getElementById("host-user-menu-dropdown");
 
-  document.querySelectorAll(".brand").forEach((el) => {
-    el.addEventListener("click", () => (window.location.href = "index.html"));
-  });
+if (trigger) {
+  const label = String(user?.username || user?.name || user?.email || "U").trim();
+  trigger.textContent = (label[0] || "U").toUpperCase();
+}
 
-  const trigger =
-    document.getElementById("host-user-menu-trigger") ||
-    document.getElementById("user-menu-trigger");
-  const dropdown =
-    document.getElementById("host-user-menu-dropdown") ||
-    document.getElementById("user-menu-dropdown");
-  trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
+trigger?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  dropdown?.classList.toggle("is-open");
+});
 
-  document.getElementById("switch-player-mode")?.addEventListener("click", async () => {
+document.addEventListener("click", () => dropdown?.classList.remove("is-open"));
+
+// Sign out
+document.getElementById("dropdown-signout")?.addEventListener("click", () => {
+  dropdown?.classList.remove("is-open");
+  logout();
+});
+
+// Mode toggle
+const playerBtn = document.getElementById("mode-player-btn");
+const hostBtn = document.getElementById("mode-host-btn");
+
+// This page is Host side (fixtures are host-only)
+hostBtn?.classList.add("is-active");
+playerBtn?.classList.remove("is-active");
+
+playerBtn?.addEventListener("click", async () => {
+  playerBtn.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
+  try {
     await fetch("/api/user/mode", {
       method: "POST",
       headers: {
@@ -32,8 +56,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       },
       body: JSON.stringify({ mode: "player" }),
     });
-    window.location.href = "join.html";
-  });
+  } catch {}
+
+  window.location.href = "join.html";
+});
+
+hostBtn?.addEventListener("click", async () => {
+  hostBtn.classList.add("is-active");
+  playerBtn?.classList.remove("is-active");
+
+  // optional: persist host mode like other pages
+  try {
+    await fetch("/api/user/mode", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + localStorage.getItem("token"),
+      },
+      body: JSON.stringify({ mode: "host" }),
+    });
+  } catch {}
+});
 
   // ---------- READ TOURNAMENT ID ----------
   const params = new URLSearchParams(window.location.search);
