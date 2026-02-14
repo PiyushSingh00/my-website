@@ -1,4 +1,3 @@
-// scripts/score.js
 import { requireAuth, logout } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -10,7 +9,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.style.cursor = "pointer";
     el.addEventListener("click", () => (window.location.href = "index.html"));
   });
-
   document.getElementById("signout-btn")?.addEventListener("click", logout);
 
   const titleEl = document.getElementById("score-title");
@@ -19,13 +17,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const saveBtn = document.getElementById("save-score");
 
   const configWrap = document.getElementById("config-fields");
-  const aWrap = document.getElementById("playerA-fields");
-  const bWrap = document.getElementById("playerB-fields");
+  const teamsWrap = document.getElementById("teams-wrap");
 
   const statusPill = document.getElementById("status-pill");
   const winnerPill = document.getElementById("winner-pill");
   const reasonPill = document.getElementById("reason-pill");
   const saveMsg = document.getElementById("save-msg");
+
+  // Timer UI
+  const timerDisplay = document.getElementById("timer-display");
+  const timerStartBtn = document.getElementById("timer-start");
+  const timerPauseBtn = document.getElementById("timer-pause");
+  const timerResetBtn = document.getElementById("timer-reset");
 
   const params = new URLSearchParams(window.location.search);
   const tournamentId = params.get("tournamentId");
@@ -44,27 +47,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function getToken() {
-    return (
-      localStorage.getItem("token") ||
-      localStorage.getItem("authToken") ||
-      ""
-    );
+    return localStorage.getItem("token") || localStorage.getItem("authToken") || "";
   }
 
   async function apiGet(url) {
-    const res = await fetch(url, {
-      headers: { Authorization: "Bearer " + getToken() },
-    });
-
+    const res = await fetch(url, { headers: { Authorization: "Bearer " + getToken() } });
     const raw = await res.text();
-
     let data = null;
     try {
       data = raw ? JSON.parse(raw) : null;
     } catch {
       data = { _nonJson: true, raw };
     }
-
     if (!res.ok) {
       const extra = data?._nonJson ? " (non-JSON response)" : "";
       throw new Error(`GET ${url} failed: ${res.status}${extra}`);
@@ -81,16 +75,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       },
       body: JSON.stringify(body || {}),
     });
-
     const raw = await res.text();
-
     let data = null;
     try {
       data = raw ? JSON.parse(raw) : null;
     } catch {
       data = { _nonJson: true, raw };
     }
-
     if (!res.ok) {
       const extra = data?._nonJson ? " (non-JSON response)" : "";
       throw new Error(`PUT ${url} failed: ${res.status}${extra}`);
@@ -98,15 +89,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     return data;
   }
 
+  function clear(el) {
+    if (el) el.innerHTML = "";
+  }
+
   // ---- Load schema + fixtures ----
   let schema = null;
   let fixtures = null;
 
   try {
+    // IMPORTANT: this endpoint should return category-aware schema (your Step B)
     const schemaResp = await apiGet(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema?categoryId=${encodeURIComponent(categoryId)}`
     );
-    schema = schemaResp?.ok ? schemaResp.data : schemaResp; // supports both styles
+    schema = schemaResp?.ok ? schemaResp.data : schemaResp;
 
     const fixturesResp = await apiGet(
       `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`
@@ -121,12 +117,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (!schema) {
     titleEl.textContent = "No scoring schema found";
-    subEl.textContent = "Set scoring schema first (you already did).";
+    subEl.textContent = "Finalize scoring schema for this category first.";
     saveBtn.disabled = true;
     return;
   }
 
-  const match = fixtures?.categories?.[categoryId]?.rounds?.[roundIndex]?.[matchIndex] || null;
+  const match =
+    fixtures?.categories?.[categoryId]?.rounds?.[roundIndex]?.[matchIndex] || null;
 
   if (!match) {
     titleEl.textContent = "Match not found";
@@ -135,14 +132,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  const homeName = match.home ?? "Player A";
-  const awayName = match.away ?? "Player B";
-
-  titleEl.textContent = `${homeName} vs ${awayName}`;
-  subEl.textContent = `${schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
-
   // Prevent scoring BYE matches
-  if (String(homeName).toUpperCase() === "BYE" || String(awayName).toUpperCase() === "BYE") {
+  const homeLabel = match.home ?? "Home";
+  const awayLabel = match.away ?? "Away";
+  if (String(homeLabel).toUpperCase() === "BYE" || String(awayLabel).toUpperCase() === "BYE") {
     statusPill.classList.add("error");
     statusPill.innerHTML = `Status: <strong>BYE</strong>`;
     winnerPill.innerHTML = `Winner: <strong>-</strong>`;
@@ -151,23 +144,95 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // ---- Local state ----
+  titleEl.textContent = `${homeLabel} vs ${awayLabel}`;
+  subEl.textContent = `${schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
+
+  // ---- Resolve roster arrays (preferred: homePlayers/awayPlayers) ----
+  function splitTeamLabel(label) {
+    if (!label) return [];
+    // supports: "A + B" OR "A+B"
+    return String(label)
+      .split("+")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  const homePlayers = Array.isArray(match.homePlayers) ? match.homePlayers : splitTeamLabel(match.home);
+  const awayPlayers = Array.isArray(match.awayPlayers) ? match.awayPlayers : splitTeamLabel(match.away);
+
+  // ---- Local score state (supports per-player + team totals) ----
+  // We keep team totals at:
+  //   state.state.A[fieldKey]  (sum)
+  //   state.state.B[fieldKey]  (sum)
+  // and per-player breakdown at:
+  //   state.state.A.players[playerName][fieldKey]
+  // This keeps your existing winner logic compatible.
   const existing = match.score || null;
 
   const state = {
     config: {},
-    state: { A: {}, B: {} },
+    state: {
+      A: { players: {} },
+      B: { players: {} },
+    },
+    timer: {
+      elapsedMs: existing?.timer?.elapsedMs ?? 0,
+      running: false,
+      startedAtEpochMs: null,
+    },
   };
 
+  // Init config fields
   (schema.inputs || []).forEach((f) => {
     state.config[f.key] = existing?.config?.[f.key] ?? f.default ?? null;
   });
 
-  (schema.playerFields || []).forEach((f) => {
-    state.state.A[f.key] = existing?.state?.A?.[f.key] ?? f.default ?? 0;
-    state.state.B[f.key] = existing?.state?.B?.[f.key] ?? f.default ?? 0;
-  });
+  // Init per-player maps
+  function ensurePlayer(side, playerName) {
+    if (!state.state[side].players[playerName]) state.state[side].players[playerName] = {};
+    return state.state[side].players[playerName];
+  }
 
+  function initPlayers(side, roster) {
+    roster.forEach((p) => {
+      const pObj = ensurePlayer(side, p);
+      (schema.playerFields || []).forEach((f) => {
+        const prev = existing?.state?.[side]?.players?.[p]?.[f.key];
+        pObj[f.key] = prev ?? f.default ?? (f.type === "text" ? "" : 0);
+      });
+    });
+  }
+
+  initPlayers("A", homePlayers);
+  initPlayers("B", awayPlayers);
+
+  // Recompute team totals for numeric-like fields
+  function recomputeTeamTotals() {
+    ["A", "B"].forEach((side) => {
+      const totals = {};
+      const roster = side === "A" ? homePlayers : awayPlayers;
+      const fields = schema.playerFields || [];
+
+      fields.forEach((f) => {
+        // sum only for counters/numbers
+        if (f.type === "counter" || f.type === "number") {
+          let sum = 0;
+          roster.forEach((p) => {
+            const v = Number(state.state[side].players?.[p]?.[f.key] ?? 0);
+            sum += Number.isFinite(v) ? v : 0;
+          });
+          totals[f.key] = sum;
+        }
+      });
+
+      // write totals into the same place your old code expects
+      Object.keys(totals).forEach((k) => (state.state[side][k] = totals[k]));
+    });
+  }
+
+  recomputeTeamTotals();
+
+  // ---- Winner compute (unchanged behavior: uses team totals) ----
   function compute(schemaObj, scoreObj) {
     const logic = schemaObj?.winnerLogic || {};
     const A = scoreObj.state?.A || {};
@@ -178,8 +243,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const field = logic.field || "score";
       const a = Number(A[field] ?? 0);
       const b = Number(B[field] ?? 0);
-      if (a > b) return { status: "completed", winnerName: homeName, reason: `${a} > ${b}` };
-      if (b > a) return { status: "completed", winnerName: awayName, reason: `${b} > ${a}` };
+      if (a > b) return { status: "completed", winnerName: homeLabel, reason: `${a} > ${b}` };
+      if (b > a) return { status: "completed", winnerName: awayLabel, reason: `${b} > ${a}` };
       return { status: "pending", winnerName: null, reason: "Equal scores" };
     }
 
@@ -198,10 +263,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const diffB = b - a;
 
       if (a >= target && (!winByTwo || diffA >= 2)) {
-        return { status: "completed", winnerName: homeName, reason: `Reached ${a}/${target}` };
+        return { status: "completed", winnerName: homeLabel, reason: `Reached ${a}/${target}` };
       }
       if (b >= target && (!winByTwo || diffB >= 2)) {
-        return { status: "completed", winnerName: awayName, reason: `Reached ${b}/${target}` };
+        return { status: "completed", winnerName: awayLabel, reason: `Reached ${b}/${target}` };
       }
       return { status: "pending", winnerName: null, reason: "Ongoing" };
     }
@@ -216,10 +281,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     reasonPill.innerHTML = `Reason: <strong>${c.reason || "-"}</strong>`;
   }
 
-  function clear(el) {
-    if (el) el.innerHTML = "";
-  }
-
+  // ---- Render config fields ----
   function renderConfigFields() {
     clear(configWrap);
     const inputs = schema.inputs || [];
@@ -279,96 +341,211 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  function renderPlayerFields(side, container, playerName) {
-    clear(container);
+  // ---- Render per-player fields ----
+  function renderPlayerFieldControl({ side, playerName, field }) {
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+
+    const label = document.createElement("label");
+    label.textContent = `${field.label || field.key}`;
+    wrap.appendChild(label);
+
+    const playerObj = ensurePlayer(side, playerName);
+
+    if (field.type === "counter") {
+      const row = document.createElement("div");
+      row.className = "counter";
+
+      const minus = document.createElement("button");
+      minus.className = "mini-btn";
+      minus.type = "button";
+      minus.textContent = "–";
+
+      const plus = document.createElement("button");
+      plus.className = "mini-btn";
+      plus.type = "button";
+      plus.textContent = "+";
+
+      const value = document.createElement("div");
+      value.className = "value";
+      value.textContent = String(playerObj[field.key] ?? 0);
+
+      const min = typeof field.min === "number" ? field.min : 0;
+
+      minus.addEventListener("click", () => {
+        const cur = Number(playerObj[field.key] ?? 0);
+        const next = Math.max(min, cur - 1);
+        playerObj[field.key] = next;
+        value.textContent = String(next);
+        recomputeTeamTotals();
+        renderPills();
+      });
+
+      plus.addEventListener("click", () => {
+        const cur = Number(playerObj[field.key] ?? 0);
+        const next = cur + 1;
+        playerObj[field.key] = next;
+        value.textContent = String(next);
+        recomputeTeamTotals();
+        renderPills();
+      });
+
+      row.appendChild(minus);
+      row.appendChild(value);
+      row.appendChild(plus);
+      wrap.appendChild(row);
+    } else if (field.type === "number") {
+      const inputEl = document.createElement("input");
+      inputEl.type = "number";
+      inputEl.value = playerObj[field.key] ?? 0;
+      inputEl.addEventListener("input", () => {
+        playerObj[field.key] = inputEl.value === "" ? 0 : Number(inputEl.value);
+        recomputeTeamTotals();
+        renderPills();
+      });
+      wrap.appendChild(inputEl);
+    } else if (field.type === "select") {
+      const sel = document.createElement("select");
+      const opts = Array.isArray(field.options) ? field.options : [];
+      sel.innerHTML = opts.map((o) => `<option value="${String(o)}">${String(o)}</option>`).join("");
+      sel.value = String(playerObj[field.key] ?? (opts[0] ?? ""));
+      sel.addEventListener("change", () => {
+        playerObj[field.key] = sel.value;
+        renderPills();
+      });
+      wrap.appendChild(sel);
+    } else {
+      const inputEl = document.createElement("input");
+      inputEl.type = "text";
+      inputEl.value = playerObj[field.key] ?? "";
+      inputEl.addEventListener("input", () => {
+        playerObj[field.key] = inputEl.value;
+        renderPills();
+      });
+      wrap.appendChild(inputEl);
+    }
+
+    if (field.help) {
+      const help = document.createElement("div");
+      help.className = "help";
+      help.textContent = field.help;
+      wrap.appendChild(help);
+    }
+
+    return wrap;
+  }
+
+  function renderTeams() {
+    clear(teamsWrap);
+
     const fields = schema.playerFields || [];
     if (!fields.length) {
-      container.innerHTML = `<p class="help">No player fields.</p>`;
+      teamsWrap.innerHTML = `<p class="help">No player fields.</p>`;
       return;
     }
 
-    fields.forEach((f) => {
-      const wrap = document.createElement("div");
-      wrap.className = "field";
+    const teams = [
+      { side: "A", title: "Home", label: homeLabel, roster: homePlayers },
+      { side: "B", title: "Away", label: awayLabel, roster: awayPlayers },
+    ];
 
-      const label = document.createElement("label");
-      label.textContent = `${playerName} — ${f.label || f.key}`;
-      wrap.appendChild(label);
+    teams.forEach((t) => {
+      const teamCard = document.createElement("div");
+      teamCard.className = "team-card";
 
-      if (f.type === "counter") {
-        const row = document.createElement("div");
-        row.className = "counter";
+      const header = document.createElement("div");
+      header.className = "team-title";
+      header.innerHTML = `<h3>${t.title}</h3><div class="team-sub">${t.label}</div>`;
+      teamCard.appendChild(header);
 
-        const minus = document.createElement("button");
-        minus.className = "mini-btn";
-        minus.type = "button";
-        minus.textContent = "–";
-
-        const plus = document.createElement("button");
-        plus.className = "mini-btn";
-        plus.type = "button";
-        plus.textContent = "+";
-
-        const value = document.createElement("div");
-        value.className = "value";
-        value.textContent = String(state.state[side][f.key] ?? 0);
-
-        const min = typeof f.min === "number" ? f.min : 0;
-
-        minus.addEventListener("click", () => {
-          const cur = Number(state.state[side][f.key] ?? 0);
-          const next = Math.max(min, cur - 1);
-          state.state[side][f.key] = next;
-          value.textContent = String(next);
-          renderPills();
-        });
-
-        plus.addEventListener("click", () => {
-          const cur = Number(state.state[side][f.key] ?? 0);
-          const next = cur + 1;
-          state.state[side][f.key] = next;
-          value.textContent = String(next);
-          renderPills();
-        });
-
-        row.appendChild(minus);
-        row.appendChild(value);
-        row.appendChild(plus);
-        wrap.appendChild(row);
-      } else if (f.type === "number") {
-        const inputEl = document.createElement("input");
-        inputEl.type = "number";
-        inputEl.value = state.state[side][f.key] ?? 0;
-        inputEl.addEventListener("input", () => {
-          state.state[side][f.key] = inputEl.value === "" ? 0 : Number(inputEl.value);
-          renderPills();
-        });
-        wrap.appendChild(inputEl);
-      } else {
-        const inputEl = document.createElement("input");
-        inputEl.type = "text";
-        inputEl.value = state.state[side][f.key] ?? "";
-        inputEl.addEventListener("input", () => {
-          state.state[side][f.key] = inputEl.value;
-          renderPills();
-        });
-        wrap.appendChild(inputEl);
+      // Show team totals for main winner field (if exists)
+      const logicField = schema?.winnerLogic?.field;
+      if (logicField) {
+        const total = Number(state.state[t.side]?.[logicField] ?? 0);
+        const totalPill = document.createElement("div");
+        totalPill.className = "pill";
+        totalPill.style.marginTop = "8px";
+        totalPill.innerHTML = `Team ${logicField}: <strong>${total}</strong>`;
+        teamCard.appendChild(totalPill);
       }
 
-      if (f.help) {
-        const help = document.createElement("div");
-        help.className = "help";
-        help.textContent = f.help;
-        wrap.appendChild(help);
-      }
+      (t.roster || []).forEach((playerName) => {
+        const playerCard = document.createElement("div");
+        playerCard.className = "player-card";
+        playerCard.innerHTML = `<h4>${playerName}</h4>`;
 
-      container.appendChild(wrap);
+        fields.forEach((f) => {
+          playerCard.appendChild(
+            renderPlayerFieldControl({ side: t.side, playerName, field: f })
+          );
+        });
+
+        teamCard.appendChild(playerCard);
+      });
+
+      teamsWrap.appendChild(teamCard);
     });
   }
 
+  // ---- Timer ----
+  let timerInterval = null;
+
+  function formatMs(ms) {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const m = String(Math.floor(totalSec / 60)).padStart(2, "0");
+    const s = String(totalSec % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  function renderTimer() {
+    if (timerDisplay) timerDisplay.textContent = formatMs(state.timer.elapsedMs);
+  }
+
+  function tickTimer() {
+    if (!state.timer.running || state.timer.startedAtEpochMs == null) return;
+    const now = Date.now();
+    const delta = now - state.timer.startedAtEpochMs;
+    state.timer.startedAtEpochMs = now;
+    state.timer.elapsedMs += delta;
+    renderTimer();
+  }
+
+  function startTimer() {
+    if (state.timer.running) return;
+    state.timer.running = true;
+    state.timer.startedAtEpochMs = Date.now();
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(tickTimer, 250);
+  }
+
+  function pauseTimer() {
+    if (!state.timer.running) return;
+    tickTimer();
+    state.timer.running = false;
+    state.timer.startedAtEpochMs = null;
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  function resetTimer() {
+    state.timer.elapsedMs = 0;
+    state.timer.running = false;
+    state.timer.startedAtEpochMs = null;
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+    renderTimer();
+  }
+
+  timerStartBtn?.addEventListener("click", startTimer);
+  timerPauseBtn?.addEventListener("click", pauseTimer);
+  timerResetBtn?.addEventListener("click", resetTimer);
+
+  // Hydrate timer from existing score
+  renderTimer();
+
+  // ---- Initial render ----
   renderConfigFields();
-  renderPlayerFields("A", aWrap, homeName);
-  renderPlayerFields("B", bWrap, awayName);
+  renderTeams();
   renderPills();
 
   // ---- Save ----
@@ -380,6 +557,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       saveMsg.classList.remove("error");
     }
 
+    // ensure timer is not leaking running timestamp
+    if (state.timer.running) tickTimer();
+
     try {
       const payload = {
         categoryId,
@@ -387,7 +567,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         matchIndex,
         score: {
           config: state.config,
-          state: state.state,
+          state: state.state, // includes team totals + players map
+          timer: { elapsedMs: state.timer.elapsedMs },
         },
       };
 

@@ -18,7 +18,7 @@
 
     <style>
       .score-card {
-        width: min(960px, 100%);
+        width: min(1060px, 100%);
         padding: 22px 22px 18px;
         border-radius: var(--radius-lg);
         background:
@@ -41,12 +41,12 @@
 
       .score-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1.6fr;
         gap: 14px;
         margin-top: 14px;
       }
 
-      @media (max-width: 780px) {
+      @media (max-width: 920px) {
         .score-grid {
           grid-template-columns: 1fr;
         }
@@ -149,6 +149,74 @@
         border-color: rgba(248, 113, 113, 0.75);
         background: rgba(248, 113, 113, 0.12);
       }
+
+      .teams-wrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      @media (max-width: 920px) {
+        .teams-wrap {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .team-card {
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 16px;
+        background: rgba(5, 11, 24, 0.62);
+        padding: 12px;
+      }
+
+      .team-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .team-title h3 {
+        margin: 0;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .team-sub {
+        color: rgba(169, 182, 204, 0.75);
+        font-size: 12px;
+      }
+
+      .player-card {
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 14px;
+        background: rgba(5, 11, 24, 0.75);
+        padding: 10px;
+        margin-top: 10px;
+      }
+
+      .player-card h4 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        color: #fff;
+      }
+
+      .timer-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-top: 10px;
+      }
+
+      .timer-time {
+        font-variant-numeric: tabular-nums;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
     </style>
   </head>
 
@@ -156,7 +224,6 @@
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">ScheduleIt</div>
-
         <div class="topbar-right">
           <button class="signout-btn" id="signout-btn" type="button">Sign out</button>
         </div>
@@ -175,6 +242,15 @@
             <button type="button" class="btn-primary" id="save-score">Save score</button>
           </div>
 
+          <div class="timer-row">
+            <div class="pill">
+              Timer: <strong class="timer-time" id="timer-display">00:00</strong>
+            </div>
+            <button type="button" class="btn-dark" id="timer-start">Start</button>
+            <button type="button" class="btn-dark" id="timer-pause">Pause</button>
+            <button type="button" class="btn-dark" id="timer-reset">Reset</button>
+          </div>
+
           <div class="actions">
             <div class="pill" id="status-pill">Status: <strong>pending</strong></div>
             <div class="pill" id="winner-pill">Winner: <strong>-</strong></div>
@@ -188,11 +264,8 @@
             </div>
 
             <div class="panel">
-              <h2>Player A / Home</h2>
-              <div id="playerA-fields"></div>
-              <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 12px 0;" />
-              <h2>Player B / Away</h2>
-              <div id="playerB-fields"></div>
+              <h2>Players</h2>
+              <div class="teams-wrap" id="teams-wrap"></div>
             </div>
           </div>
 
