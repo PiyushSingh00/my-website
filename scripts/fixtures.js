@@ -211,6 +211,28 @@ const genSchemaBtn = document.getElementById("fixtures-generate-schema-btn");
     }
     return a;
   }
+function makeMatchId() {
+  // Stable unique id for match; crypto.randomUUID is supported in modern browsers
+  if (window.crypto && crypto.randomUUID) return "M-" + crypto.randomUUID();
+  // fallback
+  return "M-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function splitTeamName(teamName) {
+  const t = String(teamName || "").trim();
+  const up = t.toUpperCase();
+  if (!t || up === "BYE" || up === "TBD") return [];
+  return t.split(" + ").map((x) => x.trim()).filter(Boolean);
+}
+
+function ensureMatchMeta(m) {
+  if (!m || typeof m !== "object") return m;
+  if (!m.matchId) m.matchId = makeMatchId();
+  if (!Array.isArray(m.homePlayers)) m.homePlayers = splitTeamName(m.home);
+  if (!Array.isArray(m.awayPlayers)) m.awayPlayers = splitTeamName(m.away);
+  return m;
+}
+
 
 function buildEntrants(names, teamSize) {
   const size = Math.max(1, Number(teamSize || 1));
@@ -241,6 +263,7 @@ function buildEntrants(names, teamSize) {
 
 
 
+
   function nextPow2(n) {
     let p = 1;
     while (p < n) p *= 2;
@@ -257,7 +280,7 @@ function buildEntrants(names, teamSize) {
   }
 
   // Create single-elim bracket from names (random order)
-  function createBracket(names, teamMap = {}) {
+function createBracket(names, teamMap = {}) {
   const list = shuffle(names.filter(Boolean));
   if (list.length < 2) return null;
 
@@ -272,8 +295,7 @@ function buildEntrants(names, teamSize) {
     const up = t.toUpperCase();
     if (!t || up === "BYE" || up === "TBD") return [];
     if (Array.isArray(teamMap[t])) return teamMap[t];
-    // fallback (in case it was stored as string)
-    return t.split(" + ").map((x) => x.trim()).filter(Boolean);
+    return splitTeamName(t);
   };
 
   // Round 1 matches
@@ -282,12 +304,14 @@ function buildEntrants(names, teamSize) {
     const home = list[i];
     const away = list[i + 1];
 
-    r1.push({
-      home,
-      away,
-      homePlayers: getRoster(home),
-      awayPlayers: getRoster(away),
-    });
+    r1.push(
+      ensureMatchMeta({
+        home,
+        away,
+        homePlayers: getRoster(home),
+        awayPlayers: getRoster(away),
+      })
+    );
   }
   rounds.push(r1);
 
@@ -297,13 +321,21 @@ function buildEntrants(names, teamSize) {
     const matchCount = Math.ceil(prevMatchCount / 2);
     const rr = [];
     for (let i = 0; i < matchCount; i++) {
-      rr.push({ home: "TBD", away: "TBD", homePlayers: [], awayPlayers: [] });
+      rr.push(
+        ensureMatchMeta({
+          home: "TBD",
+          away: "TBD",
+          homePlayers: [],
+          awayPlayers: [],
+        })
+      );
     }
     rounds.push(rr);
   }
 
   return { rounds, totalRounds };
 }
+
 
 
   async function apiJson(url, options = {}) {
@@ -557,8 +589,8 @@ const awayCell =
               <button
                 type="button"
                 class="btn-dark start-scoring-btn"
-                data-tournament-id="${encodeURIComponent(tournamentId)}"
-                data-category-id="${encodeURIComponent(categoryId)}"
+                data-tournament-id="${tournamentId}"
+                data-category-id="${categoryId}"
                 data-round="${r}"
                 data-match="${i}"
                 ${homeBye || awayBye ? "disabled" : ""}
@@ -652,6 +684,21 @@ function rebuildAcceptedFromFixturesRound1() {
   });
 }
 
+function migrateFixtures(fixturesObj) {
+  if (!fixturesObj?.categories) return fixturesObj;
+
+  Object.values(fixturesObj.categories).forEach((cat) => {
+    if (!cat?.rounds) return;
+    cat.rounds.forEach((round) => {
+      if (!Array.isArray(round)) return;
+      round.forEach((m, idx) => {
+        if (m && typeof m === "object") ensureMatchMeta(m);
+      });
+    });
+  });
+
+  return fixturesObj;
+}
 
 // ---------- INIT LOAD ----------
 tournamentMeta = await loadTournamentMeta();
@@ -670,6 +717,7 @@ const existing = await loadFixturesFromDb();
 
 if (existing) {
   fixtures = existing;
+  fixtures = migrateFixtures(fixtures);
   fixtures.__locked = true;
   generateBtn && (generateBtn.disabled = true);
   setEditUI();
@@ -786,13 +834,31 @@ genSchemaBtn?.addEventListener("click", async () => {
       `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/auto`,
       { context: { matchType: "auto" } }
     );
-    showToast(`Scoring schema generated ✅ (${resp?.scoringSchema?.sport || "sport"})`);
+
+    if (!resp.ok) {
+      showToast("Failed to generate schema");
+      console.error("Generate schema failed:", resp);
+      return;
+    }
+
+    // ✅ refresh local schema so UI uses latest immediately
+    const schemaResp = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`
+    );
+    scoringSchema = schemaResp.ok ? schemaResp.data : (resp.data?.scoringSchema || null);
+
+    showToast(`Scoring schema generated ✅ (${scoringSchema?.sport || "sport"})`);
+
+    // optional: rerender current category so scoreKey updates
+    if (activeCategoryId) renderCategoryBracket(activeCategoryId);
+
   } catch (e) {
     alert("Failed to generate schema: " + (e?.message || e));
   } finally {
     genSchemaBtn.disabled = false;
   }
 });
+
 
   // ---------- EDIT / SAVE (Round 1 only) ----------
   editBtn?.addEventListener("click", async () => {
@@ -878,6 +944,8 @@ for (let m = 0; m < round1.length; m++) {
   match.away = B.team;
   match.homePlayers = A.roster;
   match.awayPlayers = B.roster;
+  ensureMatchMeta(match);
+
 }
 
 // Global uniqueness check: a player can’t be in two teams in Round 1
