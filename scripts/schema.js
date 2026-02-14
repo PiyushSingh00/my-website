@@ -162,7 +162,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     clearError();
 
     // This MUST match your backend route (you already have /scoring-schema/auto)
-    const url = `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/auto`;
+const url = `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/suggest`;
 
     const r = await apiPost(url, { context: { categoryId } });
 
