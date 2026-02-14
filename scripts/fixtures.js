@@ -498,8 +498,8 @@ function createBracket(names, teamMap = {}) {
 
     const baseGap = 16; // controls how "tall" the tree looks
 
-const roundsHtml = cat.rounds
-  .map((round, r) => {
+    const roundsHtml = cat.rounds
+    .map((round, r) => {
     const isRound1 = r === 0;
 
     // Increase vertical spacing per round so it looks like a tree
@@ -515,22 +515,22 @@ const roundsHtml = cat.rounds
         const awayBye = String(away).toUpperCase() === "BYE";
 
         const catMeta = categories.find((x) => String(x.categoryId || x.id) === String(categoryId));
-const teamSize = Math.max(1, Number(catMeta?.teamSize || 1));
+    const teamSize = Math.max(1, Number(catMeta?.teamSize || 1));
 
-const splitTeam = (t) =>
-  String(t || "")
+    const splitTeam = (t) =>
+    String(t || "")
     .split(" + ")
     .map((x) => x.trim())
     .filter(Boolean);
 
-const homePlayers = Array.isArray(m?.homePlayers) ? m.homePlayers : splitTeam(home);
-const awayPlayers = Array.isArray(m?.awayPlayers) ? m.awayPlayers : splitTeam(away);
+    const homePlayers = Array.isArray(m?.homePlayers) ? m.homePlayers : splitTeam(home);
+    const awayPlayers = Array.isArray(m?.awayPlayers) ? m.awayPlayers : splitTeam(away);
 
-const renderPlayerSelects = (side, playersArr) => {
-  const byeSelected = String((playersArr?.[0] || "")).toUpperCase() === "BYE";
+    const renderPlayerSelects = (side, playersArr) => {
+    const byeSelected = String((playersArr?.[0] || "")).toUpperCase() === "BYE";
 
-  const selects = [];
-  for (let k = 0; k < teamSize; k++) {
+    const selects = [];
+    for (let k = 0; k < teamSize; k++) {
     const current = playersArr?.[k] || "";
     const isFirst = k === 0;
 
@@ -617,12 +617,13 @@ const awayCell =
   })
   .join("");
 
-const wrapper = document.createElement("div");
+    const wrapper = document.createElement("div");
 wrapper.className = "fixtures-group";
 wrapper.innerHTML = `
   <div class="fixtures-group-header">
     <h2>${cat.label || "Fixtures"}</h2>
     ${fixtures.__locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
+    <button type="button" class="btn btn-configure-fields">Configure scoring fields</button>
   </div>
 
   <div class="fixtures-bracket">
@@ -632,7 +633,15 @@ wrapper.innerHTML = `
   </div>
 `;
 
-    groupsEl.appendChild(wrapper);
+// Configure scoring fields button
+wrapper.querySelector(".btn-configure-fields")?.addEventListener("click", () => {
+  window.location.href =
+    `schema.html?tournamentId=${encodeURIComponent(tournamentId)}` +
+    `&categoryId=${encodeURIComponent(categoryId)}`;
+});
+
+groupsEl.appendChild(wrapper);
+
   }
 
 
