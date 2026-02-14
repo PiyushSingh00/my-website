@@ -173,7 +173,7 @@ const url = `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-s
     }
 
     // Backend returns { ok:true, scoringSchema: generated } in your current code
-    draft = r.data?.scoringSchema || null;
+draft = r.data?.draft || null;
 
     // Default: select everything in draft initially
     selectedKeys = new Set((draft?.playerFields || []).map((x) => x.key).filter(Boolean));
