@@ -212,14 +212,18 @@ const genSchemaBtn = document.getElementById("fixtures-generate-schema-btn");
     return a;
   }
 
-  function buildEntrants(names, teamSize) {
+function buildEntrants(names, teamSize) {
   const size = Math.max(1, Number(teamSize || 1));
   const shuffled = shuffle(names);
 
-  if (size === 1) return { entrants: shuffled, dropped: [] };
-
   const entrants = [];
   const dropped = [];
+  const teamMap = {}; // teamName -> [players...]
+
+  if (size === 1) {
+    shuffled.forEach((n) => (teamMap[n] = [n]));
+    return { entrants: shuffled, dropped: [], teamMap };
+  }
 
   for (let i = 0; i < shuffled.length; i += size) {
     const chunk = shuffled.slice(i, i + size);
@@ -227,11 +231,14 @@ const genSchemaBtn = document.getElementById("fixtures-generate-schema-btn");
       dropped.push(...chunk);
       continue;
     }
-    entrants.push(chunk.join(" + "));
+    const teamName = chunk.join(" + ");
+    entrants.push(teamName);
+    teamMap[teamName] = chunk;
   }
 
-  return { entrants, dropped };
+  return { entrants, dropped, teamMap };
 }
+
 
 
   function nextPow2(n) {
@@ -250,34 +257,54 @@ const genSchemaBtn = document.getElementById("fixtures-generate-schema-btn");
   }
 
   // Create single-elim bracket from names (random order)
-  function createBracket(names) {
-    const list = shuffle(names.filter(Boolean));
-    if (list.length < 2) return null;
+  function createBracket(names, teamMap = {}) {
+  const list = shuffle(names.filter(Boolean));
+  if (list.length < 2) return null;
 
-    const size = nextPow2(list.length);
-    while (list.length < size) list.push("BYE");
+  const size = nextPow2(list.length);
+  while (list.length < size) list.push("BYE");
 
-    const totalRounds = Math.log2(size);
-    const rounds = [];
+  const totalRounds = Math.log2(size);
+  const rounds = [];
 
-    // Round 1 matches
-    const r1 = [];
-    for (let i = 0; i < list.length; i += 2) {
-      r1.push({ home: list[i], away: list[i + 1] });
-    }
-    rounds.push(r1);
+  const getRoster = (teamName) => {
+    const t = String(teamName || "").trim();
+    const up = t.toUpperCase();
+    if (!t || up === "BYE" || up === "TBD") return [];
+    if (Array.isArray(teamMap[t])) return teamMap[t];
+    // fallback (in case it was stored as string)
+    return t.split(" + ").map((x) => x.trim()).filter(Boolean);
+  };
 
-    // Future rounds placeholders
-    for (let r = 1; r < totalRounds; r++) {
-      const prevMatchCount = rounds[r - 1].length;
-      const matchCount = Math.ceil(prevMatchCount / 2);
-      const rr = [];
-      for (let i = 0; i < matchCount; i++) rr.push({ home: "TBD", away: "TBD" });
-      rounds.push(rr);
-    }
+  // Round 1 matches
+  const r1 = [];
+  for (let i = 0; i < list.length; i += 2) {
+    const home = list[i];
+    const away = list[i + 1];
 
-    return { rounds, totalRounds };
+    r1.push({
+      home,
+      away,
+      homePlayers: getRoster(home),
+      awayPlayers: getRoster(away),
+    });
   }
+  rounds.push(r1);
+
+  // Future rounds placeholders
+  for (let r = 1; r < totalRounds; r++) {
+    const prevMatchCount = rounds[r - 1].length;
+    const matchCount = Math.ceil(prevMatchCount / 2);
+    const rr = [];
+    for (let i = 0; i < matchCount; i++) {
+      rr.push({ home: "TBD", away: "TBD", homePlayers: [], awayPlayers: [] });
+    }
+    rounds.push(rr);
+  }
+
+  return { rounds, totalRounds };
+}
+
 
   async function apiJson(url, options = {}) {
     const res = await fetch(url, {
@@ -418,6 +445,8 @@ const genSchemaBtn = document.getElementById("fixtures-generate-schema-btn");
     const cat = fixtures?.categories?.[categoryId];
     if (!cat || !Array.isArray(cat.rounds) || !cat.rounds.length) {
       const acceptedNames = acceptedByCategory[categoryId] || [];
+      const catMeta = categories.find((x) => String(x.categoryId || x.id) === String(categoryId));
+      const teamSize = Math.max(1, Number(catMeta?.teamSize || 1));
       groupsEl.innerHTML = `
         <div class="empty-state" style="display:flex;">
           <div class="feature-icon">🧩</div>
@@ -453,23 +482,57 @@ const roundsHtml = cat.rounds
         const homeBye = String(home).toUpperCase() === "BYE";
         const awayBye = String(away).toUpperCase() === "BYE";
 
-        const homeCell =
-          fixtures.__locked && editMode && isRound1
-            ? `<select class="fixture-select" data-side="home" data-round="${r}" data-match="${i}">
-                ${options
-                  .map((n) => `<option value="${n}" ${n === home ? "selected" : ""}>${n}</option>`)
-                  .join("")}
-              </select>`
-            : `<span class="player-name">${home}</span>`;
+        const catMeta = categories.find((x) => String(x.categoryId || x.id) === String(categoryId));
+const teamSize = Math.max(1, Number(catMeta?.teamSize || 1));
 
-        const awayCell =
-          fixtures.__locked && editMode && isRound1
-            ? `<select class="fixture-select" data-side="away" data-round="${r}" data-match="${i}">
-                ${options
-                  .map((n) => `<option value="${n}" ${n === away ? "selected" : ""}>${n}</option>`)
-                  .join("")}
-              </select>`
-            : `<span class="player-name">${away}</span>`;
+const splitTeam = (t) =>
+  String(t || "")
+    .split(" + ")
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+const homePlayers = Array.isArray(m?.homePlayers) ? m.homePlayers : splitTeam(home);
+const awayPlayers = Array.isArray(m?.awayPlayers) ? m.awayPlayers : splitTeam(away);
+
+const renderPlayerSelects = (side, playersArr) => {
+  const byeSelected = String((playersArr?.[0] || "")).toUpperCase() === "BYE";
+
+  const selects = [];
+  for (let k = 0; k < teamSize; k++) {
+    const current = playersArr?.[k] || "";
+    const isFirst = k === 0;
+
+    selects.push(`
+      <select
+        class="fixture-player-select"
+        data-side="${side}"
+        data-round="${r}"
+        data-match="${i}"
+        data-player-index="${k}"
+      >
+        ${isFirst ? `<option value="__BYE__" ${byeSelected ? "selected" : ""}>BYE</option>` : ""}
+        <option value="" ${(!current && !byeSelected) ? "selected" : ""}>Select player</option>
+        ${options
+          .filter(n => n !== "BYE")  // BYE handled via __BYE__ only
+          .map((n) => `<option value="${n}" ${n === current ? "selected" : ""}>${n}</option>`)
+          .join("")}
+      </select>
+    `);
+  }
+
+  return `<div class="fixture-player-grid">${selects.join("")}</div>`;
+};
+
+const homeCell =
+  fixtures.__locked && editMode && isRound1
+    ? renderPlayerSelects("home", homePlayers)
+    : `<span class="player-name">${home}</span>`;
+
+const awayCell =
+  fixtures.__locked && editMode && isRound1
+    ? renderPlayerSelects("away", awayPlayers)
+    : `<span class="player-name">${away}</span>`;
+
 
         const scoreKey = scoringSchema?.winnerLogic?.field || "points";
         const aVal = m?.score?.state?.A?.[scoreKey];
@@ -562,14 +625,21 @@ function rebuildAcceptedFromFixturesRound1() {
   acceptedByCategory = {};
   const cats = fixtures?.categories || {};
 
+  const splitTeam = (t) =>
+    String(t || "")
+      .split(" + ")
+      .map((x) => x.trim())
+      .filter(Boolean);
+
   Object.keys(cats).forEach((cid) => {
     const round1 = cats[cid]?.rounds?.[0] || [];
     const set = new Set();
 
     round1.forEach((m) => {
-      const h = m?.home;
-      const a = m?.away;
-      [h, a].forEach((name) => {
+      const homePlayers = Array.isArray(m?.homePlayers) ? m.homePlayers : splitTeam(m?.home);
+      const awayPlayers = Array.isArray(m?.awayPlayers) ? m.awayPlayers : splitTeam(m?.away);
+
+      [...homePlayers, ...awayPlayers].forEach((name) => {
         const n = String(name || "").trim();
         if (!n) return;
         const up = n.toUpperCase();
@@ -581,6 +651,7 @@ function rebuildAcceptedFromFixturesRound1() {
     acceptedByCategory[cid] = Array.from(set);
   });
 }
+
 
 // ---------- INIT LOAD ----------
 tournamentMeta = await loadTournamentMeta();
@@ -651,12 +722,12 @@ if (existing) {
       const names = acceptedByCategory[cid] || [];
 const teamSize = Number(c.teamSize || 1);
 
-const { entrants, dropped } = buildEntrants(names, teamSize);
+const { entrants, dropped, teamMap } = buildEntrants(names, teamSize);
 if (dropped.length) {
   showToast(`⚠️ ${dropped.length} player(s) left out (need teams of ${teamSize})`);
 }
 
-const bracket = createBracket(entrants);
+const bracket = createBracket(entrants, teamMap);
 
 
       newFixtures.categories[cid] = {
@@ -739,15 +810,83 @@ genSchemaBtn?.addEventListener("click", async () => {
   if (!activeCategoryId) return;
 
   // Apply dropdown selections to fixtures object (Round 1 only)
-  document.querySelectorAll(".fixture-select").forEach((sel) => {
-    const side = sel.getAttribute("data-side");
-    const r = Number(sel.getAttribute("data-round"));
-    const m = Number(sel.getAttribute("data-match"));
-    if (r !== 0) return;
+const catMeta = categories.find((x) => String(x.categoryId || x.id) === String(activeCategoryId));
+const teamSize = Math.max(1, Number(catMeta?.teamSize || 1));
 
-    const val = sel.value;
-    fixtures.categories[activeCategoryId].rounds[r][m][side] = val;
-  });
+const round1 = fixtures.categories[activeCategoryId].rounds?.[0] || [];
+const chosen = []; // all selected players for uniqueness check
+
+// Build per-match rosters from per-player selects
+for (let m = 0; m < round1.length; m++) {
+  const match = round1[m];
+
+  const readSideRoster = (side) => {
+    const sels = Array.from(
+      document.querySelectorAll(
+        `.fixture-player-select[data-round="0"][data-match="${m}"][data-side="${side}"]`
+      )
+    ).sort((a, b) => Number(a.dataset.playerIndex) - Number(b.dataset.playerIndex));
+
+    // Singles fallback: if old UI remains somehow
+    if (!sels.length && teamSize === 1) {
+      const legacy = document.querySelector(
+        `.fixture-select[data-round="0"][data-match="${m}"][data-side="${side}"]`
+      );
+      const val = legacy?.value || "";
+      if (String(val).toUpperCase() === "BYE") return { team: "BYE", roster: [] };
+      return { team: val, roster: val ? [val] : [] };
+    }
+
+    const vals = sels.map((s) => s.value);
+
+    // Team BYE if first select is "__BYE__"
+    if (vals[0] === "__BYE__") return { team: "BYE", roster: [] };
+
+    const roster = vals.map((v) => String(v || "").trim()).filter(Boolean);
+
+    // Must fill exactly teamSize players
+    if (roster.length !== teamSize) {
+      return { error: `Please select ${teamSize} players for ${side.toUpperCase()} in Match ${m + 1}` };
+    }
+
+    // No duplicates within same team
+    const set = new Set(roster);
+    if (set.size !== roster.length) {
+      return { error: `Duplicate player selected in ${side.toUpperCase()} team in Match ${m + 1}` };
+    }
+
+    const teamName = roster.join(" + ");
+    return { team: teamName, roster };
+  };
+
+  const A = readSideRoster("home");
+  if (A.error) { showToast(A.error); return; }
+  const B = readSideRoster("away");
+  if (B.error) { showToast(B.error); return; }
+
+  // If both BYE -> invalid
+  if (A.team === "BYE" && B.team === "BYE") {
+    showToast(`Both sides cannot be BYE (Match ${m + 1})`);
+    return;
+  }
+
+  // Track chosen players for global uniqueness (exclude BYE)
+  chosen.push(...A.roster, ...B.roster);
+
+  // Apply to match
+  match.home = A.team;
+  match.away = B.team;
+  match.homePlayers = A.roster;
+  match.awayPlayers = B.roster;
+}
+
+// Global uniqueness check: a player can’t be in two teams in Round 1
+const allSet = new Set(chosen);
+if (allSet.size !== chosen.length) {
+  showToast("A player is selected in multiple teams. Fix duplicates in Round 1.");
+  return;
+}
+
 
   const r = await apiPost(
     `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,

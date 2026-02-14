@@ -17,7 +17,16 @@
   margin: 0 0 6px;
   font-size: 24px;
 }
-
+.fixture-player-grid{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.fixture-player-select{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
 .fixtures-meta {
   display: flex;
   flex-wrap: wrap;
