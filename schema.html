@@ -1,120 +1,111 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>ScheduleIt – Scoring Fields</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Scoring Fields</title>
 
-    <!-- Fonts (match fixtures.html / schedule.html style) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-
-    <!-- IMPORTANT: use correct folder -->
+    <!-- Use the SAME pattern as other pages: styles live in /styles -->
+    <link rel="stylesheet" href="styles/host.css" />
     <link rel="stylesheet" href="styles/fixtures.css" />
-    <!-- Optional: if you create schema.css later, add it like this:
-    <link rel="stylesheet" href="styles/schema.css" />
-    -->
+
+    <style>
+      .schema-wrap { max-width: 1100px; margin: 0 auto; padding: 18px; }
+      .schema-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+      .schema-meta { font-size: 14px; opacity: .85; margin-top: 6px; }
+      .schema-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top: 12px; }
+      .schema-grid { display:grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
+      .schema-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; }
+      .schema-list { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+      .field-row { display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:12px; border:1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.12); }
+      .field-row input[type="checkbox"] { margin-top: 3px; transform: scale(1.2); }
+      .field-main { flex:1; }
+      .field-title { font-weight:700; }
+      .field-sub { font-size: 13px; opacity:.85; margin-top: 2px; }
+      .field-tags { margin-top: 6px; display:flex; gap:8px; flex-wrap:wrap; }
+      .tag { font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid rgba(255,255,255,0.10); opacity:.9; }
+      .muted { opacity:.75; }
+      .error { color: #ffb4b4; }
+      .ok { color: #b7ffcc; }
+      .small { font-size: 12px; }
+      .row { display:flex; gap:10px; flex-wrap:wrap; }
+      .input { padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.2); color:#fff; }
+    </style>
   </head>
 
   <body>
-    <div class="app-shell">
-      <!-- Top bar (same structure as fixtures.html) -->
-      <header class="topbar">
-        <a class="brand brand-link" href="index.html" aria-label="Go to homepage"
-          >ScheduleIt</a
-        >
-
-        <div class="topbar-right">
-          <div class="user-menu">
-            <button
-              type="button"
-              class="user-avatar-btn"
-              id="host-user-menu-trigger"
-              aria-label="User menu"
-            >
-              U
-            </button>
-
-            <div class="user-menu-dropdown" id="host-user-menu-dropdown">
-              <button type="button" class="dropdown-item" id="dropdown-signout">
-                Sign out
-              </button>
-            </div>
+    <!-- Keep it simple; no extra auth.js script tag here -->
+    <div class="schema-wrap">
+      <div class="schema-header">
+        <div>
+          <h1 style="margin:0;">Scoring Fields</h1>
+          <div class="schema-meta">
+            <div><span class="muted">Tournament:</span> <span id="schema-tournament-id">—</span></div>
+            <div><span class="muted">Category:</span> <span id="schema-category-id">—</span></div>
+            <div><span class="muted">Sport:</span> <span id="schema-sport-name">—</span></div>
           </div>
 
-          <div class="mode-toggle" role="group" aria-label="Mode toggle">
-            <button class="mode-btn" id="mode-player-btn" type="button">
-              Join mode
-            </button>
-            <button class="mode-btn is-active" id="mode-host-btn" type="button">
-              Host mode
-            </button>
+          <div class="schema-actions">
+            <button type="button" class="btn" id="btn-generate-ai">Generate AI Suggestions</button>
+            <button type="button" class="btn" id="btn-select-all">Select all</button>
+            <button type="button" class="btn" id="btn-select-none">Select none</button>
+            <button type="button" class="btn" id="btn-add-custom">+ Add custom field</button>
+            <button type="button" class="btn-primary" id="btn-finalize">Finalize & Save</button>
+          </div>
+
+          <div id="schema-msg" class="small muted" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="row">
+          <button type="button" class="btn-dark" id="btn-back">← Back</button>
+        </div>
+      </div>
+
+      <div class="schema-grid">
+        <div class="schema-card">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <h2 style="margin:0;">Available fields</h2>
+            <div class="small muted">Tick what you want in scoring</div>
+          </div>
+
+          <div id="schema-empty" class="muted" style="margin-top:10px;">
+            No draft schema yet. Click “Generate AI Suggestions”.
+          </div>
+
+          <div id="schema-error" class="error small" style="margin-top:10px; display:none;"></div>
+
+          <div id="schema-fields" class="schema-list"></div>
+        </div>
+
+        <div class="schema-card">
+          <h2 style="margin:0;">Add custom field</h2>
+          <div class="muted small" style="margin-top:8px;">
+            Use this if the host realizes mid-game something is missing.
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <input class="input" id="custom-key" placeholder="key (e.g. yellow_cards)" style="min-width:220px;" />
+            <input class="input" id="custom-label" placeholder="label (e.g. Yellow cards)" style="min-width:220px;" />
+            <select class="input" id="custom-type">
+              <option value="counter">counter</option>
+              <option value="number">number</option>
+              <option value="text">text</option>
+            </select>
+            <select class="input" id="custom-level">
+              <option value="basic">basic</option>
+              <option value="advanced">advanced</option>
+              <option value="pro">pro</option>
+            </select>
+            <button class="btn" type="button" id="btn-add-custom-inline">Add</button>
+          </div>
+          <div class="small muted" style="margin-top:10px;">
+            Note: key should be lowercase with underscores only.
           </div>
         </div>
-      </header>
-
-      <main class="main">
-        <section class="fixtures-card">
-          <header class="fixtures-header">
-            <p class="eyebrow">Scoring Fields</p>
-            <h1>Scoring Fields</h1>
-            <p class="helper-text fixtures-meta">
-              <span>Tournament: <span id="schema-tournament-id">—</span></span>
-            </p>
-          </header>
-
-          <div class="fixtures-toolbar">
-            <button type="button" class="btn-dark" id="schema-back-btn">
-              ← Back to fixtures
-            </button>
-
-            <button type="button" class="btn-primary" id="schema-generate-btn">
-              Generate AI Suggestions
-            </button>
-
-            <button type="button" class="btn-dark" id="schema-select-all">
-              Select all
-            </button>
-
-            <button type="button" class="btn-dark" id="schema-select-none">
-              Select none
-            </button>
-
-            <button type="button" class="btn-dark" id="schema-add-custom">
-              + Add custom field
-            </button>
-
-            <button type="button" class="btn-primary" id="schema-finalize-btn">
-              Finalize & Save
-            </button>
-          </div>
-
-          <p class="helper-text" style="margin-top: 10px;">
-            Category: <strong id="schema-category-id">—</strong>
-            &nbsp; • &nbsp;
-            Sport: <strong id="schema-sport-name">—</strong>
-          </p>
-
-          <div id="schema-error" class="fixtures-toast" style="display:none; margin-top: 12px;">
-            Error
-          </div>
-
-          <div style="margin-top: 14px;">
-            <p id="schema-empty" class="helper-text">
-              No draft schema yet. Click “Generate AI Suggestions”.
-            </p>
-
-            <div id="schema-fields-list"></div>
-          </div>
-        </section>
-      </main>
+      </div>
     </div>
 
-    <!-- IMPORTANT: module entrypoint (this file imports auth.js etc) -->
+    <!-- IMPORTANT: module script -->
     <script type="module" src="scripts/schema.js"></script>
   </body>
 </html>

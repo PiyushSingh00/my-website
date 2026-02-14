@@ -1,227 +1,273 @@
-const schemaListEl = document.getElementById("schemaList");
-const schemaSubEl = document.getElementById("schemaSub");
-const pillCategory = document.getElementById("pillCategory");
-const pillSport = document.getElementById("pillSport");
+// scripts/schema.js
+import { requireAuth } from "./auth.js";
 
-const btnSuggest = document.getElementById("btnSuggest");
-const btnSelectAll = document.getElementById("btnSelectAll");
-const btnSelectNone = document.getElementById("btnSelectNone");
-const btnFinalize = document.getElementById("btnFinalize");
-const btnAddField = document.getElementById("btnAddField");
+document.addEventListener("DOMContentLoaded", async () => {
+  const user = await requireAuth();
+  if (!user) return;
 
-const modalBackdrop = document.getElementById("modalBackdrop");
-const btnCloseModal = document.getElementById("btnCloseModal");
-const btnSaveField = document.getElementById("btnSaveField");
+  // ---- Read query params ----
+  const params = new URLSearchParams(window.location.search);
+  const tournamentId = params.get("tournamentId");
+  const categoryId = params.get("categoryId");
 
-const fLabel = document.getElementById("fLabel");
-const fKey = document.getElementById("fKey");
-const fType = document.getElementById("fType");
-const fGroup = document.getElementById("fGroup");
-const fLevel = document.getElementById("fLevel");
-const fOrder = document.getElementById("fOrder");
-const fDefault = document.getElementById("fDefault");
-const fHelp = document.getElementById("fHelp");
+  // ---- DOM refs (IDs MUST match schema.html) ----
+  const elTid = document.getElementById("schema-tournament-id");
+  const elCid = document.getElementById("schema-category-id");
+  const elSport = document.getElementById("schema-sport-name");
+  const elMsg = document.getElementById("schema-msg");
+  const elEmpty = document.getElementById("schema-empty");
+  const elErr = document.getElementById("schema-error");
+  const elFields = document.getElementById("schema-fields");
 
-const qs = new URLSearchParams(window.location.search);
-const tournamentId = qs.get("tournamentId") || "";
-const categoryId = qs.get("categoryId") || "";
+  const btnBack = document.getElementById("btn-back");
+  const btnGen = document.getElementById("btn-generate-ai");
+  const btnAll = document.getElementById("btn-select-all");
+  const btnNone = document.getElementById("btn-select-none");
+  const btnFinalize = document.getElementById("btn-finalize");
 
-let draft = null;
-let activeByCategory = {};
-let customFields = []; // added by host
+  const btnAddCustom = document.getElementById("btn-add-custom");
+  const btnAddCustomInline = document.getElementById("btn-add-custom-inline");
 
-function authHeader() {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+  const customKey = document.getElementById("custom-key");
+  const customLabel = document.getElementById("custom-label");
+  const customType = document.getElementById("custom-type");
+  const customLevel = document.getElementById("custom-level");
 
-async function apiGet(path) {
-  const r = await fetch(path, { headers: { ...authHeader() } });
-  const data = await r.json().catch(() => null);
-  return { ok: r.ok, status: r.status, data };
-}
-async function apiPost(path, body) {
-  const r = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeader() },
-    body: JSON.stringify(body || {})
-  });
-  const data = await r.json().catch(() => null);
-  return { ok: r.ok, status: r.status, data };
-}
+  // ---- Guard: if any are missing, stop with a clear error ----
+  const mustExist = [
+    ["schema-tournament-id", elTid],
+    ["schema-category-id", elCid],
+    ["schema-sport-name", elSport],
+    ["schema-fields", elFields],
+    ["btn-generate-ai", btnGen],
+    ["btn-finalize", btnFinalize],
+  ];
+  for (const [id, node] of mustExist) {
+    if (!node) {
+      // This avoids your "textContent of null" crash
+      alert(`schema.html missing element id="${id}". Fix HTML IDs and reload.`);
+      return;
+    }
+  }
 
-function render() {
-  schemaListEl.innerHTML = "";
-  if (!draft?.playerFields?.length) {
-    schemaListEl.innerHTML = `<div class="schema-meta">No draft schema yet. Click “Generate AI Suggestions”.</div>`;
+  elTid.textContent = tournamentId || "—";
+  elCid.textContent = categoryId || "—";
+
+  if (!tournamentId || !categoryId) {
+    showError("Missing tournamentId/categoryId in URL.");
     return;
   }
 
-  const fields = [...draft.playerFields];
-
-  // sort basic -> pro, then order
-  const levelRank = { basic: 0, intermediate: 1, advanced: 2, pro: 3 };
-  fields.sort((a, b) => {
-    const la = levelRank[a.level] ?? 99;
-    const lb = levelRank[b.level] ?? 99;
-    if (la !== lb) return la - lb;
-    return (a.order ?? 999) - (b.order ?? 999);
+  btnBack?.addEventListener("click", () => {
+    // go back to fixtures with the tournamentId
+    window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(tournamentId)}`;
   });
 
-  const selectedSet = new Set(
-    (activeByCategory?.[categoryId]?.playerFields || []).map((f) => f.key)
-  );
+  // ---- State ----
+  let draft = null; // { sport, version, playerFields, inputs, winnerLogic }
+  let selectedKeys = new Set();
 
-  fields.forEach((f) => {
-    const checked = selectedSet.has(f.key);
+  // ---- Helpers ----
+  function showError(msg) {
+    elErr.style.display = "block";
+    elErr.textContent = msg;
+  }
+  function clearError() {
+    elErr.style.display = "none";
+    elErr.textContent = "";
+  }
+  function setMsg(msg) {
+    if (!elMsg) return;
+    elMsg.textContent = msg || "";
+  }
 
-    const div = document.createElement("div");
-    div.className = "schema-item";
-    div.innerHTML = `
-      <input class="chk" type="checkbox" data-key="${f.key}" ${checked ? "checked" : ""} style="margin-top:4px;">
-      <div style="flex:1;">
-        <div class="row" style="justify-content:space-between;">
-          <h4>${f.label} <span class="schema-meta">(${f.key})</span></h4>
-          <div class="row">
-            <span class="pill">${f.group}</span>
-            <span class="pill">${f.level}</span>
-            <span class="pill">${f.type}</span>
+  async function apiJson(url, options = {}) {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: "Bearer " + localStorage.getItem("token"),
+      },
+    });
+    const raw = await res.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = raw;
+    }
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  async function apiPost(url, body) {
+    return apiJson(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
+
+  // ---- Render ----
+  function render() {
+    elFields.innerHTML = "";
+    clearError();
+
+    if (!draft) {
+      elEmpty.style.display = "block";
+      return;
+    }
+    elEmpty.style.display = "none";
+
+    elSport.textContent = draft.sport || "—";
+
+    const fields = Array.isArray(draft.playerFields) ? draft.playerFields : [];
+    if (!fields.length) {
+      elFields.innerHTML = `<div class="muted">No playerFields returned. Click “Generate AI Suggestions”.</div>`;
+      return;
+    }
+
+    for (const f of fields) {
+      const key = String(f.key || "").trim();
+      const label = String(f.label || key || "Field");
+      const type = String(f.type || "counter");
+      const level = String(f.level || "basic"); // if your backend doesn’t send level yet, it will show basic
+      const help = f.help ? String(f.help) : "";
+
+      const row = document.createElement("div");
+      row.className = "field-row";
+      row.innerHTML = `
+        <input type="checkbox" ${selectedKeys.has(key) ? "checked" : ""} data-key="${key}">
+        <div class="field-main">
+          <div class="field-title">${label}</div>
+          <div class="field-sub">${help || ""}</div>
+          <div class="field-tags">
+            <span class="tag">${type}</span>
+            <span class="tag">${level}</span>
+            <span class="tag">${key}</span>
           </div>
         </div>
-        <div class="schema-meta">${f.help || ""}</div>
-      </div>
-    `;
-    schemaListEl.appendChild(div);
-  });
-}
+      `;
+      row.querySelector('input[type="checkbox"]').addEventListener("change", (e) => {
+        if (e.target.checked) selectedKeys.add(key);
+        else selectedKeys.delete(key);
+      });
 
-function getSelectedKeysFromUI() {
-  const keys = [];
-  document.querySelectorAll(".chk").forEach((c) => {
-    if (c.checked) keys.push(c.dataset.key);
-  });
-  return keys;
-}
-
-btnSelectAll?.addEventListener("click", () => {
-  document.querySelectorAll(".chk").forEach((c) => (c.checked = true));
-});
-btnSelectNone?.addEventListener("click", () => {
-  document.querySelectorAll(".chk").forEach((c) => (c.checked = false));
-});
-
-btnAddField?.addEventListener("click", () => {
-  modalBackdrop.style.display = "flex";
-  fLabel.value = "";
-  fKey.value = "";
-  fType.value = "counter";
-  fGroup.value = "custom";
-  fLevel.value = "pro";
-  fOrder.value = "999";
-  fDefault.value = "0";
-  fHelp.value = "";
-});
-
-btnCloseModal?.addEventListener("click", () => {
-  modalBackdrop.style.display = "none";
-});
-
-function slugKey(label) {
-  const s = String(label || "").trim();
-  if (!s) return "";
-  const parts = s.replace(/[^a-zA-Z0-9 ]/g, " ").split(" ").filter(Boolean);
-  if (!parts.length) return "";
-  return parts[0].toLowerCase() + parts.slice(1).map(p => p[0].toUpperCase() + p.slice(1).toLowerCase()).join("");
-}
-
-btnSaveField?.addEventListener("click", () => {
-  const label = String(fLabel.value || "").trim();
-  let key = String(fKey.value || "").trim();
-  if (!key) key = slugKey(label);
-
-  if (!label || !key) {
-    alert("Label and key required");
-    return;
+      elFields.appendChild(row);
+    }
   }
 
-  customFields.push({
-    label,
-    key,
-    type: fType.value,
-    group: fGroup.value || "custom",
-    level: fLevel.value || "pro",
-    order: Number(fOrder.value || 999),
-    default: (() => {
-      if (fType.value === "boolean") return false;
-      if (fType.value === "text") return "";
-      if (fType.value === "select") return null;
-      return Number(fDefault.value || 0);
-    })(),
-    min: 0,
-    max: null,
-    help: fHelp.value || null
-  });
+  // ---- Actions ----
+  btnGen.addEventListener("click", async () => {
+    setMsg("Generating AI suggestions…");
+    clearError();
 
-  modalBackdrop.style.display = "none";
-  alert("Custom field added. It will be included when you click Finalize & Save.");
-});
+    // This MUST match your backend route (you already have /scoring-schema/auto)
+    const url = `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/auto`;
 
-btnSuggest?.addEventListener("click", async () => {
-  if (!tournamentId) return alert("Missing tournamentId");
-  btnSuggest.disabled = true;
-  try {
-    const resp = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/suggest`, {
-      context: { matchType: "auto" }
-    });
-    if (!resp.ok) return alert(resp.data?.message || "Failed");
+    const r = await apiPost(url, { context: { categoryId } });
 
-    // refresh everything
-    const g = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
-    draft = g.data?.draft || resp.data?.draft || null;
-    activeByCategory = g.data?.activeByCategory || {};
+    if (!r.ok) {
+      showError(`AI generate failed (${r.status}). Check backend logs.`);
+      setMsg("");
+      return;
+    }
+
+    // Backend returns { ok:true, scoringSchema: generated } in your current code
+    draft = r.data?.scoringSchema || null;
+
+    // Default: select everything in draft initially
+    selectedKeys = new Set((draft?.playerFields || []).map((x) => x.key).filter(Boolean));
+
+    setMsg("AI suggestions loaded. Review and finalize.");
     render();
-  } finally {
-    btnSuggest.disabled = false;
-  }
-});
+  });
 
-btnFinalize?.addEventListener("click", async () => {
-  if (!tournamentId || !categoryId) return alert("Missing tournamentId/categoryId");
-  const selectedKeys = getSelectedKeysFromUI();
-  if (!selectedKeys.length && !customFields.length) return alert("Select at least 1 field or add a custom field.");
+  btnAll?.addEventListener("click", () => {
+    if (!draft) return;
+    selectedKeys = new Set((draft.playerFields || []).map((x) => x.key).filter(Boolean));
+    render();
+  });
 
-  btnFinalize.disabled = true;
-  try {
-    const resp = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/finalize`, {
-      categoryId,
-      selectedKeys,
-      customFields
+  btnNone?.addEventListener("click", () => {
+    selectedKeys = new Set();
+    render();
+  });
+
+  function addCustomField() {
+    if (!draft) {
+      draft = { sport: "", version: "1.0", inputs: [], playerFields: [], winnerLogic: {} };
+    }
+    const key = String(customKey.value || "").trim();
+    const label = String(customLabel.value || "").trim();
+    const type = String(customType.value || "counter");
+    const level = String(customLevel.value || "basic");
+
+    if (!key || !/^[a-z0-9_]+$/.test(key)) {
+      showError("Custom key must be lowercase and use only a-z, 0-9, underscore.");
+      return;
+    }
+    if (!label) {
+      showError("Custom label is required.");
+      return;
+    }
+
+    const exists = (draft.playerFields || []).some((x) => x.key === key);
+    if (exists) {
+      showError("That key already exists in the list.");
+      return;
+    }
+
+    draft.playerFields = draft.playerFields || [];
+    draft.playerFields.push({
+      key,
+      label,
+      type,
+      default: type === "counter" ? 0 : null,
+      min: type === "counter" ? 0 : null,
+      max: null,
+      help: null,
+      level,
+      order: 999,
     });
 
-    if (!resp.ok) return alert(resp.data?.message || "Failed to finalize");
-
-    alert("✅ Scoring fields saved for this category");
-    // redirect back to fixtures
-    window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(tournamentId)}`;
-  } finally {
-    btnFinalize.disabled = false;
-  }
-});
-
-(async function init() {
-  if (!tournamentId || !categoryId) {
-    schemaSubEl.textContent = "Missing tournamentId or categoryId";
-    return;
+    selectedKeys.add(key);
+    customKey.value = "";
+    customLabel.value = "";
+    clearError();
+    setMsg("Custom field added.");
+    render();
   }
 
-  pillCategory.textContent = `Category: ${categoryId}`;
-  schemaSubEl.textContent = `Tournament: ${tournamentId}`;
-  const g = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
-  draft = g.data?.draft || null;
-  activeByCategory = g.data?.activeByCategory || {};
+  btnAddCustom?.addEventListener("click", addCustomField);
+  btnAddCustomInline?.addEventListener("click", addCustomField);
 
-  // best effort: show sport name from draft if exists
-  pillSport.textContent = `Sport: ${draft?.sport || "—"}`;
+  btnFinalize.addEventListener("click", async () => {
+    if (!draft) {
+      showError("Generate AI suggestions first.");
+      return;
+    }
+    const filtered = {
+      ...draft,
+      playerFields: (draft.playerFields || []).filter((f) => selectedKeys.has(f.key)),
+    };
 
+    setMsg("Saving selection…");
+    clearError();
+
+    // NOTE: this endpoint must exist in backend Step B/C.
+    // If you already created: scoringSchemaActiveByCategory map, save there.
+    const url = `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/finalize`;
+    const r = await apiPost(url, { categoryId, scoringSchema: filtered });
+
+    if (!r.ok) {
+      showError(`Finalize failed (${r.status}). If endpoint missing, implement it in backend next.`);
+      setMsg("");
+      return;
+    }
+
+    setMsg("Saved ✅ You can now start scoring from fixtures.");
+  });
+
+  // Initial render (no draft yet)
   render();
-})();
+});
