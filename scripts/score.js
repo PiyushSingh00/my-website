@@ -100,7 +100,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     // IMPORTANT: this endpoint should return category-aware schema (your Step B)
     const schemaResp = await apiGet(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema?categoryId=${encodeURIComponent(categoryId)}`
+  `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/active?categoryId=${encodeURIComponent(categoryId)}`
+
     );
     schema = schemaResp?.ok ? schemaResp.data : schemaResp;
 
