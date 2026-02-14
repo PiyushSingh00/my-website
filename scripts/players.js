@@ -5,40 +5,70 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
-  // ---------- TOPBAR ----------
-  const usernameLabel = document.getElementById("username-label");
-  if (usernameLabel) usernameLabel.textContent = user.username;
+  // ===== Topbar: avatar + dropdown signout + mode toggle (match host.html) =====
+document.querySelectorAll(".brand").forEach((el) => {
+  el.addEventListener("click", () => {
+    window.location.href = "index.html";
+  });
+});
 
-  const signoutBtn = document.getElementById("signout-btn");
-  signoutBtn?.addEventListener("click", logout);
+const trigger = document.getElementById("host-user-menu-trigger");
+const dropdown = document.getElementById("host-user-menu-dropdown");
 
-  document.querySelectorAll(".brand").forEach((el) => {
-    el.addEventListener("click", () => {
-      window.location.href = "index.html";
-    });
+// Set avatar initial
+if (trigger) {
+  const label = (user?.name || user?.username || user?.email || "U").trim();
+  trigger.textContent = label.charAt(0).toUpperCase();
+}
+
+// Dropdown open/close
+trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
+
+document.addEventListener("click", (e) => {
+  if (!dropdown || !trigger) return;
+  if (!dropdown.contains(e.target) && !trigger.contains(e.target)) {
+    dropdown.classList.remove("is-open");
+  }
+});
+
+
+// Dropdown: Sign out
+const dropdownSignout = document.getElementById("dropdown-signout");
+dropdownSignout?.addEventListener("click", () => {
+  dropdown?.classList.remove("is-open");
+  logout();
+});
+
+// Mode toggle: Host active on this page
+const playerBtn = document.getElementById("mode-player-btn");
+const hostBtn = document.getElementById("mode-host-btn");
+
+hostBtn?.classList.add("is-active");
+playerBtn?.classList.remove("is-active");
+
+// Switch to Join mode
+playerBtn?.addEventListener("click", async () => {
+  playerBtn.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
+  await fetch("/api/user/mode", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token"),
+    },
+    body: JSON.stringify({ mode: "player" }),
   });
 
-  // Host dropdown (same IDs as host.html)
-  const trigger =
-    document.getElementById("host-user-menu-trigger") ||
-    document.getElementById("user-menu-trigger");
-  const dropdown =
-    document.getElementById("host-user-menu-dropdown") ||
-    document.getElementById("user-menu-dropdown");
-  trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
+  window.location.href = "join.html";
+});
 
-  const switchPlayerBtn = document.getElementById("switch-player-mode");
-  switchPlayerBtn?.addEventListener("click", async () => {
-    await fetch("/api/user/mode", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-      body: JSON.stringify({ mode: "player" }),
-    });
-    window.location.href = "join.html";
-  });
+// Clicking Host mode here just keeps the active look
+hostBtn?.addEventListener("click", () => {
+  hostBtn.classList.add("is-active");
+  playerBtn?.classList.remove("is-active");
+});
+
 
   // ---------- READ TOURNAMENT ID ----------
   const params = new URLSearchParams(window.location.search);
