@@ -35,6 +35,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const categoryId = params.get("categoryId");
   const roundIndex = Number(params.get("round"));
   const matchIndex = Number(params.get("match"));
+const scoreIndex = Number(params.get("scoreIndex") ?? 0);
 
   if (!tournamentId || !categoryId || Number.isNaN(roundIndex) || Number.isNaN(matchIndex)) {
     titleEl.textContent = "Missing required URL params";
@@ -566,6 +567,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         categoryId,
         roundIndex,
         matchIndex,
+          scoreIndex,
         score: {
           config: state.config,
           state: state.state, // includes team totals + players map
