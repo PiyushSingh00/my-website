@@ -625,7 +625,10 @@ wrapper.innerHTML = `
       <h2 class="fixtures-group-title">${cat.label || "Fixtures"}</h2>
       ${fixtures.__locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
     </div>
+  </div>
 
+  <!-- ✅ Button just above the bracket container -->
+  <div class="fixtures-group-actions">
     <button type="button" class="btn-dark configure-fields-btn btn-configure-fields">
       Configure scoring fields
     </button>
