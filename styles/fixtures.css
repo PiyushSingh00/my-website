@@ -36,44 +36,62 @@
   box-sizing: border-box;        /* critical: includes padding/border in width */
   display: block;
 }
-/* Professional dropdown styling (dark theme, 3D feel) */
+
+/* --- Edit fixtures dropdown: pill, clean chevron, no overflow --- */
+.player-slot {               /* keep everything inside the pill */
+  overflow: hidden;
+}
+
 .fixture-player-select{
+  flex: 1;                   /* IMPORTANT: constrain inside flex pill */
+  min-width: 0;              /* IMPORTANT: prevents overflow in flex */
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   display: block;
 
-  background: linear-gradient(180deg, rgba(12, 20, 40, 0.98), rgba(6, 12, 26, 0.98));
+  background: rgba(6, 12, 26, 0.95);
   color: var(--text);
   border: 1px solid rgba(145, 163, 196, 0.55);
-  border-radius: 12px;
-
-  padding: 10px 40px 10px 12px;   /* extra right padding for arrow */
+  border-radius: 999px;      /* match your player-slot pill */
+  padding: 9px 38px 9px 12px;/* space for chevron */
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.1;
+  line-height: 1;
 
-  /* Raised / button-like */
-  box-shadow:
-    0 10px 18px rgba(0,0,0,0.22),
-    0 1px 0 rgba(255,255,255,0.08) inset;
-
-  outline: none;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+  outline: none;
 
+  /* subtle “button” depth */
+  box-shadow:
+    0 8px 16px rgba(0,0,0,0.22),
+    0 1px 0 rgba(255,255,255,0.07) inset;
+
+  /* clean chevron (SVG) */
   background-repeat: no-repeat;
   background-position: right 14px center;
   background-size: 12px 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23cfe3ff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
 
-  /* simple caret using gradients (no images) */
-  background-image:
-    linear-gradient(45deg, transparent 50%, rgba(220,235,255,0.9) 50%),
-    linear-gradient(135deg, rgba(220,235,255,0.9) 50%, transparent 50%);
-  background-position:
-    right 18px center,
-    right 12px center;
+.fixture-player-select:hover{
+  border-color: rgba(77, 208, 225, 0.55);
+  filter: brightness(1.04);
+}
+
+.fixture-player-select:focus{
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px rgba(77, 208, 225, 0.18),
+    0 10px 18px rgba(0,0,0,0.24),
+    0 1px 0 rgba(255,255,255,0.07) inset;
+}
+
+.fixture-player-select option{
+  background: rgba(6, 12, 26, 1);
+  color: var(--text);
 }
 
 .fixture-player-select:hover{
