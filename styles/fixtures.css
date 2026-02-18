@@ -22,11 +22,34 @@
   grid-template-columns: 1fr;
   gap: 8px;
 }
+/* Edit fixtures dropdown (player select) – match schema dark theme */
 .fixture-player-select{
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
+  background: rgba(4, 10, 24, 0.96);
+  color: var(--text);
+  border: 1px solid rgba(145, 163, 196, 0.6);
+  border-radius: 10px;         /* keep same "length/shape" feel you had */
+  padding: 10px 12px;          /* keep same spacing as before */
+  font-size: 13px;
+  outline: none;
+  appearance: none;            /* makes it look consistent across browsers */
 }
+
+.fixture-player-select:hover{
+  border-color: rgba(77, 208, 225, 0.45);
+}
+
+.fixture-player-select:focus{
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(77, 208, 225, 0.18);
+}
+
+/* Options inside dropdown */
+.fixture-player-select option{
+  background: rgba(4, 10, 24, 0.98);
+  color: var(--text);
+}
+
 .fixtures-meta {
   display: flex;
   flex-wrap: wrap;
