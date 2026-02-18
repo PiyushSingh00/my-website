@@ -101,6 +101,37 @@
   margin: 0 0 8px;
 }
 
+/* Header row inside each category group (title + actions) */
+.fixtures-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.fixtures-group-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fixtures-group-header-left .muted {
+  margin: 0;
+}
+
+/* Configure scoring fields button (match existing dark buttons) */
+.configure-fields-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 /* Bracket layout – rounds as branches */
 .fixtures-bracket {
   margin-top: 16px;

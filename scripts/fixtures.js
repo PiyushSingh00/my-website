@@ -621,9 +621,14 @@ const awayCell =
 wrapper.className = "fixtures-group";
 wrapper.innerHTML = `
   <div class="fixtures-group-header">
-    <h2>${cat.label || "Fixtures"}</h2>
-    ${fixtures.__locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
-    <button type="button" class="btn btn-configure-fields">Configure scoring fields</button>
+    <div class="fixtures-group-header-left">
+      <h2 class="fixtures-group-title">${cat.label || "Fixtures"}</h2>
+      ${fixtures.__locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
+    </div>
+
+    <button type="button" class="btn-dark configure-fields-btn btn-configure-fields">
+      Configure scoring fields
+    </button>
   </div>
 
   <div class="fixtures-bracket">
