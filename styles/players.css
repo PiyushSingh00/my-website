@@ -12,6 +12,9 @@
     var(--card);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
+
+  /* Move the whole players card slightly up */
+  margin-top: -20px;
 }
 
 .players-header h1 {
@@ -32,7 +35,6 @@
 .brand-link {
   cursor: pointer;
 }
-
 
 .players-meta {
   display: flex;
@@ -86,10 +88,21 @@
   color: var(--text);
 }
 
-/* Table */
+/* Table wrapper (shows ~4 rows + scroll) */
 .players-table-wrapper {
   margin-top: 8px;
+  max-height: 260px;     /* ~4 rows + header */
+  overflow-y: auto;
   overflow-x: auto;
+  border-radius: 12px;
+}
+
+/* Optional: sticky header */
+.players-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  z-index: 1;
 }
 
 .players-table {
@@ -115,6 +128,7 @@
 .players-table tr:hover td {
   background: rgba(255, 255, 255, 0.02);
 }
+
 /* Status pill + row actions (Accept/Reject) */
 .status-pill {
   display: inline-flex;
@@ -185,32 +199,287 @@
 }
 
 /* =========================
-   Requested UI tweaks
+   Embedded fixtures styling
+   (copied/merged from fixtures.css)
    ========================= */
 
-/* 1) Move the whole players card slightly up */
-.players-page-card {
-  margin-top: -20px; /* tweak value if you want more/less */
+.hidden { display: none; }
+
+.fixtures-embed {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* 2) Limit list height so ~4 rows visible + vertical scroll */
-.players-table-wrapper {
-  max-height: 260px;     /* shows around 4 rows + header */
-  overflow-y: auto;
-  overflow-x: auto;      /* keep existing horizontal scroll behavior */
-  border-radius: 12px;
+.fixtures-embed-title {
+  margin: 0 0 6px;
+  font-size: 20px;
 }
 
-/* Optional: sticky table header while scrolling */
-.players-table thead th {
-  position: sticky;
-  top: 0;
-  background: var(--card);
-  z-index: 1;
-}
-
-.players-footer-actions {
-  margin-top: 14px;
+.fixtures-meta {
   display: flex;
-  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.fixtures-meta span { white-space: nowrap; }
+
+/* Toolbar */
+.fixtures-toolbar {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Toast */
+.fixtures-toast {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.55);
+  color: #bbf7d0;
+}
+
+/* Category toggle buttons */
+.fixtures-toggle {
+  margin-top: 10px;
+  margin-bottom: 8px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fixtures-toggle .toggle-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.fixtures-toggle .toggle-btn:hover {
+  border-color: rgba(77, 208, 225, 0.45);
+  color: var(--text);
+}
+
+.fixtures-toggle .toggle-btn.active {
+  border-color: var(--accent);
+  background: rgba(77, 208, 225, 0.18);
+  color: var(--text);
+}
+
+/* Groups */
+.fixtures-group {
+  margin-top: 18px;
+  padding: 14px 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(4, 10, 24, 0.95);
+}
+
+.fixtures-group-title {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.fixtures-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.fixtures-group-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fixtures-group-header-left .muted {
+  margin: 0;
+}
+
+/* Bracket layout */
+.fixtures-bracket {
+  margin-top: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 10px;
+  border-radius: var(--radius-md);
+}
+
+.bracket-rounds {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 8px 8px 14px;
+  min-width: max-content;
+}
+
+.bracket-round {
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--round-gap, 12px);
+  padding-top: var(--round-offset, 0px);
+  position: relative;
+}
+
+.bracket-round::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 28px;
+  bottom: 10px;
+  border-left: 1px dashed rgba(148, 163, 184, 0.28);
+}
+
+.bracket-round:not(:last-child) .bracket-match::after {
+  content: "";
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  width: 28px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.35);
+  transform: translateY(-50%);
+}
+
+.round-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.bracket-match {
+  position: relative;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 14, 30, 0.9);
+  padding: 10px 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.match-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.player-slot {
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(145, 163, 196, 0.5);
+  font-size: 14px;
+  margin-bottom: 6px;
+  background: rgba(4, 10, 24, 0.96);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-slot:last-child { margin-bottom: 0; }
+
+.player-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* BYE styling */
+.player-slot.bye {
+  font-style: italic;
+  color: var(--muted);
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+/* Edit (Round 1) selects */
+.fixture-player-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.fixture-player-select {
+  width: 100%;
+  background: rgba(6, 12, 26, 1);
+  color: var(--text);
+  border: 1px solid rgba(145, 163, 196, 0.6);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.fixture-player-select:hover {
+  border-color: rgba(77, 208, 225, 0.55);
+  filter: brightness(1.04);
+}
+
+.fixture-player-select:focus {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px rgba(77, 208, 225, 0.20),
+    0 12px 20px rgba(0,0,0,0.24),
+    0 1px 0 rgba(255,255,255,0.08) inset;
+}
+
+.fixture-player-select option {
+  background: rgba(6, 12, 26, 1);
+  color: var(--text);
+}
+
+/* Start scoring button */
+.start-scoring-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.start-scoring-btn:hover {
+  border-color: rgba(77, 208, 225, 0.45);
+  color: var(--text);
+}
+
+.start-scoring-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Nice scrollbar */
+.fixtures-bracket::-webkit-scrollbar { height: 10px; }
+.fixtures-bracket::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+.fixtures-bracket::-webkit-scrollbar-thumb {
+  background: rgba(77, 208, 225, 0.35);
+  border-radius: 999px;
+}
+.fixtures-bracket::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 208, 225, 0.55);
 }

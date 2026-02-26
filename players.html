@@ -18,9 +18,7 @@
   <body>
     <!-- Same topbar structure as host page -->
     <header class="topbar">
-      <a class="brand brand-link" href="index.html" aria-label="Go to homepage"
-        >ScheduleIt</a
-      >
+      <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
       <div class="topbar-right">
         <!-- User avatar + dropdown (same as host.html) -->
@@ -43,16 +41,11 @@
 
         <!-- Mode toggle (same as host.html) -->
         <div class="mode-toggle" role="group" aria-label="Mode toggle">
-          <button class="mode-btn" id="mode-player-btn" type="button">
-            Join mode
-          </button>
-          <button class="mode-btn is-active" id="mode-host-btn" type="button">
-            Host mode
-          </button>
+          <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
+          <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
         </div>
       </div>
     </header>
-
 
     <main class="main">
       <section class="players-page-card">
@@ -68,24 +61,21 @@
 
         <div class="players-toolbar">
           <button class="btn-dark" type="button" id="players-back-btn">← Back</button>
-        </div>
 
+          <button class="btn-primary" type="button" id="create-fixtures-btn">
+            Create tournament fixtures
+          </button>
+        </div>
 
         <div class="players-tabs" id="players-tabs"></div>
 
         <div id="players-empty-state" class="empty-state">
           <div class="feature-icon">👥</div>
           <h3>No players yet</h3>
-          <p class="muted">
-            Once players join this tournament, they will appear here.
-          </p>
+          <p class="muted">Once players join this tournament, they will appear here.</p>
         </div>
 
-        <div
-          id="players-table-wrapper"
-          class="players-table-wrapper"
-          style="display: none;"
-        >
+        <div id="players-table-wrapper" class="players-table-wrapper" style="display: none;">
           <table class="players-table">
             <thead>
               <tr>
@@ -100,12 +90,52 @@
           </table>
         </div>
 
-        <div class="players-footer-actions">
-          <button class="btn-primary" type="button" id="create-fixtures-btn">
-            Create tournament fixtures
-          </button>
-        </div>         
+        <!-- ✅ EMBEDDED FIXTURES (replaces fixtures.html) -->
+        <section id="fixtures-embed" class="fixtures-embed hidden">
+          <header class="fixtures-header">
+            <p class="eyebrow">Knockout fixtures</p>
+            <h2 id="fixtures-tournament-name" class="fixtures-embed-title">Tournament name</h2>
+            <p class="helper-text fixtures-meta">
+              <span id="fixtures-tournament-sport"></span>
+              <span id="fixtures-tournament-dates"></span>
+              <span>Code: <span id="fixtures-tournament-code"></span></span>
+            </p>
+          </header>
 
+          <div class="fixtures-toolbar">
+            <button type="button" class="btn-primary" id="fixtures-generate-btn">
+              Regenerate fixtures
+            </button>
+
+            <button type="button" class="btn-dark" id="fixtures-configure-fields-btn">
+              Configure scoring fields
+            </button>
+
+            <button type="button" class="btn-dark" id="fixtures-edit-btn" style="display:none;">
+              Edit fixtures
+            </button>
+          </div>
+
+          <div id="fixtures-toast" class="fixtures-toast" style="display:none;">✓ Done</div>
+
+          <p class="helper-text">
+            Fixtures are auto-generated in random order for each category. BYE indicates a free pass
+            to the next round.
+          </p>
+
+          <div class="fixtures-toggle" id="fixtures-toggle"></div>
+
+          <div id="fixtures-none-selected" class="empty-state" style="display:flex;">
+            <div class="feature-icon">🎯</div>
+            <h3>Choose which fixtures to view</h3>
+            <p class="muted">
+              Select a <strong>Category</strong> above to see the knockout bracket.
+            </p>
+          </div>
+
+          <div id="fixtures-groups"></div>
+        </section>
+        <!-- ✅ END EMBEDDED FIXTURES -->
       </section>
     </main>
 
