@@ -480,6 +480,28 @@ h1 {
   color: var(--text);
 }
 
+.password-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 10px;
+  line-height: 0;
+}
+
+.password-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* default: show eye (password hidden) */
+.password-toggle .icon-eye-off { display: none; }
+
+/* when password is visible, switch icon */
+.password-toggle.is-visible .icon-eye { display: none; }
+.password-toggle.is-visible .icon-eye-off { display: inline-flex; }
+
 /* Utility: full-width button inside modal */
 .btn.full-width {
   width: 100%;

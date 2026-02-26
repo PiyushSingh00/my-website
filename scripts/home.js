@@ -75,15 +75,42 @@ function closeModal(modal) {
     });
   });
 
+  // Gate these CTAs behind login
+  function routeOrLogin(targetPath) {
+    const token = localStorage.getItem("token");
+    if (token) {
+      window.location.href = targetPath;
+      return;
+    }
+
+  // user is not signed in -> open login modal
+  closeModal(signupModal);
+  closeModal(signinModal);
+  openModal(signinModal);
+  }
+
   startHostingBtn?.addEventListener("click", (e) => {
-  e.preventDefault();
-  openModal(signupModal);
+    e.preventDefault();
+    routeOrLogin("host.html");
   });
 
-browseTournamentsBtn?.addEventListener("click", (e) => {
-  e.preventDefault();
-  openModal(signupModal);
+  browseTournamentsBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    routeOrLogin("join.html");
   });
+
+  document.querySelectorAll('.password-toggle').forEach((btn) => {
+  const targetId = btn.getAttribute('data-target');
+  const input = targetId ? document.getElementById(targetId) : null;
+  if (!input) return;
+
+  btn.addEventListener('click', () => {
+    const makeVisible = input.type === 'password';
+    input.type = makeVisible ? 'text' : 'password';
+    btn.classList.toggle('is-visible', makeVisible);
+    btn.setAttribute('aria-label', makeVisible ? 'Hide password' : 'Show password');
+  });
+});
 
 
   /* ===============================
