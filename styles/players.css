@@ -91,7 +91,7 @@
 /* Table wrapper (shows ~4 rows + scroll) */
 .players-table-wrapper {
   margin-top: 8px;
-  max-height: 260px;     /* ~4 rows + header */
+  max-height: 200px;     /* ~4 rows + header */
   overflow-y: auto;
   overflow-x: auto;
   border-radius: 12px;
@@ -482,4 +482,13 @@
 }
 .fixtures-bracket::-webkit-scrollbar-thumb:hover {
   background: rgba(77, 208, 225, 0.55);
+}
+
+/* Make "Create tournament fixtures" more compact */
+#create-fixtures-btn {
+  width: auto;          /* avoid stretching */
+  padding: 8px 12px;    /* slimmer */
+  font-size: 13px;
+  border-radius: 999px; /* consistent pill look */
+  white-space: nowrap;
 }
