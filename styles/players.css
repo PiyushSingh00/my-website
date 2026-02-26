@@ -492,3 +492,16 @@
   border-radius: 999px; /* consistent pill look */
   white-space: nowrap;
 }
+
+/* Compact fixtures toolbar buttons */
+.fixtures-toolbar button,
+#fixtures-generate-btn,
+#fixtures-configure-fields-btn,
+#fixtures-edit-btn {
+  width: auto !important;
+  padding: 7px 10px !important;   /* slimmer */
+  font-size: 13px !important;
+  border-radius: 999px !important;
+  white-space: nowrap;
+  min-width: 0 !important;
+}
