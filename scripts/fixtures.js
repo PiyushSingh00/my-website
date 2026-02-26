@@ -91,9 +91,7 @@ hostBtn?.addEventListener("click", async () => {
   const sportEl = document.getElementById("fixtures-tournament-sport");
   const datesEl = document.getElementById("fixtures-tournament-dates");
   const codeEl = document.getElementById("fixtures-tournament-code");
-const genSchemaBtn = document.getElementById("fixtures-generate-schema-btn");
 
-  const backBtn = document.getElementById("fixtures-back-btn");
   const generateBtn = document.getElementById("fixtures-generate-btn");
   const toastEl = document.getElementById("fixtures-toast");
 
@@ -115,9 +113,6 @@ const genSchemaBtn = document.getElementById("fixtures-generate-schema-btn");
       `score.html?tournamentId=${tId}&categoryId=${cId}&round=${round}&match=${match}`;
   });
 
-  backBtn?.addEventListener("click", () => {
-    window.location.href = `players.html?tournamentId=${encodeURIComponent(tournamentId)}`;
-  });
 
   // Inject Edit/Save buttons into toolbar (so you don’t have to edit fixtures.html)
   const toolbar = document.querySelector(".fixtures-toolbar");
@@ -433,6 +428,18 @@ function createBracket(names, teamMap = {}) {
     editBtn.className = editMode ? "btn-primary" : "btn-dark";
   }
 
+  const configureFieldsToolbarBtn = document.getElementById("fixtures-configure-fields-btn");
+
+  configureFieldsToolbarBtn?.addEventListener("click", () => {
+    if (!activeCategoryId) {
+      showToast("Select a category first");
+      return;
+    }
+    window.location.href =
+      `schema.html?tournamentId=${encodeURIComponent(tournamentId)}` +
+      `&categoryId=${encodeURIComponent(activeCategoryId)}`;
+  });
+
 
   function renderCategoryToggles() {
     if (!toggleWrap) return;
@@ -588,7 +595,7 @@ const awayCell =
             <div class="match-actions" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
               <button
                 type="button"
-                class="btn-dark start-scoring-btn"
+                class="toggle-btn start-scoring-btn"
                 data-tournament-id="${tournamentId}"
                 data-category-id="${categoryId}"
                 data-round="${r}"
@@ -627,13 +634,6 @@ wrapper.innerHTML = `
     </div>
   </div>
 
-  <!-- ✅ Button just above the bracket container -->
-  <div class="fixtures-group-actions">
-    <button type="button" class="btn-dark configure-fields-btn btn-configure-fields">
-      Configure scoring fields
-    </button>
-  </div>
-
   <div class="fixtures-bracket">
     <div class="bracket-rounds">
       ${roundsHtml}
@@ -641,12 +641,6 @@ wrapper.innerHTML = `
   </div>
 `;
 
-// Configure scoring fields button
-wrapper.querySelector(".btn-configure-fields")?.addEventListener("click", () => {
-  window.location.href =
-    `schema.html?tournamentId=${encodeURIComponent(tournamentId)}` +
-    `&categoryId=${encodeURIComponent(categoryId)}`;
-});
 
 groupsEl.appendChild(wrapper);
 
@@ -842,39 +836,6 @@ const bracket = createBracket(entrants, teamMap);
     renderCategoryToggles();
     if (activeCategoryId) renderCategoryBracket(activeCategoryId);
   });
-
-
-genSchemaBtn?.addEventListener("click", async () => {
-  genSchemaBtn.disabled = true;
-  try {
-    const resp = await apiPost(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/auto`,
-      { context: { matchType: "auto" } }
-    );
-
-    if (!resp.ok) {
-      showToast("Failed to generate schema");
-      console.error("Generate schema failed:", resp);
-      return;
-    }
-
-    // ✅ refresh local schema so UI uses latest immediately
-    const schemaResp = await apiGet(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`
-    );
-    scoringSchema = schemaResp.ok ? schemaResp.data : (resp.data?.scoringSchema || null);
-
-    showToast(`Scoring schema generated ✅ (${scoringSchema?.sport || "sport"})`);
-
-    // optional: rerender current category so scoreKey updates
-    if (activeCategoryId) renderCategoryBracket(activeCategoryId);
-
-  } catch (e) {
-    alert("Failed to generate schema: " + (e?.message || e));
-  } finally {
-    genSchemaBtn.disabled = false;
-  }
-});
 
 
   // ---------- EDIT / SAVE (Round 1 only) ----------

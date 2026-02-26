@@ -208,38 +208,7 @@
   margin: 0;
 }
 
-/* Configure scoring fields button (match existing dark buttons) */
-.configure-fields-btn {
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-}
 
-/* Row above bracket container */
-.fixtures-group-actions {
-  display: flex;
-  justify-content: flex-start;
-  margin: 6px 0 10px;  /* space between header and bracket */
-}
-
-/* 3D / raised button look */
-.configure-fields-btn {
-  padding: 10px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-
-  box-shadow:
-    0 10px 18px rgba(0, 0, 0, 0.22),
-    0 2px 0 rgba(255, 255, 255, 0.12) inset;
-  transform: translateY(0);
-  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
-}
 
 .configure-fields-btn:hover {
   transform: translateY(-1px);
@@ -511,10 +480,26 @@
   justify-content: flex-end;
 }
 
+
+/* Start scoring button styled like category toggle buttons */
 .start-scoring-btn {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.start-scoring-btn:hover {
+  border-color: rgba(77, 208, 225, 0.45);
+  color: var(--text);
+}
+
+.start-scoring-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

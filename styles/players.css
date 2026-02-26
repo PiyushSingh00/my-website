@@ -183,3 +183,34 @@
 #players-empty-state {
   margin-top: 10px;
 }
+
+/* =========================
+   Requested UI tweaks
+   ========================= */
+
+/* 1) Move the whole players card slightly up */
+.players-page-card {
+  margin-top: -20px; /* tweak value if you want more/less */
+}
+
+/* 2) Limit list height so ~4 rows visible + vertical scroll */
+.players-table-wrapper {
+  max-height: 260px;     /* shows around 4 rows + header */
+  overflow-y: auto;
+  overflow-x: auto;      /* keep existing horizontal scroll behavior */
+  border-radius: 12px;
+}
+
+/* Optional: sticky table header while scrolling */
+.players-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  z-index: 1;
+}
+
+.players-footer-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-start;
+}
