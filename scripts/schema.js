@@ -59,9 +59,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   btnBack?.addEventListener("click", () => {
-    // go back to fixtures with the tournamentId
-    window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(tournamentId)}`;
-  });
+  // go back to players page (keep context if present)
+  const qp = new URLSearchParams();
+  if (tournamentId) qp.set("tournamentId", tournamentId);
+  if (categoryId) qp.set("categoryId", categoryId);
+  window.location.href = `players.html?${qp.toString()}`;
+});
 
   // ---- State ----
   let draft = null; // { sport, version, playerFields, inputs, winnerLogic }
