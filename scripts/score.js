@@ -11,35 +11,50 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   document.getElementById("signout-btn")?.addEventListener("click", logout);
 
-  const titleEl = document.getElementById("score-title");
-  const subEl = document.getElementById("score-sub");
-  const backBtn = document.getElementById("back-to-fixtures");
-  const saveBtn = document.getElementById("save-score");
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  const titleEl       = document.getElementById("score-title");   // kept for error messages
+  const subEl         = document.getElementById("score-sub");
+  const backBtn       = document.getElementById("back-to-fixtures");
+  const saveBtn       = document.getElementById("save-score");
+  const configWrap    = document.getElementById("config-fields");
+  const teamsWrap     = document.getElementById("teams-wrap");    // hidden legacy div
+  const statusPill    = document.getElementById("status-pill");
+  const winnerPill    = document.getElementById("winner-pill");
+  const reasonPill    = document.getElementById("reason-pill");
+  const saveMsg       = document.getElementById("save-msg");
 
-  const configWrap = document.getElementById("config-fields");
-  const teamsWrap = document.getElementById("teams-wrap");
-
-  const statusPill = document.getElementById("status-pill");
-  const winnerPill = document.getElementById("winner-pill");
-  const reasonPill = document.getElementById("reason-pill");
-  const saveMsg = document.getElementById("save-msg");
+  // New scoreboard UI elements
+  const homeNameEl    = document.getElementById("home-name");
+  const awayNameEl    = document.getElementById("away-name");
+  const homeScoreEl   = document.getElementById("home-score");
+  const awayScoreEl   = document.getElementById("away-score");
+  const rosterArea    = document.getElementById("roster-area");
+  const overlay       = document.getElementById("stat-overlay");
+  const drawer        = document.getElementById("stat-drawer");
+  const drawerNameEl  = document.getElementById("drawer-player-name");
+  const drawerTeamEl  = document.getElementById("drawer-team-name");
+  const drawerFields  = document.getElementById("drawer-fields");
+  const drawerClose   = document.getElementById("drawer-close");
+  const settingsPanel = document.getElementById("settings-panel");
+  const toggleSettings= document.getElementById("toggle-settings");
 
   // Timer UI
-  const timerDisplay = document.getElementById("timer-display");
+  const timerDisplay  = document.getElementById("timer-display");
   const timerStartBtn = document.getElementById("timer-start");
   const timerPauseBtn = document.getElementById("timer-pause");
   const timerResetBtn = document.getElementById("timer-reset");
 
-  const params = new URLSearchParams(window.location.search);
-  const tournamentId = params.get("tournamentId");
-  const categoryId = params.get("categoryId");
-  const roundIndex = Number(params.get("round"));
-  const matchIndex = Number(params.get("match"));
-const scoreIndex = Number(params.get("scoreIndex") ?? 0);
+  // ── URL params ────────────────────────────────────────────────────────────
+  const params        = new URLSearchParams(window.location.search);
+  const tournamentId  = params.get("tournamentId");
+  const categoryId    = params.get("categoryId");
+  const roundIndex    = Number(params.get("round"));
+  const matchIndex    = Number(params.get("match"));
+  const scoreIndex    = Number(params.get("scoreIndex") ?? 0);
 
   if (!tournamentId || !categoryId || Number.isNaN(roundIndex) || Number.isNaN(matchIndex)) {
-    titleEl.textContent = "Missing required URL params";
-    subEl.textContent = "Expected: ?tournamentId=...&categoryId=...&round=0&match=0";
+    if (titleEl) titleEl.textContent = "Missing required URL params";
+    if (subEl)   subEl.textContent   = "Expected: ?tournamentId=...&categoryId=...&round=0&match=0";
     return;
   }
 
@@ -47,6 +62,7 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
     window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(tournamentId)}`;
   });
 
+  // ── API helpers ───────────────────────────────────────────────────────────
   function getToken() {
     return localStorage.getItem("token") || localStorage.getItem("authToken") || "";
   }
@@ -54,55 +70,36 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
   async function apiGet(url) {
     const res = await fetch(url, { headers: { Authorization: "Bearer " + getToken() } });
     const raw = await res.text();
-    let data = null;
-    try {
-      data = raw ? JSON.parse(raw) : null;
-    } catch {
-      data = { _nonJson: true, raw };
-    }
-    if (!res.ok) {
-      const extra = data?._nonJson ? " (non-JSON response)" : "";
-      throw new Error(`GET ${url} failed: ${res.status}${extra}`);
-    }
+    let data  = null;
+    try   { data = raw ? JSON.parse(raw) : null; }
+    catch { data = { _nonJson: true, raw }; }
+    if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`);
     return data;
   }
 
   async function apiPut(url, body) {
     const res = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + getToken(),
-      },
-      body: JSON.stringify(body || {}),
+      method:  "PUT",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + getToken() },
+      body:    JSON.stringify(body || {}),
     });
     const raw = await res.text();
-    let data = null;
-    try {
-      data = raw ? JSON.parse(raw) : null;
-    } catch {
-      data = { _nonJson: true, raw };
-    }
-    if (!res.ok) {
-      const extra = data?._nonJson ? " (non-JSON response)" : "";
-      throw new Error(`PUT ${url} failed: ${res.status}${extra}`);
-    }
+    let data  = null;
+    try   { data = raw ? JSON.parse(raw) : null; }
+    catch { data = { _nonJson: true, raw }; }
+    if (!res.ok) throw new Error(`PUT ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`);
     return data;
   }
 
-  function clear(el) {
-    if (el) el.innerHTML = "";
-  }
+  function clear(el) { if (el) el.innerHTML = ""; }
 
-  // ---- Load schema + fixtures ----
-  let schema = null;
+  // ── Load schema + fixtures ────────────────────────────────────────────────
+  let schema   = null;
   let fixtures = null;
 
   try {
-    // IMPORTANT: this endpoint should return category-aware schema (your Step B)
     const schemaResp = await apiGet(
-  `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/active?categoryId=${encodeURIComponent(categoryId)}`
-
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/active?categoryId=${encodeURIComponent(categoryId)}`
     );
     schema = schemaResp?.ok ? schemaResp.data : schemaResp;
 
@@ -112,63 +109,56 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
     fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
   } catch (e) {
     console.error(e);
-    titleEl.textContent = "Failed to load scoring data";
-    subEl.textContent = String(e?.message || e);
+    if (titleEl) titleEl.textContent = "Failed to load scoring data";
+    if (subEl)   subEl.textContent   = String(e?.message || e);
     return;
   }
 
   if (!schema) {
-    titleEl.textContent = "No scoring schema found";
-    subEl.textContent = "Finalize scoring schema for this category first.";
-    saveBtn.disabled = true;
+    if (titleEl) titleEl.textContent = "No scoring schema found";
+    if (subEl)   subEl.textContent   = "Finalize scoring schema for this category first.";
+    if (saveBtn) saveBtn.disabled    = true;
     return;
   }
 
-  const match =
-    fixtures?.categories?.[categoryId]?.rounds?.[roundIndex]?.[matchIndex] || null;
+  const match = fixtures?.categories?.[categoryId]?.rounds?.[roundIndex]?.[matchIndex] || null;
 
   if (!match) {
-    titleEl.textContent = "Match not found";
-    subEl.textContent = "Invalid categoryId/round/match index.";
-    saveBtn.disabled = true;
+    if (titleEl) titleEl.textContent = "Match not found";
+    if (subEl)   subEl.textContent   = "Invalid categoryId/round/match index.";
+    if (saveBtn) saveBtn.disabled    = true;
     return;
   }
 
   // Prevent scoring BYE matches
   const homeLabel = match.home ?? "Home";
   const awayLabel = match.away ?? "Away";
+
   if (String(homeLabel).toUpperCase() === "BYE" || String(awayLabel).toUpperCase() === "BYE") {
-    statusPill.classList.add("error");
-    statusPill.innerHTML = `Status: <strong>BYE</strong>`;
-    winnerPill.innerHTML = `Winner: <strong>-</strong>`;
-    reasonPill.innerHTML = `Reason: <strong>This match contains BYE, no scoring needed.</strong>`;
-    saveBtn.disabled = true;
+    statusPill?.classList.add("error");
+    if (statusPill) statusPill.innerHTML = `Status: <strong>BYE</strong>`;
+    if (winnerPill) winnerPill.innerHTML = `Winner: <strong>-</strong>`;
+    if (reasonPill) reasonPill.innerHTML = `Reason: <strong>This match contains BYE, no scoring needed.</strong>`;
+    if (saveBtn)    saveBtn.disabled     = true;
     return;
   }
 
-  titleEl.textContent = `${homeLabel} vs ${awayLabel}`;
-  subEl.textContent = `${schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
+  // Update meta
+  if (titleEl)    titleEl.textContent = `${homeLabel} vs ${awayLabel}`;
+  if (subEl)      subEl.textContent   = `${schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
+  if (homeNameEl) homeNameEl.textContent = homeLabel;
+  if (awayNameEl) awayNameEl.textContent = awayLabel;
 
-  // ---- Resolve roster arrays (preferred: homePlayers/awayPlayers) ----
+  // ── Roster resolution ─────────────────────────────────────────────────────
   function splitTeamLabel(label) {
     if (!label) return [];
-    // supports: "A + B" OR "A+B"
-    return String(label)
-      .split("+")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    return String(label).split("+").map((s) => s.trim()).filter(Boolean);
   }
 
   const homePlayers = Array.isArray(match.homePlayers) ? match.homePlayers : splitTeamLabel(match.home);
   const awayPlayers = Array.isArray(match.awayPlayers) ? match.awayPlayers : splitTeamLabel(match.away);
 
-  // ---- Local score state (supports per-player + team totals) ----
-  // We keep team totals at:
-  //   state.state.A[fieldKey]  (sum)
-  //   state.state.B[fieldKey]  (sum)
-  // and per-player breakdown at:
-  //   state.state.A.players[playerName][fieldKey]
-  // This keeps your existing winner logic compatible.
+  // ── Score state ───────────────────────────────────────────────────────────
   const existing = match.score || null;
 
   const state = {
@@ -178,18 +168,16 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
       B: { players: {} },
     },
     timer: {
-      elapsedMs: existing?.timer?.elapsedMs ?? 0,
-      running: false,
+      elapsedMs:        existing?.timer?.elapsedMs ?? 0,
+      running:          false,
       startedAtEpochMs: null,
     },
   };
 
-  // Init config fields
   (schema.inputs || []).forEach((f) => {
     state.config[f.key] = existing?.config?.[f.key] ?? f.default ?? null;
   });
 
-  // Init per-player maps
   function ensurePlayer(side, playerName) {
     if (!state.state[side].players[playerName]) state.state[side].players[playerName] = {};
     return state.state[side].players[playerName];
@@ -199,7 +187,7 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
     roster.forEach((p) => {
       const pObj = ensurePlayer(side, p);
       (schema.playerFields || []).forEach((f) => {
-        const prev = existing?.state?.[side]?.players?.[p]?.[f.key];
+        const prev  = existing?.state?.[side]?.players?.[p]?.[f.key];
         pObj[f.key] = prev ?? f.default ?? (f.type === "text" ? "" : 0);
       });
     });
@@ -208,15 +196,11 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
   initPlayers("A", homePlayers);
   initPlayers("B", awayPlayers);
 
-  // Recompute team totals for numeric-like fields
   function recomputeTeamTotals() {
     ["A", "B"].forEach((side) => {
-      const totals = {};
       const roster = side === "A" ? homePlayers : awayPlayers;
-      const fields = schema.playerFields || [];
-
-      fields.forEach((f) => {
-        // sum only for counters/numbers
+      const totals = {};
+      (schema.playerFields || []).forEach((f) => {
         if (f.type === "counter" || f.type === "number") {
           let sum = 0;
           roster.forEach((p) => {
@@ -226,20 +210,18 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
           totals[f.key] = sum;
         }
       });
-
-      // write totals into the same place your old code expects
       Object.keys(totals).forEach((k) => (state.state[side][k] = totals[k]));
     });
   }
 
   recomputeTeamTotals();
 
-  // ---- Winner compute (unchanged behavior: uses team totals) ----
+  // ── Winner compute ────────────────────────────────────────────────────────
   function compute(schemaObj, scoreObj) {
     const logic = schemaObj?.winnerLogic || {};
-    const A = scoreObj.state?.A || {};
-    const B = scoreObj.state?.B || {};
-    const cfg = scoreObj.config || {};
+    const A     = scoreObj.state?.A || {};
+    const B     = scoreObj.state?.B || {};
+    const cfg   = scoreObj.config   || {};
 
     if (logic.type === "higherScoreWins") {
       const field = logic.field || "score";
@@ -251,25 +233,19 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
     }
 
     if (logic.type === "firstToTarget") {
-      const field = logic.field || "points";
-      const targetKey = logic.targetFrom || "targetPoints";
+      const field       = logic.field        || "points";
+      const targetKey   = logic.targetFrom   || "targetPoints";
       const winByTwoKey = logic.winByTwoFrom || "winByTwo";
-      const a = Number(A[field] ?? 0);
-      const b = Number(B[field] ?? 0);
-      const target = Number(cfg[targetKey] ?? 0);
-      const winByTwo = Boolean(cfg[winByTwoKey]);
+      const a           = Number(A[field] ?? 0);
+      const b           = Number(B[field] ?? 0);
+      const target      = Number(cfg[targetKey]   ?? 0);
+      const winByTwo    = Boolean(cfg[winByTwoKey]);
 
       if (!target) return { status: "pending", winnerName: null, reason: "Target not set" };
-
-      const diffA = a - b;
-      const diffB = b - a;
-
-      if (a >= target && (!winByTwo || diffA >= 2)) {
+      if (a >= target && (!winByTwo || (a - b) >= 2))
         return { status: "completed", winnerName: homeLabel, reason: `Reached ${a}/${target}` };
-      }
-      if (b >= target && (!winByTwo || diffB >= 2)) {
+      if (b >= target && (!winByTwo || (b - a) >= 2))
         return { status: "completed", winnerName: awayLabel, reason: `Reached ${b}/${target}` };
-      }
       return { status: "pending", winnerName: null, reason: "Ongoing" };
     }
 
@@ -278,32 +254,52 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
 
   function renderPills() {
     const c = compute(schema, state);
-    statusPill.innerHTML = `Status: <strong>${c.status}</strong>`;
-    winnerPill.innerHTML = `Winner: <strong>${c.winnerName || "-"}</strong>`;
-    reasonPill.innerHTML = `Reason: <strong>${c.reason || "-"}</strong>`;
+    if (statusPill) statusPill.innerHTML = `Status: <strong>${c.status}</strong>`;
+    if (winnerPill) winnerPill.innerHTML = `Winner: <strong>${c.winnerName || "-"}</strong>`;
+    if (reasonPill) reasonPill.innerHTML = `Reason: <strong>${c.reason || "-"}</strong>`;
   }
 
-  // ---- Render config fields ----
+  // ── Scoreboard live score display ─────────────────────────────────────────
+  const logicField = schema?.winnerLogic?.field || null;
+
+  function refreshScoreDisplay() {
+    if (!logicField) return;
+    if (homeScoreEl) homeScoreEl.textContent = Number(state.state.A?.[logicField] ?? 0);
+    if (awayScoreEl) awayScoreEl.textContent = Number(state.state.B?.[logicField] ?? 0);
+  }
+
+  refreshScoreDisplay();
+
+  // ── Settings toggle ───────────────────────────────────────────────────────
+  toggleSettings?.addEventListener("click", () => {
+    settingsPanel?.classList.toggle("open");
+    if (toggleSettings) {
+      toggleSettings.textContent = settingsPanel?.classList.contains("open")
+        ? "✕ Settings"
+        : "⚙ Settings";
+    }
+  });
+
+  // ── Config fields ─────────────────────────────────────────────────────────
   function renderConfigFields() {
     clear(configWrap);
     const inputs = schema.inputs || [];
     if (!inputs.length) {
-      configWrap.innerHTML = `<p class="help">No match settings.</p>`;
+      if (configWrap) configWrap.innerHTML = `<p class="help">No match settings.</p>`;
       return;
     }
 
     inputs.forEach((f) => {
-      const wrap = document.createElement("div");
+      const wrap  = document.createElement("div");
       wrap.className = "field";
 
       const label = document.createElement("label");
       label.textContent = f.label || f.key;
 
       let inputEl;
-
       if (f.type === "number") {
-        inputEl = document.createElement("input");
-        inputEl.type = "number";
+        inputEl       = document.createElement("input");
+        inputEl.type  = "number";
         inputEl.value = state.config[f.key] ?? "";
         if (typeof f.min === "number") inputEl.min = String(f.min);
         if (typeof f.max === "number") inputEl.max = String(f.max);
@@ -320,8 +316,8 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
           renderPills();
         });
       } else {
-        inputEl = document.createElement("input");
-        inputEl.type = "text";
+        inputEl       = document.createElement("input");
+        inputEl.type  = "text";
         inputEl.value = state.config[f.key] ?? "";
         inputEl.addEventListener("input", () => {
           state.config[f.key] = inputEl.value;
@@ -334,162 +330,215 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
 
       if (f.help) {
         const help = document.createElement("div");
-        help.className = "help";
+        help.className   = "help";
         help.textContent = f.help;
         wrap.appendChild(help);
       }
 
-      configWrap.appendChild(wrap);
+      configWrap?.appendChild(wrap);
     });
   }
 
-  // ---- Render per-player fields ----
-  function renderPlayerFieldControl({ side, playerName, field }) {
-    const wrap = document.createElement("div");
-    wrap.className = "field";
-
-    const label = document.createElement("label");
-    label.textContent = `${field.label || field.key}`;
-    wrap.appendChild(label);
-
-    const playerObj = ensurePlayer(side, playerName);
-
-    if (field.type === "counter") {
-      const row = document.createElement("div");
-      row.className = "counter";
-
-      const minus = document.createElement("button");
-      minus.className = "mini-btn";
-      minus.type = "button";
-      minus.textContent = "–";
-
-      const plus = document.createElement("button");
-      plus.className = "mini-btn";
-      plus.type = "button";
-      plus.textContent = "+";
-
-      const value = document.createElement("div");
-      value.className = "value";
-      value.textContent = String(playerObj[field.key] ?? 0);
-
-      const min = typeof field.min === "number" ? field.min : 0;
-
-      minus.addEventListener("click", () => {
-        const cur = Number(playerObj[field.key] ?? 0);
-        const next = Math.max(min, cur - 1);
-        playerObj[field.key] = next;
-        value.textContent = String(next);
-        recomputeTeamTotals();
-        renderPills();
-      });
-
-      plus.addEventListener("click", () => {
-        const cur = Number(playerObj[field.key] ?? 0);
-        const next = cur + 1;
-        playerObj[field.key] = next;
-        value.textContent = String(next);
-        recomputeTeamTotals();
-        renderPills();
-      });
-
-      row.appendChild(minus);
-      row.appendChild(value);
-      row.appendChild(plus);
-      wrap.appendChild(row);
-    } else if (field.type === "number") {
-      const inputEl = document.createElement("input");
-      inputEl.type = "number";
-      inputEl.value = playerObj[field.key] ?? 0;
-      inputEl.addEventListener("input", () => {
-        playerObj[field.key] = inputEl.value === "" ? 0 : Number(inputEl.value);
-        recomputeTeamTotals();
-        renderPills();
-      });
-      wrap.appendChild(inputEl);
-    } else if (field.type === "select") {
-      const sel = document.createElement("select");
-      const opts = Array.isArray(field.options) ? field.options : [];
-      sel.innerHTML = opts.map((o) => `<option value="${String(o)}">${String(o)}</option>`).join("");
-      sel.value = String(playerObj[field.key] ?? (opts[0] ?? ""));
-      sel.addEventListener("change", () => {
-        playerObj[field.key] = sel.value;
-        renderPills();
-      });
-      wrap.appendChild(sel);
-    } else {
-      const inputEl = document.createElement("input");
-      inputEl.type = "text";
-      inputEl.value = playerObj[field.key] ?? "";
-      inputEl.addEventListener("input", () => {
-        playerObj[field.key] = inputEl.value;
-        renderPills();
-      });
-      wrap.appendChild(inputEl);
-    }
-
-    if (field.help) {
-      const help = document.createElement("div");
-      help.className = "help";
-      help.textContent = field.help;
-      wrap.appendChild(help);
-    }
-
-    return wrap;
+  // ── Stat drawer ───────────────────────────────────────────────────────────
+  function closeDrawer() {
+    drawer?.classList.remove("open");
+    overlay?.classList.remove("show");
+    document.body.classList.remove("drawer-lock");
   }
 
-  function renderTeams() {
-    clear(teamsWrap);
+  drawerClose?.addEventListener("click", closeDrawer);
+  overlay?.addEventListener("click", closeDrawer);
 
-    const fields = schema.playerFields || [];
-    if (!fields.length) {
-      teamsWrap.innerHTML = `<p class="help">No player fields.</p>`;
-      return;
-    }
+  function openDrawer({ playerName, teamLabel, fields, playerObj, onUpdate }) {
+    if (drawerNameEl) drawerNameEl.textContent = playerName;
+    if (drawerTeamEl) drawerTeamEl.textContent = teamLabel;
+    clear(drawerFields);
 
-    const teams = [
-      { side: "A", title: "Home", label: homeLabel, roster: homePlayers },
-      { side: "B", title: "Away", label: awayLabel, roster: awayPlayers },
-    ];
+    fields.forEach((field) => {
+      const row = document.createElement("div");
+      row.className = "df-row";
 
-    teams.forEach((t) => {
-      const teamCard = document.createElement("div");
-      teamCard.className = "team-card";
+      const lbl = document.createElement("div");
+      lbl.className   = "df-label";
+      lbl.textContent = field.label || field.key;
+      row.appendChild(lbl);
 
-      const header = document.createElement("div");
-      header.className = "team-title";
-      header.innerHTML = `<h3>${t.title}</h3><div class="team-sub">${t.label}</div>`;
-      teamCard.appendChild(header);
+      if (field.type === "counter" || field.type === "number") {
+        const ctrl    = document.createElement("div");
+        ctrl.className = "df-counter";
 
-      // Show team totals for main winner field (if exists)
-      const logicField = schema?.winnerLogic?.field;
-      if (logicField) {
-        const total = Number(state.state[t.side]?.[logicField] ?? 0);
-        const totalPill = document.createElement("div");
-        totalPill.className = "pill";
-        totalPill.style.marginTop = "8px";
-        totalPill.innerHTML = `Team ${logicField}: <strong>${total}</strong>`;
-        teamCard.appendChild(totalPill);
-      }
+        const minBtn  = document.createElement("button");
+        minBtn.type   = "button";
+        minBtn.className  = "df-counter-btn";
+        minBtn.textContent = "−";
 
-      (t.roster || []).forEach((playerName) => {
-        const playerCard = document.createElement("div");
-        playerCard.className = "player-card";
-        playerCard.innerHTML = `<h4>${playerName}</h4>`;
+        const valEl   = document.createElement("div");
+        valEl.className   = "df-counter-val";
+        valEl.textContent = String(playerObj[field.key] ?? 0);
 
-        fields.forEach((f) => {
-          playerCard.appendChild(
-            renderPlayerFieldControl({ side: t.side, playerName, field: f })
-          );
+        const plusBtn = document.createElement("button");
+        plusBtn.type  = "button";
+        plusBtn.className   = "df-counter-btn df-counter-plus";
+        plusBtn.textContent = "+";
+
+        const min = typeof field.min === "number" ? field.min : 0;
+
+        minBtn.addEventListener("click", () => {
+          const next = Math.max(min, Number(playerObj[field.key] ?? 0) - 1);
+          playerObj[field.key] = next;
+          valEl.textContent = String(next);
+          onUpdate();
         });
 
-        teamCard.appendChild(playerCard);
+        plusBtn.addEventListener("click", () => {
+          const next = Number(playerObj[field.key] ?? 0) + 1;
+          playerObj[field.key] = next;
+          valEl.textContent = String(next);
+          onUpdate();
+        });
+
+        ctrl.appendChild(minBtn);
+        ctrl.appendChild(valEl);
+        ctrl.appendChild(plusBtn);
+        row.appendChild(ctrl);
+
+      } else if (field.type === "select") {
+        const sel     = document.createElement("select");
+        sel.className = "df-select";
+        const opts    = Array.isArray(field.options) ? field.options : [];
+        sel.innerHTML = opts.map((o) => `<option value="${o}">${o}</option>`).join("");
+        sel.value     = String(playerObj[field.key] ?? (opts[0] ?? ""));
+        sel.addEventListener("change", () => {
+          playerObj[field.key] = sel.value;
+          onUpdate();
+        });
+        row.appendChild(sel);
+
+      } else {
+        const inp     = document.createElement("input");
+        inp.className = "df-input";
+        inp.type      = field.type === "number" ? "number" : "text";
+        inp.value     = playerObj[field.key] ?? "";
+        inp.addEventListener("input", () => {
+          playerObj[field.key] = field.type === "number"
+            ? (inp.value === "" ? 0 : Number(inp.value))
+            : inp.value;
+          onUpdate();
+        });
+        row.appendChild(inp);
+      }
+
+      if (field.help) {
+        const help = document.createElement("div");
+        help.className   = "df-help";
+        help.textContent = field.help;
+        row.appendChild(help);
+      }
+
+      drawerFields?.appendChild(row);
+    });
+
+    drawer?.classList.add("open");
+    overlay?.classList.add("show");
+    document.body.classList.add("drawer-lock");
+  }
+
+  // ── Roster panels ─────────────────────────────────────────────────────────
+  function buildRosterPanel({ side, teamLabel, roster, fields }) {
+    const panel = document.createElement("div");
+    panel.className    = "roster-panel";
+    panel.dataset.side = side;
+
+    const header = document.createElement("div");
+    header.className = "roster-panel-header";
+    header.innerHTML = `
+      <span class="rp-label">${side === "A" ? "🏠" : "✈️"} ${teamLabel}</span>
+      <span class="rp-close">✕</span>`;
+    header.querySelector(".rp-close").addEventListener("click", () => {
+      panel.classList.remove("active");
+    });
+    panel.appendChild(header);
+
+    if (!roster.length) {
+      const empty = document.createElement("p");
+      empty.className   = "rp-empty";
+      empty.textContent = "No players listed.";
+      panel.appendChild(empty);
+      return panel;
+    }
+
+    roster.forEach((playerName) => {
+      const chip    = document.createElement("button");
+      chip.type     = "button";
+      chip.className = "player-chip";
+
+      function getMainStat() {
+        if (!logicField) return null;
+        const v = state.state[side].players?.[playerName]?.[logicField];
+        return v != null ? v : 0;
+      }
+
+      function refreshChip() {
+        const stat = getMainStat();
+        chip.innerHTML = `
+          <span class="pc-name">${playerName}</span>
+          ${stat !== null ? `<span class="pc-stat">${stat}</span>` : ""}`;
+      }
+      refreshChip();
+
+      chip.addEventListener("click", () => {
+        ensurePlayer(side, playerName);
+        openDrawer({
+          playerName,
+          teamLabel,
+          fields,
+          playerObj: state.state[side].players[playerName],
+          onUpdate: () => {
+            recomputeTeamTotals();
+            renderPills();
+            refreshChip();
+            refreshScoreDisplay();
+          },
+        });
       });
 
-      teamsWrap.appendChild(teamCard);
+      panel.appendChild(chip);
+    });
+
+    return panel;
+  }
+
+  const playerFields = schema.playerFields || [];
+  const homePanelEl  = buildRosterPanel({ side: "A", teamLabel: homeLabel, roster: homePlayers, fields: playerFields });
+  const awayPanelEl  = buildRosterPanel({ side: "B", teamLabel: awayLabel, roster: awayPlayers, fields: playerFields });
+
+  rosterArea?.appendChild(homePanelEl);
+  rosterArea?.appendChild(awayPanelEl);
+
+  document.getElementById("team-home")?.addEventListener("click", () => {
+    homePanelEl.classList.toggle("active");
+    awayPanelEl.classList.remove("active");
+  });
+  document.getElementById("team-away")?.addEventListener("click", () => {
+    awayPanelEl.classList.toggle("active");
+    homePanelEl.classList.remove("active");
+  });
+
+  // ── Legacy renderTeams (writes to hidden #teams-wrap for compatibility) ────
+  function renderTeams() {
+    clear(teamsWrap);
+    [
+      { side: "A", title: "Home", label: homeLabel },
+      { side: "B", title: "Away", label: awayLabel },
+    ].forEach((t) => {
+      const card = document.createElement("div");
+      card.className = "team-card";
+      card.innerHTML = `<div class="team-title"><h3>${t.title}</h3><div class="team-sub">${t.label}</div></div>`;
+      teamsWrap?.appendChild(card);
     });
   }
 
-  // ---- Timer ----
+  // ── Timer ─────────────────────────────────────────────────────────────────
   let timerInterval = null;
 
   function formatMs(ms) {
@@ -506,15 +555,14 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
   function tickTimer() {
     if (!state.timer.running || state.timer.startedAtEpochMs == null) return;
     const now = Date.now();
-    const delta = now - state.timer.startedAtEpochMs;
-    state.timer.startedAtEpochMs = now;
-    state.timer.elapsedMs += delta;
+    state.timer.elapsedMs        += now - state.timer.startedAtEpochMs;
+    state.timer.startedAtEpochMs  = now;
     renderTimer();
   }
 
   function startTimer() {
     if (state.timer.running) return;
-    state.timer.running = true;
+    state.timer.running          = true;
     state.timer.startedAtEpochMs = Date.now();
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(tickTimer, 250);
@@ -523,15 +571,15 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
   function pauseTimer() {
     if (!state.timer.running) return;
     tickTimer();
-    state.timer.running = false;
+    state.timer.running          = false;
     state.timer.startedAtEpochMs = null;
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = null;
   }
 
   function resetTimer() {
-    state.timer.elapsedMs = 0;
-    state.timer.running = false;
+    state.timer.elapsedMs        = 0;
+    state.timer.running          = false;
     state.timer.startedAtEpochMs = null;
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = null;
@@ -542,33 +590,22 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
   timerPauseBtn?.addEventListener("click", pauseTimer);
   timerResetBtn?.addEventListener("click", resetTimer);
 
-  // Hydrate timer from existing score
   renderTimer();
 
-  // ---- Initial render ----
+  // ── Initial render ────────────────────────────────────────────────────────
   renderConfigFields();
   renderTeams();
   renderPills();
 
-  // ---- Notify new UI layer ----
-  document.dispatchEvent(new CustomEvent("scoreReady", {
-    detail: {
-      state, schema, homeLabel, awayLabel,
-      homePlayers, awayPlayers,
-      recomputeTeamTotals, renderPills,
-    }
-  }));
-
-  // ---- Save ----
+  // ── Save ──────────────────────────────────────────────────────────────────
   saveBtn?.addEventListener("click", async () => {
     saveBtn.disabled = true;
     if (saveMsg) {
       saveMsg.style.display = "inline-flex";
-      saveMsg.textContent = "Saving…";
+      saveMsg.textContent   = "Saving…";
       saveMsg.classList.remove("error");
     }
 
-    // ensure timer is not leaking running timestamp
     if (state.timer.running) tickTimer();
 
     try {
@@ -576,11 +613,11 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
         categoryId,
         roundIndex,
         matchIndex,
-          scoreIndex,
+        scoreIndex,
         score: {
           config: state.config,
-          state: state.state, // includes team totals + players map
-          timer: { elapsedMs: state.timer.elapsedMs },
+          state:  state.state,
+          timer:  { elapsedMs: state.timer.elapsedMs },
         },
       };
 
@@ -590,23 +627,22 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
       );
 
       if (saveMsg) {
-        saveMsg.textContent = "Saved ✅";
+        saveMsg.textContent   = "Saved ✅";
         saveMsg.style.display = "inline-flex";
       }
 
-      const serverMatch = resp?.match || null;
-      const computed = serverMatch?.score?.computed || null;
+      const computed = resp?.match?.score?.computed || null;
       if (computed) {
-        statusPill.innerHTML = `Status: <strong>${computed.status}</strong>`;
-        winnerPill.innerHTML = `Winner: <strong>${computed.winnerName || "-"}</strong>`;
-        reasonPill.innerHTML = `Reason: <strong>${computed.reason || "-"}</strong>`;
+        if (statusPill) statusPill.innerHTML = `Status: <strong>${computed.status}</strong>`;
+        if (winnerPill) winnerPill.innerHTML = `Winner: <strong>${computed.winnerName || "-"}</strong>`;
+        if (reasonPill) reasonPill.innerHTML = `Reason: <strong>${computed.reason || "-"}</strong>`;
       }
     } catch (e) {
       console.error(e);
       if (saveMsg) {
         saveMsg.classList.add("error");
-        saveMsg.textContent = `Save failed: ${String(e?.message || e)}`;
         saveMsg.style.display = "inline-flex";
+        saveMsg.textContent   = `Save failed: ${String(e?.message || e)}`;
       }
     } finally {
       saveBtn.disabled = false;
