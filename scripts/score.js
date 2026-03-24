@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   backBtn?.addEventListener("click", () => {
-    window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+    window.location.href = `players.html?tournamentId=${encodeURIComponent(tournamentId)}`;
   });
 
   // ── API helpers ───────────────────────────────────────────────────────────
