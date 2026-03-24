@@ -5,22 +5,21 @@
     <title>ScheduleIt – Score match</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap"
       rel="stylesheet"
     />
 
-    <!-- Reuse host look & feel -->
     <link rel="stylesheet" href="styles/host.css" />
-    <!-- Score page specific CSS -->
     <link rel="stylesheet" href="styles/score.css" />
   </head>
 
   <body>
     <div class="app-shell">
+
+      <!-- TOPBAR -->
       <header class="topbar">
         <div class="brand">ScheduleIt</div>
         <div class="topbar-right">
@@ -29,51 +28,361 @@
       </header>
 
       <main class="main">
-        <section class="score-card">
-          <header class="score-header">
-            <p class="eyebrow">Match scoring</p>
-            <h1 id="score-title">Loading…</h1>
-            <p class="score-sub" id="score-sub"></p>
-          </header>
 
-          <div class="fixtures-toolbar score-toolbar">
-            <button type="button" class="btn-dark" id="back-to-fixtures">← Back to fixtures</button>
-            <button type="button" class="btn-primary" id="save-score">Save score</button>
+        <!-- BACK + SAVE row -->
+        <div class="action-bar">
+          <button type="button" class="ab-btn ab-back" id="back-to-fixtures">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Fixtures
+          </button>
+          <div class="ab-center">
+            <span class="match-meta" id="score-sub"></span>
+          </div>
+          <button type="button" class="ab-btn ab-save" id="save-score">Save score</button>
+        </div>
+
+        <!-- SCOREBOARD HERO -->
+        <div class="scoreboard" id="scoreboard">
+          <div class="team-block" id="team-home" data-side="A">
+            <div class="team-name" id="home-name">Home</div>
+            <div class="team-score" id="home-score">0</div>
+            <div class="team-tap-hint">tap to see players</div>
           </div>
 
-          <div class="timer-row">
-            <div class="pill">
-              Timer: <strong class="timer-time" id="timer-display">00:00</strong>
-            </div>
-            <button type="button" class="btn-dark" id="timer-start">Start</button>
-            <button type="button" class="btn-dark" id="timer-pause">Pause</button>
-            <button type="button" class="btn-dark" id="timer-reset">Reset</button>
-            <button id="btnAddFieldMidGame" class="btn-dark" type="button">+ Add field mid-game</button>
-          </div>
-
-          <div class="actions">
-            <div class="pill" id="status-pill">Status: <strong>pending</strong></div>
-            <div class="pill" id="winner-pill">Winner: <strong>-</strong></div>
-            <div class="pill" id="reason-pill">Reason: <strong>-</strong></div>
-          </div>
-
-          <div class="score-grid">
-            <div class="panel">
-              <h2>Match settings</h2>
-              <div id="config-fields"></div>
-            </div>
-
-            <div class="panel">
-              <h2>Players</h2>
-              <div class="teams-wrap" id="teams-wrap"></div>
+          <div class="scoreboard-center">
+            <div class="vs-badge">VS</div>
+            <div class="timer-display" id="timer-display">00:00</div>
+            <div class="timer-controls">
+              <button class="tc-btn" id="timer-start" title="Start">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 2l9 5-9 5V2z"/></svg>
+              </button>
+              <button class="tc-btn" id="timer-pause" title="Pause">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="2" width="4" height="10" rx="1"/><rect x="8" y="2" width="4" height="10" rx="1"/></svg>
+              </button>
+              <button class="tc-btn" id="timer-reset" title="Reset">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 7a4.5 4.5 0 1 0 .9-2.7"/><path d="M2.5 2v2.7H5.2"/></svg>
+              </button>
             </div>
           </div>
 
-          <div id="save-msg" class="pill save-msg"></div>
-        </section>
+          <div class="team-block" id="team-away" data-side="B">
+            <div class="team-name" id="away-name">Away</div>
+            <div class="team-score" id="away-score">0</div>
+            <div class="team-tap-hint">tap to see players</div>
+          </div>
+        </div>
+
+        <!-- STATUS ROW -->
+        <div class="status-row">
+          <div class="status-chip" id="status-pill">Status: <strong>pending</strong></div>
+          <div class="status-chip" id="winner-pill">Winner: <strong>–</strong></div>
+          <div class="status-chip" id="reason-pill">Reason: <strong>–</strong></div>
+          <button id="btnAddFieldMidGame" class="status-chip chip-btn" type="button">+ Add field</button>
+          <button id="toggle-settings" class="status-chip chip-btn" type="button">⚙ Settings</button>
+        </div>
+
+        <!-- MATCH SETTINGS (collapsible) -->
+        <div class="settings-panel" id="settings-panel">
+          <div class="settings-inner">
+            <h3 class="panel-label">Match settings</h3>
+            <div id="config-fields"></div>
+          </div>
+        </div>
+
+        <!-- PLAYER ROSTER PANELS (shown on team tap) -->
+        <div class="roster-area" id="roster-area">
+          <!-- injected by JS -->
+        </div>
+
+        <!-- SAVE MSG -->
+        <div id="save-msg" class="save-toast"></div>
+
+        <!-- hidden legacy wrappers kept so JS selectors still work -->
+        <div id="teams-wrap" style="display:none"></div>
+
       </main>
     </div>
 
+    <!-- PLAYER STAT DRAWER (slide-up) -->
+    <div class="stat-drawer-overlay" id="stat-overlay"></div>
+    <div class="stat-drawer" id="stat-drawer">
+      <div class="drawer-handle"></div>
+      <div class="drawer-header">
+        <div>
+          <div class="drawer-player-name" id="drawer-player-name">Player</div>
+          <div class="drawer-team-name" id="drawer-team-name">Team</div>
+        </div>
+        <button class="drawer-close" id="drawer-close">✕</button>
+      </div>
+      <div class="drawer-fields" id="drawer-fields"></div>
+    </div>
+
     <script type="module" src="scripts/score.js"></script>
+    <script>
+    // =====================================================================
+    //  LIVE-SCORE UI LAYER  (pure frontend, no backend changes)
+    //  Runs AFTER score.js has populated state and rendered the original DOM.
+    //  We patch renderTeams() and add the new roster / drawer behaviour.
+    // =====================================================================
+    document.addEventListener("DOMContentLoaded", () => {
+
+      // ── Wait for score.js module to expose its internals via custom event ──
+      // score.js fires "scoreReady" with { state, schema, homeLabel, awayLabel,
+      //   homePlayers, awayPlayers, recomputeTeamTotals, renderPills }
+      // If you haven't added that event yet, the UI still works in demo mode.
+
+      const homeNameEl  = document.getElementById("home-name");
+      const awayNameEl  = document.getElementById("away-name");
+      const homeScoreEl = document.getElementById("home-score");
+      const awayScoreEl = document.getElementById("away-score");
+      const rosterArea  = document.getElementById("roster-area");
+      const overlay     = document.getElementById("stat-overlay");
+      const drawer      = document.getElementById("stat-drawer");
+      const drawerName  = document.getElementById("drawer-player-name");
+      const drawerTeam  = document.getElementById("drawer-team-name");
+      const drawerFields= document.getElementById("drawer-fields");
+      const drawerClose = document.getElementById("drawer-close");
+      const settingsPanel = document.getElementById("settings-panel");
+      const toggleSettings = document.getElementById("toggle-settings");
+
+      // ── Settings toggle ──
+      toggleSettings?.addEventListener("click", () => {
+        settingsPanel.classList.toggle("open");
+        toggleSettings.textContent = settingsPanel.classList.contains("open")
+          ? "✕ Settings" : "⚙ Settings";
+      });
+
+      // ── Drawer close ──
+      function closeDrawer() {
+        drawer.classList.remove("open");
+        overlay.classList.remove("show");
+        document.body.classList.remove("drawer-lock");
+      }
+      drawerClose?.addEventListener("click", closeDrawer);
+      overlay?.addEventListener("click", closeDrawer);
+
+      // ── Open drawer for a player ──
+      function openDrawer({ playerName, teamLabel, fields, playerObj, side, onUpdate }) {
+        drawerName.textContent = playerName;
+        drawerTeam.textContent = teamLabel;
+        drawerFields.innerHTML = "";
+
+        fields.forEach(field => {
+          const row = document.createElement("div");
+          row.className = "df-row";
+
+          const lbl = document.createElement("div");
+          lbl.className = "df-label";
+          lbl.textContent = field.label || field.key;
+          row.appendChild(lbl);
+
+          if (field.type === "counter" || field.type === "number") {
+            const ctrl = document.createElement("div");
+            ctrl.className = "df-counter";
+
+            const minBtn = document.createElement("button");
+            minBtn.className = "df-counter-btn";
+            minBtn.textContent = "−";
+
+            const val = document.createElement("div");
+            val.className = "df-counter-val";
+            val.textContent = String(playerObj[field.key] ?? 0);
+
+            const plusBtn = document.createElement("button");
+            plusBtn.className = "df-counter-btn df-counter-plus";
+            plusBtn.textContent = "+";
+
+            const min = typeof field.min === "number" ? field.min : 0;
+
+            minBtn.addEventListener("click", () => {
+              const cur = Number(playerObj[field.key] ?? 0);
+              const next = Math.max(min, cur - 1);
+              playerObj[field.key] = next;
+              val.textContent = String(next);
+              onUpdate();
+            });
+            plusBtn.addEventListener("click", () => {
+              const cur = Number(playerObj[field.key] ?? 0);
+              playerObj[field.key] = cur + 1;
+              val.textContent = String(cur + 1);
+              onUpdate();
+            });
+
+            ctrl.appendChild(minBtn);
+            ctrl.appendChild(val);
+            ctrl.appendChild(plusBtn);
+            row.appendChild(ctrl);
+
+          } else if (field.type === "select") {
+            const sel = document.createElement("select");
+            sel.className = "df-select";
+            const opts = Array.isArray(field.options) ? field.options : [];
+            sel.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join("");
+            sel.value = String(playerObj[field.key] ?? (opts[0] ?? ""));
+            sel.addEventListener("change", () => {
+              playerObj[field.key] = sel.value;
+              onUpdate();
+            });
+            row.appendChild(sel);
+
+          } else {
+            const inp = document.createElement("input");
+            inp.className = "df-input";
+            inp.type = field.type === "number" ? "number" : "text";
+            inp.value = playerObj[field.key] ?? "";
+            inp.addEventListener("input", () => {
+              playerObj[field.key] = field.type === "number"
+                ? (inp.value === "" ? 0 : Number(inp.value))
+                : inp.value;
+              onUpdate();
+            });
+            row.appendChild(inp);
+          }
+
+          if (field.help) {
+            const help = document.createElement("div");
+            help.className = "df-help";
+            help.textContent = field.help;
+            row.appendChild(help);
+          }
+
+          drawerFields.appendChild(row);
+        });
+
+        drawer.classList.add("open");
+        overlay.classList.add("show");
+        document.body.classList.add("drawer-lock");
+      }
+
+      // ── Build roster cards ──
+      function buildRosterPanel({ side, teamLabel, roster, fields, stateRef, recompute, renderPills, logicField }) {
+        const panel = document.createElement("div");
+        panel.className = "roster-panel";
+        panel.dataset.side = side;
+
+        const ph = document.createElement("div");
+        ph.className = "roster-panel-header";
+        ph.innerHTML = `
+          <span class="rp-label">${side === "A" ? "🏠" : "✈️"} ${teamLabel}</span>
+          <span class="rp-close">✕</span>`;
+        ph.querySelector(".rp-close").addEventListener("click", () => {
+          panel.classList.remove("active");
+        });
+        panel.appendChild(ph);
+
+        if (!roster.length) {
+          panel.innerHTML += `<p class="rp-empty">No players listed.</p>`;
+        }
+
+        roster.forEach(playerName => {
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "player-chip";
+
+          function getMainStat() {
+            if (logicField) {
+              const v = stateRef[side].players?.[playerName]?.[logicField];
+              return v != null ? v : 0;
+            }
+            return null;
+          }
+
+          function refreshCard() {
+            const stat = getMainStat();
+            card.innerHTML = `
+              <span class="pc-name">${playerName}</span>
+              ${stat !== null ? `<span class="pc-stat">${stat}</span>` : ""}`;
+          }
+          refreshCard();
+
+          card.addEventListener("click", () => {
+            if (!stateRef[side].players[playerName]) {
+              stateRef[side].players[playerName] = {};
+            }
+            openDrawer({
+              playerName,
+              teamLabel,
+              fields,
+              playerObj: stateRef[side].players[playerName],
+              side,
+              onUpdate: () => {
+                recompute();
+                renderPills();
+                refreshCard();
+                // update scoreboard totals
+                if (logicField) {
+                  const total = Number(stateRef[side]?.[logicField] ?? 0);
+                  if (side === "A") homeScoreEl.textContent = total;
+                  else awayScoreEl.textContent = total;
+                }
+              }
+            });
+          });
+
+          panel.appendChild(card);
+        });
+
+        return panel;
+      }
+
+      // ── Listen for score.js ready signal ──
+      document.addEventListener("scoreReady", (e) => {
+        const { state, schema, homeLabel, awayLabel,
+                homePlayers, awayPlayers,
+                recomputeTeamTotals, renderPills } = e.detail;
+
+        // Populate names
+        homeNameEl.textContent = homeLabel;
+        awayNameEl.textContent = awayLabel;
+
+        const logicField = schema?.winnerLogic?.field || null;
+        const fields = schema?.playerFields || [];
+
+        // Initial score display
+        function refreshScores() {
+          if (logicField) {
+            homeScoreEl.textContent = Number(state.state.A?.[logicField] ?? 0);
+            awayScoreEl.textContent = Number(state.state.B?.[logicField] ?? 0);
+          }
+        }
+        refreshScores();
+
+        const homePanelEl = buildRosterPanel({
+          side: "A", teamLabel: homeLabel, roster: homePlayers,
+          fields, stateRef: state.state,
+          recompute: recomputeTeamTotals,
+          renderPills, logicField
+        });
+        const awayPanelEl = buildRosterPanel({
+          side: "B", teamLabel: awayLabel, roster: awayPlayers,
+          fields, stateRef: state.state,
+          recompute: recomputeTeamTotals,
+          renderPills, logicField
+        });
+
+        rosterArea.appendChild(homePanelEl);
+        rosterArea.appendChild(awayPanelEl);
+
+        // Tap team to open roster
+        document.getElementById("team-home").addEventListener("click", () => {
+          homePanelEl.classList.toggle("active");
+          awayPanelEl.classList.remove("active");
+        });
+        document.getElementById("team-away").addEventListener("click", () => {
+          awayPanelEl.classList.toggle("active");
+          homePanelEl.classList.remove("active");
+        });
+      });
+
+      // ── Fallback: if scoreReady never fires (dev / demo), show demo team names ──
+      setTimeout(() => {
+        if (!homeNameEl.textContent || homeNameEl.textContent === "Home") {
+          homeNameEl.textContent = homeNameEl.textContent || "Home Team";
+          awayNameEl.textContent = awayNameEl.textContent || "Away Team";
+        }
+      }, 3000);
+
+    });
+    </script>
   </body>
 </html>

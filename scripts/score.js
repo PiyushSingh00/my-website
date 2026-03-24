@@ -550,6 +550,15 @@ const scoreIndex = Number(params.get("scoreIndex") ?? 0);
   renderTeams();
   renderPills();
 
+  // ---- Notify new UI layer ----
+  document.dispatchEvent(new CustomEvent("scoreReady", {
+    detail: {
+      state, schema, homeLabel, awayLabel,
+      homePlayers, awayPlayers,
+      recomputeTeamTotals, renderPills,
+    }
+  }));
+
   // ---- Save ----
   saveBtn?.addEventListener("click", async () => {
     saveBtn.disabled = true;

@@ -1,292 +1,639 @@
-.score-card {
-  width: min(1060px, 100%);
-  padding: 22px 22px 18px;
-  border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at top left, rgba(77, 208, 225, 0.16), transparent 55%),
-    var(--card);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+/* =====================================================================
+   SCORE PAGE  —  Live Scoring UI
+   Depends on host.css for: --card, --border, --shadow, --radius-lg,
+   --accent-2, --muted, --text, .topbar, .main, .brand, .btn-dark,
+   .btn-primary, .signout-btn, .eyebrow, .fixtures-toolbar
+   ===================================================================== */
+
+/* ── Fonts ────────────────────────────────────────────────────────── */
+/* Bebas Neue for big score numbers, DM Sans for UI, JetBrains Mono for timer */
+
+/* ── Page shell ───────────────────────────────────────────────────── */
+body.drawer-lock {
+  overflow: hidden;
 }
 
-.score-header h1 {
-  margin: 0 0 6px;
-  font-size: 22px;
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
-.score-sub {
-  margin: 0 0 14px;
-  color: var(--muted);
-  font-size: 13px;
+/* ── Action bar (back / meta / save) ─────────────────────────────── */
+.action-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.score-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.6fr;
-  gap: 14px;
-  margin-top: 14px;
+.ab-center {
+  flex: 1;
+  text-align: center;
 }
 
-@media (max-width: 920px) {
-  .score-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.panel {
-  padding: 14px 14px 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(5, 11, 24, 0.72);
-}
-
-.panel h2 {
-  margin: 0 0 10px;
-  font-size: 14px;
+.match-meta {
+  font-size: 12px;
+  color: var(--muted, rgba(169,182,204,.75));
   letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--accent-2);
 }
 
-.field {
-  display: grid;
-  grid-template-columns: 1fr;
+.ab-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: rgba(5,11,24,.85);
+  color: var(--text, #e2e8f0);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter .15s;
+  white-space: nowrap;
+}
+.ab-btn:hover { filter: brightness(1.15); }
+
+.ab-save {
+  background: linear-gradient(135deg, #4dd0e1 0%, #0e7490 100%);
+  border-color: transparent;
+  color: #001a22;
+  font-weight: 700;
+}
+.ab-save:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── Scoreboard hero ──────────────────────────────────────────────── */
+.scoreboard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0;
+  align-items: center;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(77,208,225,.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 50%, rgba(14,116,144,.10) 0%, transparent 60%),
+    rgba(5,11,24,.90);
+  border: 1px solid rgba(77,208,225,.22);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(77,208,225,.08), 0 12px 40px rgba(0,0,0,.45);
+}
+
+/* Team block */
+.team-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 28px 16px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .18s;
+  position: relative;
+}
+.team-block:hover {
+  background: rgba(77,208,225,.06);
+}
+.team-block:active {
+  background: rgba(77,208,225,.12);
+}
+
+.team-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(169,182,204,.85);
+  text-align: center;
+  word-break: break-word;
+  max-width: 140px;
+}
+
+.team-score {
+  font-family: 'Bebas Neue', 'Impact', sans-serif;
+  font-size: clamp(64px, 12vw, 96px);
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 40px rgba(77,208,225,.4);
+  transition: transform .12s, text-shadow .12s;
+}
+.team-score.bump {
+  transform: scale(1.18);
+  text-shadow: 0 0 60px rgba(77,208,225,.8);
+}
+
+.team-tap-hint {
+  font-size: 10px;
+  color: rgba(169,182,204,.45);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* Center column */
+.scoreboard-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 8px;
+}
+
+.vs-badge {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  color: rgba(77,208,225,.55);
+}
+
+.timer-display {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(20px, 4vw, 26px);
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.08em;
+  background: rgba(5,11,24,.8);
+  border: 1px solid rgba(148,163,184,.25);
+  border-radius: 12px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+.timer-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.tc-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.3);
+  background: rgba(5,10,22,.95);
+  color: var(--text, #e2e8f0);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, border-color .15s;
+}
+.tc-btn:hover {
+  background: rgba(77,208,225,.18);
+  border-color: rgba(77,208,225,.5);
+}
+
+/* ── Status chips row ─────────────────────────────────────────────── */
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: rgba(5,11,24,.8);
+  color: var(--text, #e2e8f0);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.status-chip strong { color: #fff; }
+
+.chip-btn {
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.chip-btn:hover {
+  background: rgba(77,208,225,.12);
+  border-color: rgba(77,208,225,.45);
+}
+
+/* error state reuse */
+.status-chip.error {
+  color: #fecaca;
+  border-color: rgba(248,113,113,.75);
+  background: rgba(248,113,113,.12);
+}
+
+/* ── Settings panel (collapsible) ────────────────────────────────── */
+.settings-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .3s ease;
+}
+.settings-panel.open {
+  max-height: 600px;
+}
+.settings-inner {
+  padding: 16px;
+  background: rgba(5,11,24,.80);
+  border: 1px solid rgba(148,163,184,.28);
+  border-radius: 18px;
+}
+.panel-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(77,208,225,.8);
+  margin: 0 0 12px;
+}
+
+/* config fields (reuse existing .field styles from host.css if present) */
+.settings-inner .field {
+  display: grid;
+  gap: 5px;
   margin-bottom: 12px;
 }
-
-.field label {
-  font-size: 12px;
+.settings-inner .field label {
+  font-size: 11px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--muted, rgba(169,182,204,.75));
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+.settings-inner input,
+.settings-inner select {
+  width: 100%;
+  height: 38px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: rgba(5,11,24,.9);
+  color: var(--text, #e2e8f0);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  outline: none;
+}
+.settings-inner input:focus,
+.settings-inner select:focus {
+  border-color: rgba(77,208,225,.7);
+  box-shadow: 0 0 0 3px rgba(77,208,225,.15);
+}
 
-.help {
+/* ── Roster area ──────────────────────────────────────────────────── */
+.roster-area {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 600px) {
+  .roster-area { grid-template-columns: 1fr; }
+}
+
+.roster-panel {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(5,11,24,.82);
+  border: 1px solid rgba(148,163,184,.28);
+  border-radius: 20px;
+  padding: 14px;
+  animation: rp-in .2s ease;
+}
+.roster-panel.active {
+  display: flex;
+}
+
+@keyframes rp-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.roster-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.rp-label {
+  font-family: 'DM Sans', sans-serif;
   font-size: 12px;
-  color: rgba(169, 182, 204, 0.75);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(77,208,225,.85);
+}
+.rp-close {
+  font-size: 13px;
+  color: rgba(169,182,204,.6);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: color .15s;
+}
+.rp-close:hover { color: #fff; }
+
+.rp-empty {
+  font-size: 12px;
+  color: rgba(169,182,204,.55);
+}
+
+/* Player chip */
+.player-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(5,11,24,.65);
+  color: var(--text, #e2e8f0);
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.player-chip:hover {
+  background: rgba(77,208,225,.1);
+  border-color: rgba(77,208,225,.4);
+}
+.player-chip:active { transform: scale(.97); }
+
+.pc-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.pc-stat {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  color: rgba(77,208,225,.9);
+  line-height: 1;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ── Stat drawer (slide-up overlay) ──────────────────────────────── */
+.stat-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(3px);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.stat-drawer-overlay.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.stat-drawer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 201;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(77,208,225,.1) 0%, transparent 55%),
+    #0d1b2a;
+  border: 1px solid rgba(77,208,225,.22);
+  border-bottom: none;
+  border-radius: 24px 24px 0 0;
+  padding: 12px 20px 32px;
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.32,.72,0,1);
+  max-height: 85dvh;
+  overflow-y: auto;
+  /* desktop: constrain width */
+  max-width: 520px;
+  margin: 0 auto;
+}
+.stat-drawer.open {
+  transform: translateY(0);
+}
+
+.drawer-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148,163,184,.35);
+  margin: 0 auto 16px;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.drawer-player-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  line-height: 1;
+  color: #fff;
+  letter-spacing: 0.04em;
+}
+.drawer-team-name {
+  font-size: 11px;
+  color: rgba(77,208,225,.75);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 3px;
+}
+
+.drawer-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.3);
+  background: rgba(5,11,24,.9);
+  color: rgba(169,182,204,.8);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.drawer-close:hover { color: #fff; border-color: rgba(148,163,184,.6); }
+
+/* Drawer field rows */
+.df-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(148,163,184,.12);
+}
+.df-row:last-child { border-bottom: none; }
+
+.df-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text, #e2e8f0);
+  flex: 1;
+}
+.df-help {
+  font-size: 11px;
+  color: rgba(169,182,204,.55);
   margin-top: 2px;
 }
 
-.counter {
+.df-counter {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
-
-.counter .value {
-  min-width: 54px;
-  text-align: center;
-  font-weight: 700;
-  font-size: 18px;
-  padding: 8px 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(5, 11, 24, 0.9);
-}
-
-.mini-btn {
-  width: 38px;
-  height: 38px;
+.df-counter-btn {
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(5, 10, 22, 0.98);
-  color: var(--text);
-  font-size: 18px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: rgba(5,11,24,.95);
+  color: var(--text, #e2e8f0);
+  font-size: 20px;
+  font-weight: 400;
   cursor: pointer;
-}
-
-.mini-btn:hover {
-  filter: brightness(1.08);
-}
-
-.actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
   align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background .12s, border-color .12s;
+}
+.df-counter-btn:hover {
+  background: rgba(77,208,225,.15);
+  border-color: rgba(77,208,225,.5);
+}
+.df-counter-plus {
+  background: rgba(77,208,225,.12);
+  border-color: rgba(77,208,225,.4);
+  color: #4dd0e1;
+  font-weight: 700;
+}
+.df-counter-plus:hover {
+  background: rgba(77,208,225,.25);
 }
 
+.df-counter-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  color: #fff;
+  min-width: 44px;
+  text-align: center;
+  line-height: 1;
+}
+
+.df-input,
+.df-select {
+  height: 40px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: rgba(5,11,24,.9);
+  color: var(--text, #e2e8f0);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  min-width: 110px;
+}
+.df-input:focus,
+.df-select:focus {
+  border-color: rgba(77,208,225,.7);
+  box-shadow: 0 0 0 3px rgba(77,208,225,.15);
+}
+
+/* ── Save toast ───────────────────────────────────────────────────── */
+.save-toast {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(77,208,225,.45);
+  background: rgba(5,11,24,.95);
+  color: #e2e8f0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 8px 30px rgba(0,0,0,.4);
+}
+.save-toast.error {
+  color: #fecaca;
+  border-color: rgba(248,113,113,.6);
+}
+
+/* ── Score bump animation ─────────────────────────────────────────── */
+@keyframes score-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+.team-score.bump {
+  animation: score-bump .25s ease;
+}
+
+/* ── Responsive tweaks ────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .scoreboard {
+    border-radius: 18px;
+  }
+  .team-block {
+    padding: 20px 10px 14px;
+  }
+  .team-name {
+    font-size: 11px;
+    max-width: 90px;
+  }
+  .action-bar .ab-center {
+    display: none;
+  }
+  .stat-drawer {
+    border-radius: 20px 20px 0 0;
+    padding: 12px 16px 24px;
+  }
+}
+
+/* ── Legacy wrappers (score.js still renders into these internally) ── */
+#teams-wrap { display: none !important; }
+#config-fields { /* visible inside .settings-inner */ }
+
+/* pill kept for JS that sets innerHTML on status pills */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(5, 11, 24, 0.8);
-  color: var(--text);
+  border: 1px solid rgba(148,163,184,.45);
+  background: rgba(5,11,24,.8);
+  color: var(--text, #e2e8f0);
   font-size: 13px;
 }
-
-.pill strong {
-  color: #fff;
-}
-
-.error {
+.pill strong { color: #fff; }
+.pill.error {
   color: #fecaca;
-  border-color: rgba(248, 113, 113, 0.75);
-  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248,113,113,.75);
+  background: rgba(248,113,113,.12);
 }
 
-.teams-wrap {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-@media (max-width: 920px) {
-  .teams-wrap {
-    grid-template-columns: 1fr;
-  }
-}
-
-.team-card {
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 16px;
-  background: rgba(5, 11, 24, 0.62);
-  padding: 12px;
-}
-
-.team-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.team-title h3 {
-  margin: 0;
-  font-size: 14px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.team-sub {
-  color: rgba(169, 182, 204, 0.75);
-  font-size: 12px;
-}
-
-.player-card {
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 14px;
-  background: rgba(5, 11, 24, 0.75);
-  padding: 10px;
-  margin-top: 10px;
-}
-
-.player-card h4 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: #fff;
-}
-
-.timer-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  margin-top: 10px;
-}
-
-.timer-time {
-  font-variant-numeric: tabular-nums;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
-
-/* moved from inline styles */
-.score-toolbar {
-  margin-top: 10px;
-}
-
-.save-msg {
-  margin-top: 14px;
+/* hide elements the old HTML used that we've replaced */
+.score-toolbar,
+.timer-row,
+.score-header > .eyebrow,
+.score-card > .actions {
   display: none;
-}
-
-/* =========================
-   Score page form controls
-   ========================= */
-
-/* Make any default button in the score page match theme */
-.score-card button {
-  font-family: inherit;
-}
-
-/* Style inputs & selects created dynamically (config + player fields) */
-.score-card input,
-.score-card select {
-  width: 100%;
-  height: 40px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(5, 11, 24, 0.9);
-  color: var(--text);
-  outline: none;
-  font-size: 14px;
-}
-
-.score-card input::placeholder {
-  color: rgba(169, 182, 204, 0.65);
-}
-
-.score-card input:focus,
-.score-card select:focus {
-  border-color: rgba(77, 208, 225, 0.8);
-  box-shadow: 0 0 0 3px rgba(77, 208, 225, 0.18);
-}
-
-/* Remove the ugly white dropdown arrow background on some browsers */
-.score-card select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, rgba(169, 182, 204, 0.85) 50%),
-    linear-gradient(135deg, rgba(169, 182, 204, 0.85) 50%, transparent 50%);
-  background-position: calc(100% - 18px) 16px, calc(100% - 12px) 16px;
-  background-size: 6px 6px, 6px 6px;
-  background-repeat: no-repeat;
-  padding-right: 34px;
-}
-
-/* Make number inputs not show weird white inner UI on some browsers */
-.score-card input[type="number"] {
-  -moz-appearance: textfield;
-}
-.score-card input[type="number"]::-webkit-outer-spin-button,
-.score-card input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-/* Improve field spacing so controls look like the rest of the site */
-.player-card .field,
-#config-fields .field {
-  margin-bottom: 12px;
-}
-
-.player-card .field label,
-#config-fields .field label {
-  margin-bottom: 2px;
-}
-
-/* Make "Add field mid-game" look consistent even if host.css doesn't style it */
-#btnAddFieldMidGame {
-  height: 40px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(5, 11, 24, 0.9);
-  color: var(--text);
-  cursor: pointer;
-  font-weight: 600;
-}
-#btnAddFieldMidGame:hover {
-  filter: brightness(1.08);
 }
