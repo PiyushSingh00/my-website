@@ -529,57 +529,69 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function createBracket(names, teamMap = {}) {
-    const list = shuffle(names.filter(Boolean));
-    if (list.length < 2) return null;
+  // 1. Clean the list of names
+  let list = names.filter(Boolean);
+  if (list.length < 2) return null;
 
-    const size = nextPow2(list.length);
-    while (list.length < size) list.push("BYE");
+  // 2. Determine the required bracket size (e.g., 4, 8, 16)
+  const size = nextPow2(list.length);
 
-    const totalRounds = Math.log2(size);
-    const rounds = [];
+  // 3. Add "BYE" tokens to the list until it reaches the required size
+  while (list.length < size) {
+    list.push("BYE");
+  }
 
-    const getRoster = (teamName) => {
-      const t = String(teamName || "").trim();
-      const up = t.toUpperCase();
-      if (!t || up === "BYE" || up === "TBD") return [];
-      if (Array.isArray(teamMap[t])) return teamMap[t];
-      return splitTeamName(t);
-    };
+  // 4. 🔥 CRITICAL FIX: Shuffle the list AFTER adding BYEs 
+  // This ensures BYEs are paired with players, not each other.
+  list = shuffle(list);
 
-    const r1 = [];
-    for (let i = 0; i < list.length; i += 2) {
-      const home = list[i];
-      const away = list[i + 1];
-      r1.push(
+  const totalRounds = Math.log2(size);
+  const rounds = [];
+
+  const getRoster = (teamName) => {
+    const t = String(teamName || "").trim();
+    const up = t.toUpperCase();
+    if (!t || up === "BYE" || up === "TBD") return [];
+    if (Array.isArray(teamMap[t])) return teamMap[t];
+    return splitTeamName(t);
+  };
+
+  // 5. Build Round 1
+  const r1 = [];
+  for (let i = 0; i < list.length; i += 2) {
+    const home = list[i];
+    const away = list[i + 1];
+    r1.push(
+      ensureMatchMeta({
+        home,
+        away,
+        homePlayers: getRoster(home),
+        awayPlayers: getRoster(away),
+      })
+    );
+  }
+  rounds.push(r1);
+
+  // 6. Build subsequent TBD rounds
+  for (let r = 1; r < totalRounds; r++) {
+    const prevMatchCount = rounds[r - 1].length;
+    const matchCount = Math.ceil(prevMatchCount / 2);
+    const rr = [];
+    for (let i = 0; i < matchCount; i++) {
+      rr.push(
         ensureMatchMeta({
-          home,
-          away,
-          homePlayers: getRoster(home),
-          awayPlayers: getRoster(away),
+          home: "TBD",
+          away: "TBD",
+          homePlayers: [],
+          awayPlayers: [],
         })
       );
     }
-    rounds.push(r1);
-
-    for (let r = 1; r < totalRounds; r++) {
-      const prevMatchCount = rounds[r - 1].length;
-      const matchCount = Math.ceil(prevMatchCount / 2);
-      const rr = [];
-      for (let i = 0; i < matchCount; i++) {
-        rr.push(
-          ensureMatchMeta({
-            home: "TBD",
-            away: "TBD",
-            homePlayers: [],
-            awayPlayers: [],
-          })
-        );
-      }
-      rounds.push(rr);
-    }
-
-    return { rounds, totalRounds };
+    rounds.push(rr);
   }
+
+  return { rounds, totalRounds };
+}
 
   function normalizeStatusFixtures(p) {
     const raw =
