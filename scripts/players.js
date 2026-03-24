@@ -930,6 +930,78 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (fixturesState.activeCategoryId) renderCategoryBracket(fixturesState.activeCategoryId);
   }
 
+  async function forceRegenerateFixtures() {
+  // Always rebuild from latest accepted players
+  rebuildAcceptedByCategory();
+
+  const newFixtures = { categories: {} };
+  let createdAny = false;
+
+  fixturesState.categories.forEach((c) => {
+    const cid = c.categoryId || c.id;
+    if (!cid) return;
+
+    const names = fixturesState.acceptedByCategory[cid] || [];
+    const teamSize = Number(c.teamSize || 1);
+
+    const { entrants, dropped, teamMap } = buildEntrants(names, teamSize);
+
+    if (dropped.length) {
+      showToast(`⚠️ ${dropped.length} player(s) left out (need teams of ${teamSize})`);
+    }
+
+    const bracket = createBracket(entrants, teamMap);
+
+    newFixtures.categories[cid] = {
+      categoryId: cid,
+      label: categoryLabel(c),
+      ...(bracket ? bracket : { rounds: [], totalRounds: 0 }),
+    };
+
+    if (bracket) createdAny = true;
+  });
+
+  if (!createdAny) {
+    showToast("Not enough accepted players to regenerate fixtures");
+    return;
+  }
+
+  try {
+    // 🔥 overwrite existing fixtures (same endpoint)
+    const r = await apiPost(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
+      newFixtures
+    );
+
+    if (!r.ok) {
+      showToast("Failed to regenerate fixtures");
+      console.error("Regenerate failed:", r);
+      return;
+    }
+
+    // ✅ replace state completely (old scores gone automatically)
+    fixturesState.fixtures = r.data || newFixtures;
+    fixturesState.fixtures.__locked = true;
+
+    fixturesState.editMode = false;
+
+    showToast("Fixtures regenerated");
+
+    renderCategoryToggles();
+    if (fixturesState.activeCategoryId) {
+      renderCategoryBracket(fixturesState.activeCategoryId);
+    }
+
+  } catch (e) {
+    console.error(e);
+    showToast("Something went wrong while regenerating");
+  }
+}
+
+  fixturesUi.generateBtn.textContent = fixturesState.fixtures?.__locked
+  ? "Regenerate fixtures"
+  : "Generate fixtures";
+  
   async function initFixturesIfNeeded() {
     if (fixturesUi.didInit) return;
     fixturesUi.didInit = true;
@@ -960,8 +1032,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Generate button
     fixturesUi.generateBtn?.addEventListener("click", async () => {
+    const alreadyGenerated = fixturesState.fixtures?.__locked;
+
+    if (alreadyGenerated) {
+      const confirmReset = window.confirm(
+        "Are you sure you want to regenerate fixtures?\n\nIt will erase all scores and results of the current tournament."
+      );
+
+      if (!confirmReset) return;
+
+      await forceRegenerateFixtures(); // new function
+    } else {
       await generateAndSaveFixtures();
-    });
+    }
+  });
 
     // Edit / Save (Round 1 only) — same logic as fixtures.js
     fixturesUi.editBtn?.addEventListener("click", async () => {
