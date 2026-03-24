@@ -910,7 +910,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (again) {
           fixturesState.fixtures = migrateFixtures(again);
           fixturesState.fixtures.__locked = true;
-          fixturesUi.generateBtn && (fixturesUi.generateBtn.disabled = true);
+        if (fixturesUi.generateBtn) {
+        fixturesUi.generateBtn.disabled = false;
+        fixturesUi.generateBtn.textContent = "Regenerate fixtures";
+      }
           setEditUI();
         }
         return;
@@ -922,7 +925,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     fixturesState.fixtures = r.data || newFixtures;
     fixturesState.fixtures.__locked = true;
-    fixturesUi.generateBtn && (fixturesUi.generateBtn.disabled = true);
+    if (fixturesUi.generateBtn) {
+    fixturesUi.generateBtn.disabled = false;
+    fixturesUi.generateBtn.textContent = "Regenerate fixtures";
+  }
     setEditUI();
     showToast("Fixtures generated");
 
@@ -998,9 +1004,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 }
 
-  fixturesUi.generateBtn.textContent = fixturesState.fixtures?.__locked
-  ? "Regenerate fixtures"
-  : "Generate fixtures";
   
   async function initFixturesIfNeeded() {
     if (fixturesUi.didInit) return;
@@ -1163,7 +1166,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (existing) {
       fixturesState.fixtures = migrateFixtures(existing);
       fixturesState.fixtures.__locked = true;
-      fixturesUi.generateBtn && (fixturesUi.generateBtn.disabled = true);
+    if (fixturesUi.generateBtn) {
+      fixturesUi.generateBtn.disabled = false;
+      fixturesUi.generateBtn.textContent = "Regenerate fixtures";
+    }
       setEditUI();
       rebuildAcceptedFromFixturesRound1();
     } else {
@@ -1179,7 +1185,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         };
       });
       fixturesState.fixtures.__locked = false;
-      fixturesUi.generateBtn && (fixturesUi.generateBtn.disabled = false);
+      if (fixturesUi.generateBtn) {
+      fixturesUi.generateBtn.disabled = false;
+      fixturesUi.generateBtn.textContent = "Generate fixtures";
+    }
       setEditUI();
       rebuildAcceptedByCategory();
     }
