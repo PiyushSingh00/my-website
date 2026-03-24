@@ -1,10 +1,13 @@
 import { requireAuth, logout } from "./auth.js";
+import { initCricket }    from "./sport-cricket.js";
+import { initFootball }   from "./sport-football.js";
+import { initBasketball } from "./sport-basketball.js";
+import { initBadminton }  from "./sport-badminton.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
-  // Topbar actions
   document.querySelectorAll(".brand").forEach((el) => {
     el.style.cursor = "pointer";
     el.addEventListener("click", () => (window.location.href = "index.html"));
@@ -12,18 +15,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("signout-btn")?.addEventListener("click", logout);
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
-  const titleEl       = document.getElementById("score-title");   // kept for error messages
+  const titleEl       = document.getElementById("score-title");
   const subEl         = document.getElementById("score-sub");
   const backBtn       = document.getElementById("back-to-fixtures");
   const saveBtn       = document.getElementById("save-score");
   const configWrap    = document.getElementById("config-fields");
-  const teamsWrap     = document.getElementById("teams-wrap");    // hidden legacy div
+  const teamsWrap     = document.getElementById("teams-wrap");
   const statusPill    = document.getElementById("status-pill");
   const winnerPill    = document.getElementById("winner-pill");
   const reasonPill    = document.getElementById("reason-pill");
   const saveMsg       = document.getElementById("save-msg");
-
-  // New scoreboard UI elements
   const homeNameEl    = document.getElementById("home-name");
   const awayNameEl    = document.getElementById("away-name");
   const homeScoreEl   = document.getElementById("home-score");
@@ -37,8 +38,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const drawerClose   = document.getElementById("drawer-close");
   const settingsPanel = document.getElementById("settings-panel");
   const toggleSettings= document.getElementById("toggle-settings");
-
-  // Timer UI
   const timerDisplay  = document.getElementById("timer-display");
   const timerStartBtn = document.getElementById("timer-start");
   const timerPauseBtn = document.getElementById("timer-pause");
@@ -59,7 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   backBtn?.addEventListener("click", () => {
-    window.location.href = `players.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+    window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(tournamentId)}`;
   });
 
   // ── API helpers ───────────────────────────────────────────────────────────
@@ -93,7 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function clear(el) { if (el) el.innerHTML = ""; }
 
-  // ── Load schema + fixtures ────────────────────────────────────────────────
+  // ── Load data ─────────────────────────────────────────────────────────────
   let schema   = null;
   let fixtures = null;
 
@@ -130,7 +129,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // Prevent scoring BYE matches
   const homeLabel = match.home ?? "Home";
   const awayLabel = match.away ?? "Away";
 
@@ -138,18 +136,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     statusPill?.classList.add("error");
     if (statusPill) statusPill.innerHTML = `Status: <strong>BYE</strong>`;
     if (winnerPill) winnerPill.innerHTML = `Winner: <strong>-</strong>`;
-    if (reasonPill) reasonPill.innerHTML = `Reason: <strong>This match contains BYE, no scoring needed.</strong>`;
+    if (reasonPill) reasonPill.innerHTML = `Reason: <strong>BYE match — no scoring needed.</strong>`;
     if (saveBtn)    saveBtn.disabled     = true;
     return;
   }
 
-  // Update meta
-  if (titleEl)    titleEl.textContent = `${homeLabel} vs ${awayLabel}`;
-  if (subEl)      subEl.textContent   = `${schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
+  if (titleEl)    titleEl.textContent    = `${homeLabel} vs ${awayLabel}`;
+  if (subEl)      subEl.textContent      = `${schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
   if (homeNameEl) homeNameEl.textContent = homeLabel;
   if (awayNameEl) awayNameEl.textContent = awayLabel;
 
-  // ── Roster resolution ─────────────────────────────────────────────────────
   function splitTeamLabel(label) {
     if (!label) return [];
     return String(label).split("+").map((s) => s.trim()).filter(Boolean);
@@ -173,6 +169,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       startedAtEpochMs: null,
     },
   };
+
+  // Restore any sport-specific state from existing score
+  if (existing?.cricket)    state.cricket    = existing.cricket;
+  if (existing?.football)   state.football   = existing.football;
+  if (existing?.basketball) state.basketball = existing.basketball;
+  if (existing?.badminton)  state.badminton  = existing.badminton;
 
   (schema.inputs || []).forEach((f) => {
     state.config[f.key] = existing?.config?.[f.key] ?? f.default ?? null;
@@ -257,26 +259,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (statusPill) statusPill.innerHTML = `Status: <strong>${c.status}</strong>`;
     if (winnerPill) winnerPill.innerHTML = `Winner: <strong>${c.winnerName || "-"}</strong>`;
     if (reasonPill) reasonPill.innerHTML = `Reason: <strong>${c.reason || "-"}</strong>`;
+    // Update top scoreboard numbers from master state
+    const logicField = schema?.winnerLogic?.field;
+    if (logicField) {
+      if (homeScoreEl) homeScoreEl.textContent = Number(state.state.A?.[logicField] ?? 0);
+      if (awayScoreEl) awayScoreEl.textContent = Number(state.state.B?.[logicField] ?? 0);
+    }
   }
-
-  // ── Scoreboard live score display ─────────────────────────────────────────
-  const logicField = schema?.winnerLogic?.field || null;
-
-  function refreshScoreDisplay() {
-    if (!logicField) return;
-    if (homeScoreEl) homeScoreEl.textContent = Number(state.state.A?.[logicField] ?? 0);
-    if (awayScoreEl) awayScoreEl.textContent = Number(state.state.B?.[logicField] ?? 0);
-  }
-
-  refreshScoreDisplay();
 
   // ── Settings toggle ───────────────────────────────────────────────────────
   toggleSettings?.addEventListener("click", () => {
     settingsPanel?.classList.toggle("open");
     if (toggleSettings) {
       toggleSettings.textContent = settingsPanel?.classList.contains("open")
-        ? "✕ Settings"
-        : "⚙ Settings";
+        ? "✕ Settings" : "⚙ Settings";
     }
   });
 
@@ -288,17 +284,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (configWrap) configWrap.innerHTML = `<p class="help">No match settings.</p>`;
       return;
     }
-
     inputs.forEach((f) => {
       const wrap  = document.createElement("div");
       wrap.className = "field";
-
       const label = document.createElement("label");
       label.textContent = f.label || f.key;
-
       let inputEl;
       if (f.type === "number") {
-        inputEl       = document.createElement("input");
+        inputEl = document.createElement("input");
         inputEl.type  = "number";
         inputEl.value = state.config[f.key] ?? "";
         if (typeof f.min === "number") inputEl.min = String(f.min);
@@ -316,7 +309,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           renderPills();
         });
       } else {
-        inputEl       = document.createElement("input");
+        inputEl = document.createElement("input");
         inputEl.type  = "text";
         inputEl.value = state.config[f.key] ?? "";
         inputEl.addEventListener("input", () => {
@@ -324,28 +317,24 @@ document.addEventListener("DOMContentLoaded", async () => {
           renderPills();
         });
       }
-
       wrap.appendChild(label);
       wrap.appendChild(inputEl);
-
       if (f.help) {
         const help = document.createElement("div");
         help.className   = "help";
         help.textContent = f.help;
         wrap.appendChild(help);
       }
-
       configWrap?.appendChild(wrap);
     });
   }
 
-  // ── Stat drawer ───────────────────────────────────────────────────────────
+  // ── Generic drawer (for non-sport-specific player fields) ─────────────────
   function closeDrawer() {
     drawer?.classList.remove("open");
     overlay?.classList.remove("show");
     document.body.classList.remove("drawer-lock");
   }
-
   drawerClose?.addEventListener("click", closeDrawer);
   overlay?.addEventListener("click", closeDrawer);
 
@@ -353,189 +342,185 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (drawerNameEl) drawerNameEl.textContent = playerName;
     if (drawerTeamEl) drawerTeamEl.textContent = teamLabel;
     clear(drawerFields);
-
     fields.forEach((field) => {
       const row = document.createElement("div");
       row.className = "df-row";
-
       const lbl = document.createElement("div");
       lbl.className   = "df-label";
       lbl.textContent = field.label || field.key;
       row.appendChild(lbl);
-
       if (field.type === "counter" || field.type === "number") {
         const ctrl    = document.createElement("div");
         ctrl.className = "df-counter";
-
         const minBtn  = document.createElement("button");
         minBtn.type   = "button";
         minBtn.className  = "df-counter-btn";
         minBtn.textContent = "−";
-
         const valEl   = document.createElement("div");
         valEl.className   = "df-counter-val";
         valEl.textContent = String(playerObj[field.key] ?? 0);
-
         const plusBtn = document.createElement("button");
         plusBtn.type  = "button";
         plusBtn.className   = "df-counter-btn df-counter-plus";
         plusBtn.textContent = "+";
-
         const min = typeof field.min === "number" ? field.min : 0;
-
         minBtn.addEventListener("click", () => {
           const next = Math.max(min, Number(playerObj[field.key] ?? 0) - 1);
           playerObj[field.key] = next;
           valEl.textContent = String(next);
           onUpdate();
         });
-
         plusBtn.addEventListener("click", () => {
           const next = Number(playerObj[field.key] ?? 0) + 1;
           playerObj[field.key] = next;
           valEl.textContent = String(next);
           onUpdate();
         });
-
         ctrl.appendChild(minBtn);
         ctrl.appendChild(valEl);
         ctrl.appendChild(plusBtn);
         row.appendChild(ctrl);
-
       } else if (field.type === "select") {
-        const sel     = document.createElement("select");
+        const sel = document.createElement("select");
         sel.className = "df-select";
-        const opts    = Array.isArray(field.options) ? field.options : [];
+        const opts = Array.isArray(field.options) ? field.options : [];
         sel.innerHTML = opts.map((o) => `<option value="${o}">${o}</option>`).join("");
-        sel.value     = String(playerObj[field.key] ?? (opts[0] ?? ""));
-        sel.addEventListener("change", () => {
-          playerObj[field.key] = sel.value;
-          onUpdate();
-        });
+        sel.value = String(playerObj[field.key] ?? (opts[0] ?? ""));
+        sel.addEventListener("change", () => { playerObj[field.key] = sel.value; onUpdate(); });
         row.appendChild(sel);
-
       } else {
-        const inp     = document.createElement("input");
+        const inp = document.createElement("input");
         inp.className = "df-input";
-        inp.type      = field.type === "number" ? "number" : "text";
-        inp.value     = playerObj[field.key] ?? "";
+        inp.type  = field.type === "number" ? "number" : "text";
+        inp.value = playerObj[field.key] ?? "";
         inp.addEventListener("input", () => {
           playerObj[field.key] = field.type === "number"
-            ? (inp.value === "" ? 0 : Number(inp.value))
-            : inp.value;
+            ? (inp.value === "" ? 0 : Number(inp.value)) : inp.value;
           onUpdate();
         });
         row.appendChild(inp);
       }
-
       if (field.help) {
         const help = document.createElement("div");
         help.className   = "df-help";
         help.textContent = field.help;
         row.appendChild(help);
       }
-
       drawerFields?.appendChild(row);
     });
-
     drawer?.classList.add("open");
     overlay?.classList.add("show");
     document.body.classList.add("drawer-lock");
   }
 
-  // ── Roster panels ─────────────────────────────────────────────────────────
-  function buildRosterPanel({ side, teamLabel, roster, fields }) {
-    const panel = document.createElement("div");
-    panel.className    = "roster-panel";
-    panel.dataset.side = side;
+  // ── Generic roster panels (fallback for unknown sports) ───────────────────
+  function buildGenericRosterPanels() {
+    if (!rosterArea) return;
+    const logicField   = schema?.winnerLogic?.field || null;
+    const playerFields = schema.playerFields || [];
 
-    const header = document.createElement("div");
-    header.className = "roster-panel-header";
-    header.innerHTML = `
-      <span class="rp-label">${side === "A" ? "🏠" : "✈️"} ${teamLabel}</span>
-      <span class="rp-close">✕</span>`;
-    header.querySelector(".rp-close").addEventListener("click", () => {
-      panel.classList.remove("active");
-    });
-    panel.appendChild(header);
+    function buildPanel(side, teamLabel, roster) {
+      const panel = document.createElement("div");
+      panel.className    = "roster-panel";
+      panel.dataset.side = side;
+      const header = document.createElement("div");
+      header.className = "roster-panel-header";
+      header.innerHTML = `
+        <span class="rp-label">${side === "A" ? "🏠" : "✈️"} ${teamLabel}</span>
+        <span class="rp-close">✕</span>`;
+      header.querySelector(".rp-close").addEventListener("click", () => panel.classList.remove("active"));
+      panel.appendChild(header);
 
-    if (!roster.length) {
-      const empty = document.createElement("p");
-      empty.className   = "rp-empty";
-      empty.textContent = "No players listed.";
-      panel.appendChild(empty);
+      roster.forEach((playerName) => {
+        const chip = document.createElement("button");
+        chip.type  = "button";
+        chip.className = "player-chip";
+        function refreshChip() {
+          const stat = logicField ? (state.state[side].players?.[playerName]?.[logicField] ?? 0) : null;
+          chip.innerHTML = `<span class="pc-name">${playerName}</span>${stat !== null ? `<span class="pc-stat">${stat}</span>` : ""}`;
+        }
+        refreshChip();
+        chip.addEventListener("click", () => {
+          ensurePlayer(side, playerName);
+          openDrawer({
+            playerName, teamLabel,
+            fields: playerFields,
+            playerObj: state.state[side].players[playerName],
+            onUpdate: () => { recomputeTeamTotals(); renderPills(); refreshChip(); },
+          });
+        });
+        panel.appendChild(chip);
+      });
       return panel;
     }
 
-    roster.forEach((playerName) => {
-      const chip    = document.createElement("button");
-      chip.type     = "button";
-      chip.className = "player-chip";
+    const homePanel = buildPanel("A", homeLabel, homePlayers);
+    const awayPanel = buildPanel("B", awayLabel, awayPlayers);
+    rosterArea.appendChild(homePanel);
+    rosterArea.appendChild(awayPanel);
 
-      function getMainStat() {
-        if (!logicField) return null;
-        const v = state.state[side].players?.[playerName]?.[logicField];
-        return v != null ? v : 0;
-      }
-
-      function refreshChip() {
-        const stat = getMainStat();
-        chip.innerHTML = `
-          <span class="pc-name">${playerName}</span>
-          ${stat !== null ? `<span class="pc-stat">${stat}</span>` : ""}`;
-      }
-      refreshChip();
-
-      chip.addEventListener("click", () => {
-        ensurePlayer(side, playerName);
-        openDrawer({
-          playerName,
-          teamLabel,
-          fields,
-          playerObj: state.state[side].players[playerName],
-          onUpdate: () => {
-            recomputeTeamTotals();
-            renderPills();
-            refreshChip();
-            refreshScoreDisplay();
-          },
-        });
-      });
-
-      panel.appendChild(chip);
+    document.getElementById("team-home")?.addEventListener("click", () => {
+      homePanel.classList.toggle("active");
+      awayPanel.classList.remove("active");
     });
-
-    return panel;
+    document.getElementById("team-away")?.addEventListener("click", () => {
+      awayPanel.classList.toggle("active");
+      homePanel.classList.remove("active");
+    });
   }
 
-  const playerFields = schema.playerFields || [];
-  const homePanelEl  = buildRosterPanel({ side: "A", teamLabel: homeLabel, roster: homePlayers, fields: playerFields });
-  const awayPanelEl  = buildRosterPanel({ side: "B", teamLabel: awayLabel, roster: awayPlayers, fields: playerFields });
+  // ── Sport router ──────────────────────────────────────────────────────────
+  const sport = (schema.sport || "").toLowerCase();
 
-  rosterArea?.appendChild(homePanelEl);
-  rosterArea?.appendChild(awayPanelEl);
+  // onSave callback passed to sport modules — queues a debounced autosave
+  let saveDebounce = null;
+  function onSportUpdate() {
+    renderPills();
+    clearTimeout(saveDebounce);
+    saveDebounce = setTimeout(doSave, 1500);
+  }
 
-  document.getElementById("team-home")?.addEventListener("click", () => {
-    homePanelEl.classList.toggle("active");
-    awayPanelEl.classList.remove("active");
-  });
-  document.getElementById("team-away")?.addEventListener("click", () => {
-    awayPanelEl.classList.toggle("active");
-    homePanelEl.classList.remove("active");
-  });
+  const sportCtx = {
+    homeLabel, awayLabel, homePlayers, awayPlayers,
+    state, onSave: onSportUpdate, renderPills, sport,
+  };
 
-  // ── Legacy renderTeams (writes to hidden #teams-wrap for compatibility) ────
-  function renderTeams() {
-    clear(teamsWrap);
-    [
-      { side: "A", title: "Home", label: homeLabel },
-      { side: "B", title: "Away", label: awayLabel },
-    ].forEach((t) => {
-      const card = document.createElement("div");
-      card.className = "team-card";
-      card.innerHTML = `<div class="team-title"><h3>${t.title}</h3><div class="team-sub">${t.label}</div></div>`;
-      teamsWrap?.appendChild(card);
-    });
+  // Hide the generic scoreboard tap-hint for sport-specific UIs
+  function hideTapHints() {
+    document.querySelectorAll(".team-tap-hint").forEach(el => el.style.display = "none");
+    document.querySelectorAll(".team-block").forEach(el => el.style.cursor = "default");
+    if (homeScoreEl) homeScoreEl.style.fontSize = "48px";
+    if (awayScoreEl) awayScoreEl.style.fontSize = "48px";
+  }
+
+  if (sport.includes("cricket")) {
+    hideTapHints();
+    const ui = initCricket(sportCtx);
+    rosterArea?.appendChild(ui);
+  } else if (sport.includes("football") || sport.includes("soccer")) {
+    hideTapHints();
+    // For football, hide the top-level scoreboard since the sport module has its own
+    document.getElementById("scoreboard")?.style.setProperty("display", "none");
+    const ui = initFootball(sportCtx);
+    rosterArea?.appendChild(ui);
+  } else if (sport.includes("basketball")) {
+    hideTapHints();
+    document.getElementById("scoreboard")?.style.setProperty("display", "none");
+    const ui = initBasketball(sportCtx);
+    rosterArea?.appendChild(ui);
+  } else if (sport.includes("badminton") || sport.includes("tennis")) {
+    hideTapHints();
+    document.getElementById("scoreboard")?.style.setProperty("display", "none");
+    const ui = initBadminton(sportCtx);
+    rosterArea?.appendChild(ui);
+  } else {
+    // Generic fallback — original roster/drawer UI
+    buildGenericRosterPanels();
+    const logicField = schema?.winnerLogic?.field || null;
+    if (logicField) {
+      if (homeScoreEl) homeScoreEl.textContent = Number(state.state.A?.[logicField] ?? 0);
+      if (awayScoreEl) awayScoreEl.textContent = Number(state.state.B?.[logicField] ?? 0);
+    }
   }
 
   // ── Timer ─────────────────────────────────────────────────────────────────
@@ -571,15 +556,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   function pauseTimer() {
     if (!state.timer.running) return;
     tickTimer();
-    state.timer.running          = false;
+    state.timer.running = false;
     state.timer.startedAtEpochMs = null;
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = null;
   }
 
   function resetTimer() {
-    state.timer.elapsedMs        = 0;
-    state.timer.running          = false;
+    state.timer.elapsedMs = 0;
+    state.timer.running   = false;
     state.timer.startedAtEpochMs = null;
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = null;
@@ -589,48 +574,40 @@ document.addEventListener("DOMContentLoaded", async () => {
   timerStartBtn?.addEventListener("click", startTimer);
   timerPauseBtn?.addEventListener("click", pauseTimer);
   timerResetBtn?.addEventListener("click", resetTimer);
-
   renderTimer();
 
-  // ── Initial render ────────────────────────────────────────────────────────
+  // ── Config fields + pills ─────────────────────────────────────────────────
   renderConfigFields();
-  renderTeams();
   renderPills();
 
   // ── Save ──────────────────────────────────────────────────────────────────
-  saveBtn?.addEventListener("click", async () => {
-    saveBtn.disabled = true;
+  async function doSave() {
+    if (saveBtn) saveBtn.disabled = true;
     if (saveMsg) {
       saveMsg.style.display = "inline-flex";
       saveMsg.textContent   = "Saving…";
       saveMsg.classList.remove("error");
     }
-
     if (state.timer.running) tickTimer();
-
     try {
       const payload = {
-        categoryId,
-        roundIndex,
-        matchIndex,
-        scoreIndex,
+        categoryId, roundIndex, matchIndex, scoreIndex,
         score: {
           config: state.config,
           state:  state.state,
           timer:  { elapsedMs: state.timer.elapsedMs },
+          // sport-specific blobs
+          ...(state.cricket    && { cricket:    state.cricket    }),
+          ...(state.football   && { football:   state.football   }),
+          ...(state.basketball && { basketball: state.basketball }),
+          ...(state.badminton  && { badminton:  state.badminton  }),
         },
       };
-
       const resp = await apiPut(
         `/api/host/tournaments/${encodeURIComponent(tournamentId)}/matches/score`,
         payload
       );
-
-      if (saveMsg) {
-        saveMsg.textContent   = "Saved ✅";
-        saveMsg.style.display = "inline-flex";
-      }
-
+      if (saveMsg) { saveMsg.textContent = "Saved ✅"; saveMsg.style.display = "inline-flex"; }
       const computed = resp?.match?.score?.computed || null;
       if (computed) {
         if (statusPill) statusPill.innerHTML = `Status: <strong>${computed.status}</strong>`;
@@ -645,7 +622,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         saveMsg.textContent   = `Save failed: ${String(e?.message || e)}`;
       }
     } finally {
-      saveBtn.disabled = false;
+      if (saveBtn) saveBtn.disabled = false;
     }
-  });
+  }
+
+  saveBtn?.addEventListener("click", doSave);
 });
