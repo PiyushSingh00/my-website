@@ -529,21 +529,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function createBracket(names, teamMap = {}) {
-  // 1. Clean the list of names
-  let list = names.filter(Boolean);
-  if (list.length < 2) return null;
+  // 1. Get real players and shuffle them first
+  let players = names.filter(Boolean);
+  if (players.length < 2) return null;
+  
+  players = shuffle(players); // Randomize player order
 
-  // 2. Determine the required bracket size (e.g., 4, 8, 16)
-  const size = nextPow2(list.length);
+  // 2. Determine bracket size and how many BYEs are needed
+  const size = nextPow2(players.length);
+  const byeCount = size - players.length;
 
-  // 3. Add "BYE" tokens to the list until it reaches the required size
-  while (list.length < size) {
-    list.push("BYE");
+  // 3. Construct the list by interleaving players and BYEs
+  const list = [];
+  let playerIdx = 0;
+  let byesAllocated = 0;
+
+  // We iterate by match (2 slots at a time)
+  for (let i = 0; i < size / 2; i++) {
+    // Slot 1: Always a player
+    list.push(players[playerIdx++]);
+
+    // Slot 2: A BYE if we have any left, otherwise the next player
+    if (byesAllocated < byeCount) {
+      list.push("BYE");
+      byesAllocated++;
+    } else {
+      list.push(players[playerIdx++]);
+    }
   }
-
-  // 4. 🔥 CRITICAL FIX: Shuffle the list AFTER adding BYEs 
-  // This ensures BYEs are paired with players, not each other.
-  list = shuffle(list);
 
   const totalRounds = Math.log2(size);
   const rounds = [];
@@ -556,7 +569,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return splitTeamName(t);
   };
 
-  // 5. Build Round 1
+  // 4. Build Round 1 using the interleaved list
   const r1 = [];
   for (let i = 0; i < list.length; i += 2) {
     const home = list[i];
@@ -572,7 +585,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   rounds.push(r1);
 
-  // 6. Build subsequent TBD rounds
+  // 5. Build subsequent rounds (Semi-finals, Finals, etc.)
   for (let r = 1; r < totalRounds; r++) {
     const prevMatchCount = rounds[r - 1].length;
     const matchCount = Math.ceil(prevMatchCount / 2);
