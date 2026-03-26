@@ -1091,3 +1091,216 @@ body.drawer-lock {
   color: rgba(169,182,204,.7);
 }
 .bt-players { margin-top: 10px; }
+
+
+/* =====================================================================
+   PICKLEBALL UI
+   ===================================================================== */
+
+/* ── Main scoreboard ─────────────────────────────────────────────── */
+.pk-scoreboard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(132,204,22,.10), transparent 55%),
+    radial-gradient(ellipse at 80% 50%, rgba(77,208,225,.08), transparent 55%),
+    rgba(5,11,24,.90);
+  border: 1px solid rgba(132,204,22,.25);
+  border-radius: 22px;
+  padding: 18px 10px;
+  gap: 6px;
+  box-shadow: 0 0 0 1px rgba(132,204,22,.08), 0 8px 32px rgba(0,0,0,.4);
+}
+
+.pk-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  transition: background .2s;
+}
+.pk-team.pk-serving {
+  background: rgba(132,204,22,.10);
+  border: 1px solid rgba(132,204,22,.35);
+}
+
+.pk-team-name {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: rgba(169,182,204,.85);
+  text-align: center;
+  word-break: break-word;
+  max-width: 120px;
+}
+.pk-serving-dot {
+  color: #84cc16;
+  font-size: 10px;
+  vertical-align: middle;
+  margin-right: 3px;
+}
+
+.pk-big-score {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(52px, 10vw, 80px);
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 30px rgba(132,204,22,.3);
+}
+.pk-team.pk-serving .pk-big-score {
+  text-shadow: 0 0 40px rgba(132,204,22,.6);
+}
+
+.pk-games-won {
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: #84cc16;
+}
+
+.pk-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+}
+.pk-score-label, .pk-games-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: rgba(148,163,184,.5);
+}
+.pk-score-call {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(14px, 3vw, 18px);
+  font-weight: 700;
+  color: #84cc16;
+  white-space: nowrap;
+}
+.pk-games-score {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: #e2e8f0;
+}
+
+/* ── Serving info bar ────────────────────────────────────────────── */
+.pk-serving-bar {
+  margin-top: 8px;
+  padding: 7px 14px;
+  background: rgba(132,204,22,.08);
+  border: 1px solid rgba(132,204,22,.25);
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(169,182,204,.85);
+  text-align: center;
+}
+.pk-serving-bar strong { color: #84cc16; }
+
+/* ── Rally winner buttons ────────────────────────────────────────── */
+.pk-rally-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pk-rally-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 12px;
+  border-radius: 18px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform .1s, background .15s, border-color .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.pk-rally-btn:active { transform: scale(.96); }
+
+.pk-server-btn {
+  background: rgba(132,204,22,.12);
+  border-color: rgba(132,204,22,.4);
+}
+.pk-server-btn:hover {
+  background: rgba(132,204,22,.22);
+  border-color: rgba(132,204,22,.7);
+}
+
+.pk-receiver-btn {
+  background: rgba(251,191,36,.08);
+  border-color: rgba(251,191,36,.35);
+}
+.pk-receiver-btn:hover {
+  background: rgba(251,191,36,.18);
+  border-color: rgba(251,191,36,.6);
+}
+
+.pk-rb-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: rgba(169,182,204,.6);
+}
+.pk-rb-team {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: #fff;
+  line-height: 1;
+  text-align: center;
+  word-break: break-word;
+}
+.pk-rb-outcome {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(169,182,204,.7);
+  margin-top: 2px;
+}
+.pk-server-btn   .pk-rb-outcome { color: #84cc16; }
+.pk-receiver-btn .pk-rb-outcome { color: #fbbf24; }
+
+/* ── More details row ────────────────────────────────────────────── */
+.pk-details-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+  flex-wrap: wrap;
+}
+
+.pk-details-btn {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px dashed rgba(148,163,184,.4);
+  background: transparent;
+  color: rgba(169,182,204,.75);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.pk-details-btn:hover {
+  border-color: rgba(132,204,22,.5);
+  color: #84cc16;
+}
+
+.pk-rally-count {
+  font-size: 11px;
+  color: rgba(148,163,184,.5);
+}
+
+/* ── Player stat chips ───────────────────────────────────────────── */
+.pk-player-stats { margin-top: 8px; }
+.pk-chips-row    { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+
+/* reuse .player-chip from main score.css, override pc-stat colour */
+.pk-player-chip .pc-stat { color: #84cc16; }
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 420px) {
+  .pk-rally-btns { grid-template-columns: 1fr; }
+  .pk-big-score  { font-size: 52px; }
+}
