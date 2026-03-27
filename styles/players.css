@@ -317,14 +317,14 @@
 .fixtures-bracket {
   margin-top: 14px;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: auto;
   padding-bottom: 10px;
   border-radius: var(--radius-md);
 }
 
 .bracket-rounds {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;   /* columns stretch to same height */
   gap: 28px;
   padding: 8px 8px 14px;
   min-width: max-content;
@@ -334,20 +334,22 @@
   min-width: 240px;
   display: flex;
   flex-direction: column;
-  gap: var(--round-gap, 12px);
-  padding-top: var(--round-offset, 0px);
+  /* distribute matches so each sits at the midpoint of its two feeders */
+  justify-content: space-around;
   position: relative;
 }
 
-.bracket-round::before {
+/* Vertical connector line on the left side of each round (except first) */
+.bracket-round:not(:first-child)::before {
   content: "";
   position: absolute;
   left: -14px;
-  top: 28px;
-  bottom: 10px;
+  top: 0;
+  bottom: 0;
   border-left: 1px dashed rgba(148, 163, 184, 0.28);
 }
 
+/* Horizontal connector from each match to the next round */
 .bracket-round:not(:last-child) .bracket-match::after {
   content: "";
   position: absolute;

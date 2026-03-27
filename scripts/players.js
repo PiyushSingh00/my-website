@@ -753,13 +753,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const allowedNames = fixturesState.acceptedByCategory[categoryId] || [];
     const options = ["BYE", ...allowedNames];
 
-    const baseGap = 16;
-
     const roundsHtml = cat.rounds
       .map((round, r) => {
         const isRound1 = r === 0;
-        const gap = baseGap * Math.pow(2, r);
-        const offset = r === 0 ? 0 : gap / 2;
 
         const matchesHtml = round
           .map((m, i) => {
@@ -861,7 +857,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           .join("");
 
         return `
-          <div class="bracket-round" style="--round-gap:${gap}px; --round-offset:${offset}px" data-round="${r}">
+          <div class="bracket-round" data-round="${r}">
             <div class="round-title">${getRoundLabel(r, cat.totalRounds || cat.total_rounds || 0)}</div>
             ${matchesHtml}
           </div>
