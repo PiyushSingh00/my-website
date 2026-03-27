@@ -831,7 +831,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               data-tournament-id="${tournamentId}"
               data-category-id="${categoryId}"
               data-round="${r}" data-match="${i}"
-              ${canScore ? "" : "disabled"}>▶ Score</button>
+              ${canScore ? "" : "disabled"}>▶ Start Scoring</button>
             <span class="bk-score-txt">${scoreTxt}</span>
             ${m?.winner ? `<span class="bk-winner-badge">🏆 ${m.winner}</span>` : ""}
           </div>
