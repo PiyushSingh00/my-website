@@ -1097,6 +1097,52 @@ body {
 }
 @media (max-width: 480px) { .wiz-date-row { grid-template-columns: 1fr; } }
 
+.wiz-date-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.wiz-date-input-wrap input {
+  width: 100%;
+  padding-right: 48px;
+}
+
+.wiz-date-trigger {
+  position: absolute;
+  right: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.wiz-date-trigger:hover {
+  color: var(--text);
+}
+
+.wiz-helper-text {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.wiz-section-card {
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: rgba(12, 20, 36, 0.72);
+}
+
+.wiz-section-title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 /* ── Tournament type cards ─────────────────────────────────────────── */
 .wiz-type-cards {
   display: grid;

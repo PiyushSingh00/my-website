@@ -40,10 +40,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     dateEnd:     "",
     venue:       "",
     details:     "",
-    tournamentType: "single",  // "single" | "team"
+
+    tournamentType: "single",   // single | team
     eventCount:  1,
-    eventNames:  [],           // ["Men's Singles", "Women's Doubles", …]
-    eventConfigs:[],           // [{ gender, ageGroup, playingLevel, teamSize }, …]
+    eventNames:  [],
+    eventConfigs:[],
+
+    stageFormat: "",            // knockout | round_robin | group_knockout
+    groupCount: "",
+
+    tournamentRules: {
+      maxMatchesPerPlayer: "",
+      bestOfSets: "",
+      pointsPerSet: ""
+    },
+
+    leaguePoints: {
+      win: "",
+      loss: "",
+      draw: ""
+    },
+
     courtCount:  1,
     courtNames:  [],
     requirePayment: false,
@@ -87,26 +104,76 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (n === TOTAL_STEPS - 1) buildReview();
   }
 
+  function isPowerOfTwo(value) {
+  const num = Number(value);
+  return num > 0 && (num & (num - 1)) === 0;
+}
+
+function shouldShowLeaguePoints() {
+  return wiz.stageFormat === "round_robin" || wiz.stageFormat === "group_knockout";
+}
+
+function toggleLeaguePointsSection() {
+  const wrap = document.getElementById("wiz-league-points-wrap");
+  if (!wrap) return;
+  wrap.classList.toggle("hidden", !shouldShowLeaguePoints());
+}
+
+function openNativeDatePicker(input) {
+  if (!input) return;
+  if (typeof input.showPicker === "function") {
+    input.showPicker();
+  } else {
+    input.focus();
+    input.click();
+  }
+}
+
   // ── Step validation ───────────────────────────────────────────────────
   function validateStep(n) {
     if (n === 0) {
-      if (!document.getElementById("w-name").value.trim())       { alert("Please enter the tournament name.");    return false; }
-      if (!document.getElementById("w-sport").value)             { alert("Please select a sport.");               return false; }
-      if (!document.getElementById("w-date-start").value)        { alert("Please set a start date.");             return false; }
-      if (!document.getElementById("w-date-end").value)          { alert("Please set an end date.");              return false; }
-      if (!document.getElementById("w-venue").value.trim())      { alert("Please enter a venue.");                return false; }
+      if (!document.getElementById("w-name").value.trim())  { alert("Please enter the tournament name."); return false; }
+      if (!document.getElementById("w-sport").value)        { alert("Please select a sport."); return false; }
+      if (!document.getElementById("w-date-start").value)   { alert("Please set a start date."); return false; }
+      if (!document.getElementById("w-date-end").value)     { alert("Please set an end date."); return false; }
+      if (!document.getElementById("w-venue").value.trim()) { alert("Please enter a venue."); return false; }
     }
+
     if (n === 1) {
+      const stageFormat = document.getElementById("w-stage-format")?.value || "";
+      if (!stageFormat) {
+        alert("Please select the format of tournament.");
+        return false;
+      }
+
+      if (stageFormat === "group_knockout") {
+        const groupCount = document.getElementById("w-group-count")?.value;
+        if (!groupCount) {
+          alert("Please enter number of groups.");
+          return false;
+        }
+        if (!isPowerOfTwo(groupCount)) {
+          alert("Number of groups must be a power of 2, like 2, 4, 8 or 16.");
+          return false;
+        }
+      }
+
       if (wiz.tournamentType === "team") {
-        const anyEmpty = wiz.eventNames.some(n => !n.trim());
-        if (anyEmpty) { alert("Please name all events."); return false; }
+        const anyEmpty = wiz.eventNames.some(name => !name.trim());
+        if (anyEmpty) {
+          alert("Please name all events.");
+          return false;
+        }
       }
     }
+
     if (n === 4) {
       if (wiz.requirePayment && !document.getElementById("w-amount").value) {
-        alert("Please enter the entry fee amount."); return false;
+        alert("Please enter the entry fee amount.");
+        return false;
       }
     }
+
     return true;
   }
 
@@ -120,15 +187,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       wiz.venue     = document.getElementById("w-venue").value.trim();
       wiz.details   = document.getElementById("w-details").value.trim();
     }
+
     if (n === 1) {
-      // eventNames already kept in sync by input listeners
+      wiz.stageFormat = document.getElementById("w-stage-format")?.value || "";
+      wiz.groupCount  = document.getElementById("w-group-count")?.value || "";
     }
+
     if (n === 2) {
-      // eventConfigs synced by select listeners
+      wiz.tournamentRules.maxMatchesPerPlayer = document.getElementById("w-max-matches-per-player")?.value || "";
+      wiz.tournamentRules.bestOfSets          = document.getElementById("w-best-of-sets")?.value || "";
+      wiz.tournamentRules.pointsPerSet        = document.getElementById("w-points-per-set")?.value || "";
+
+      wiz.leaguePoints.win  = document.getElementById("w-points-win")?.value || "";
+      wiz.leaguePoints.loss = document.getElementById("w-points-loss")?.value || "";
+      wiz.leaguePoints.draw = document.getElementById("w-points-draw")?.value || "";
     }
-    if (n === 3) {
-      // courtNames synced by input listeners
-    }
+
     if (n === 4) {
       wiz.amount = document.getElementById("w-amount")?.value || "";
     }
@@ -161,11 +235,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     card.addEventListener("click", () => {
       document.querySelectorAll(".wiz-type-card").forEach(c => c.classList.remove("active"));
       card.classList.add("active");
+
       wiz.tournamentType = card.dataset.type;
       const isTeam = wiz.tournamentType === "team";
+
       document.getElementById("wiz-event-count-wrap").classList.toggle("hidden", !isTeam);
       document.getElementById("wiz-event-names-wrap").classList.toggle("hidden", !isTeam);
-      if (isTeam) renderEventNameFields();
+
+      if (isTeam) {
+        wiz.eventCount = 1;
+        document.getElementById("w-event-count-display").textContent = "1";
+        wiz.eventNames = [wiz.eventNames[0] || ""];
+        renderEventNameFields();
+      } else {
+        wiz.eventCount = 1;
+        document.getElementById("w-event-count-display").textContent = "1";
+        wiz.eventNames = [];
+      }
     });
   });
 
@@ -182,6 +268,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     while (wiz.eventNames.length < wiz.eventCount) wiz.eventNames.push("");
     renderEventNameFields();
   }
+
+  const stageFormatSelect = document.getElementById("w-stage-format");
+  const groupCountWrap = document.getElementById("wiz-group-count-wrap");
+
+  stageFormatSelect?.addEventListener("change", () => {
+    wiz.stageFormat = stageFormatSelect.value;
+
+    const isGroupKnockout = wiz.stageFormat === "group_knockout";
+    groupCountWrap?.classList.toggle("hidden", !isGroupKnockout);
+
+    if (!isGroupKnockout) {
+      wiz.groupCount = "";
+      const groupInput = document.getElementById("w-group-count");
+      if (groupInput) groupInput.value = "";
+    }
+
+    toggleLeaguePointsSection();
+  });
+
+  document.getElementById("w-group-count")?.addEventListener("input", (e) => {
+    wiz.groupCount = e.target.value;
+  });
+
+  document.querySelectorAll(".wiz-date-trigger").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.dataset.target;
+      const input = document.getElementById(targetId);
+      openNativeDatePicker(input);
+    });
+  });
 
   // ── Step 3: Event config ──────────────────────────────────────────────
   function renderEventConfig() {
@@ -254,6 +370,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       wrap.appendChild(card);
     });
+
+    toggleLeaguePointsSection();
   }
 
   // ── Step 4: Courts ────────────────────────────────────────────────────
@@ -324,14 +442,43 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="wiz-review-row"><span class="wiz-review-key">Venue</span><span class="wiz-review-val">${wiz.venue}</span></div>
         ${wiz.details ? `<div class="wiz-review-row"><span class="wiz-review-key">Notes</span><span class="wiz-review-val">${wiz.details}</span></div>` : ""}
       </div>
+
+      <div class="wiz-review-section">
+        <div class="wiz-review-row"><span class="wiz-review-key">Tournament type</span><span class="wiz-review-val">${wiz.tournamentType === "team" ? "Team event" : "Single event"}</span></div>
+        <div class="wiz-review-row"><span class="wiz-review-key">Format</span><span class="wiz-review-val">${
+          wiz.stageFormat === "knockout" ? "Knockout" :
+          wiz.stageFormat === "round_robin" ? "Round Robin" :
+          wiz.stageFormat === "group_knockout" ? "Group + Knockout" : "-"
+        }</span></div>
+        ${wiz.stageFormat === "group_knockout" ? `<div class="wiz-review-row"><span class="wiz-review-key">Groups</span><span class="wiz-review-val">${wiz.groupCount || "-"}</span></div>` : ""}
+      </div>
+
       <div class="wiz-review-section">
         <div class="wiz-review-section-title">Events (${events.length})</div>
         ${evRows}
       </div>
+
+      <div class="wiz-review-section">
+        <div class="wiz-review-section-title">Tournament rules</div>
+        <div class="wiz-review-row"><span class="wiz-review-key">Max matches per player</span><span class="wiz-review-val">${wiz.tournamentRules.maxMatchesPerPlayer || "-"}</span></div>
+        <div class="wiz-review-row"><span class="wiz-review-key">Best of sets</span><span class="wiz-review-val">${wiz.tournamentRules.bestOfSets || "-"}</span></div>
+        <div class="wiz-review-row"><span class="wiz-review-key">Points per set</span><span class="wiz-review-val">${wiz.tournamentRules.pointsPerSet || "-"}</span></div>
+      </div>
+
+      ${shouldShowLeaguePoints() ? `
+        <div class="wiz-review-section">
+          <div class="wiz-review-section-title">League match points</div>
+          <div class="wiz-review-row"><span class="wiz-review-key">Win</span><span class="wiz-review-val">${wiz.leaguePoints.win || "-"}</span></div>
+          <div class="wiz-review-row"><span class="wiz-review-key">Loss</span><span class="wiz-review-val">${wiz.leaguePoints.loss || "-"}</span></div>
+          <div class="wiz-review-row"><span class="wiz-review-key">Draw</span><span class="wiz-review-val">${wiz.leaguePoints.draw || "-"}</span></div>
+        </div>
+      ` : ""}
+
       <div class="wiz-review-section">
         <div class="wiz-review-row"><span class="wiz-review-key">Courts</span><span class="wiz-review-val">${courtList}</span></div>
         <div class="wiz-review-row"><span class="wiz-review-key">Payment</span><span class="wiz-review-val">${wiz.requirePayment ? "₹" + wiz.amount : "Free entry"}</span></div>
-      </div>`;
+      </div>
+    `;
   }
 
   // ── Nav buttons ───────────────────────────────────────────────────────
@@ -378,7 +525,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       playerDetails:    wiz.details,
       venue:            wiz.venue,
       categories:       categories,
+
       tournamentType:   wiz.tournamentType,
+      stageFormat:      wiz.stageFormat,
+      groupCount:       wiz.stageFormat === "group_knockout" ? Number(wiz.groupCount) : null,
+
+      tournamentRules: {
+        maxMatchesPerPlayer: wiz.tournamentRules.maxMatchesPerPlayer ? Number(wiz.tournamentRules.maxMatchesPerPlayer) : null,
+        bestOfSets:          wiz.tournamentRules.bestOfSets ? Number(wiz.tournamentRules.bestOfSets) : null,
+        pointsPerSet:        wiz.tournamentRules.pointsPerSet ? Number(wiz.tournamentRules.pointsPerSet) : null,
+      },
+
+      leaguePoints: shouldShowLeaguePoints() ? {
+        win:  wiz.leaguePoints.win  !== "" ? Number(wiz.leaguePoints.win)  : null,
+        loss: wiz.leaguePoints.loss !== "" ? Number(wiz.leaguePoints.loss) : null,
+        draw: wiz.leaguePoints.draw !== "" ? Number(wiz.leaguePoints.draw) : null,
+      } : null,
+
       courtCount:       wiz.courtCount,
       courtNames:       wiz.courtNames,
       requirePayment:   wiz.requirePayment,
@@ -407,9 +570,43 @@ document.addEventListener("DOMContentLoaded", async () => {
     showCreatedToast();
 
     // Reset wizard
-    Object.assign(wiz, { name:"", sport:"", dateStart:"", dateEnd:"", venue:"", details:"",
-      tournamentType:"single", eventCount:1, eventNames:[], eventConfigs:[],
-      courtCount:1, courtNames:[], requirePayment:false, amount:"" });
+    Object.assign(wiz, {
+      name:"", sport:"", dateStart:"", dateEnd:"", venue:"", details:"",
+      tournamentType:"single",
+      eventCount:1,
+      eventNames:[],
+      eventConfigs:[],
+      stageFormat:"",
+      groupCount:"",
+      tournamentRules: {
+        maxMatchesPerPlayer: "",
+        bestOfSets: "",
+        pointsPerSet: ""
+      },
+      leaguePoints: {
+        win: "",
+        loss: "",
+        draw: ""
+      },
+      courtCount:1,
+      courtNames:[],
+      requirePayment:false,
+      amount:""
+    });
+    document.getElementById("w-event-count-display").textContent = "1";
+    document.getElementById("w-stage-format").value = "";
+    document.getElementById("w-group-count").value = "";
+    document.getElementById("wiz-group-count-wrap").classList.add("hidden");
+    document.getElementById("wiz-league-points-wrap").classList.add("hidden");
+
+    document.getElementById("w-max-matches-per-player").value = "";
+    document.getElementById("w-best-of-sets").value = "";
+    document.getElementById("w-points-per-set").value = "";
+    document.getElementById("w-points-win").value = "";
+    document.getElementById("w-points-loss").value = "";
+    document.getElementById("w-points-draw").value = "";
+
+
     document.querySelectorAll(".wiz-type-card").forEach(c => c.classList.toggle("active", c.dataset.type === "single"));
     document.getElementById("wiz-event-count-wrap").classList.add("hidden");
     document.getElementById("wiz-event-names-wrap").classList.add("hidden");
@@ -535,7 +732,7 @@ hostBtn?.addEventListener("click", () => {
 
       const sports = await res.json();
 
-      const sportSelect = document.getElementById("sport-name");
+      const sportSelect = document.getElementById("w-sport");
       if (!sportSelect) return;
 
       // Clear existing options except "Select sport"

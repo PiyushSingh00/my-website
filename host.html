@@ -162,14 +162,21 @@
                   </select>
                 </div>
                 <div class="wiz-date-row">
-                  <div class="field-group">
-                    <label for="w-date-start">Start date <span class="req">*</span></label>
-                    <input type="date" id="w-date-start" />
-                  </div>
-                  <div class="field-group">
-                    <label for="w-date-end">End date <span class="req">*</span></label>
-                    <input type="date" id="w-date-end" />
-                  </div>
+                    <div class="field-group">
+                        <label for="w-date-start">Start date <span class="req">*</span></label>
+                        <div class="wiz-date-input-wrap">
+                        <input type="date" id="w-date-start" />
+                        <button type="button" class="wiz-date-trigger" data-target="w-date-start" aria-label="Open start date calendar">📅</button>
+                        </div>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="w-date-end">End date <span class="req">*</span></label>
+                        <div class="wiz-date-input-wrap">
+                        <input type="date" id="w-date-end" />
+                        <button type="button" class="wiz-date-trigger" data-target="w-date-end" aria-label="Open end date calendar">📅</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="field-group">
                   <label for="w-venue">Venue <span class="req">*</span></label>
@@ -182,45 +189,105 @@
               </div>
 
               <!-- Step 2: Format -->
-              <div class="wiz-step" data-step="1">
-                <p class="eyebrow">Step 2 of 6</p>
-                <h2 class="wiz-step-title">Tournament format</h2>
-                <div class="field-group">
-                  <label>Tournament type <span class="req">*</span></label>
-                  <div class="wiz-type-cards">
-                    <button type="button" class="wiz-type-card active" data-type="single">
-                      <span class="wiz-type-icon">🎾</span>
-                      <span class="wiz-type-name">Single event</span>
-                      <span class="wiz-type-desc">One event per match</span>
-                    </button>
-                    <button type="button" class="wiz-type-card" data-type="team">
-                      <span class="wiz-type-icon">🏆</span>
-                      <span class="wiz-type-name">Team event</span>
-                      <span class="wiz-type-desc">Multiple events per match</span>
-                    </button>
-                  </div>
+            <div class="wiz-step" data-step="1">
+            <p class="eyebrow">Step 2 of 6</p>
+            <h2 class="wiz-step-title">Tournament format</h2>
+
+            <div class="field-group">
+                <label>Tournament type <span class="req">*</span></label>
+                <div class="wiz-type-cards">
+                <button type="button" class="wiz-type-card active" data-type="single">
+                    <span class="wiz-type-icon">🎾</span>
+                    <span class="wiz-type-name">Single event</span>
+                    <span class="wiz-type-desc">One event per match</span>
+                </button>
+                <button type="button" class="wiz-type-card" data-type="team">
+                    <span class="wiz-type-icon">🏆</span>
+                    <span class="wiz-type-name">Team event</span>
+                    <span class="wiz-type-desc">Multiple events per match</span>
+                </button>
                 </div>
-                <div id="wiz-event-count-wrap" class="field-group hidden">
-                  <label>Number of events per match <span class="req">*</span></label>
-                  <div class="wiz-counter-row">
-                    <button type="button" class="counter-btn" id="wiz-event-dec">−</button>
-                    <span class="wiz-counter-val" id="w-event-count-display">3</span>
-                    <button type="button" class="counter-btn" id="wiz-event-inc">+</button>
-                  </div>
+            </div>
+
+            <div id="wiz-event-count-wrap" class="field-group hidden">
+                <label>Number of events per match <span class="req">*</span></label>
+                <div class="wiz-counter-row">
+                <button type="button" class="counter-btn" id="wiz-event-dec">−</button>
+                <span class="wiz-counter-val" id="w-event-count-display">1</span>
+                <button type="button" class="counter-btn" id="wiz-event-inc">+</button>
                 </div>
-                <div id="wiz-event-names-wrap" class="hidden">
-                  <p class="wiz-sublabel">Name each event</p>
-                  <div id="wiz-event-name-fields"></div>
-                </div>
-              </div>
+            </div>
+
+            <div id="wiz-event-names-wrap" class="hidden">
+                <p class="wiz-sublabel">Name each event</p>
+                <div id="wiz-event-name-fields"></div>
+            </div>
+
+            <div class="field-group" style="margin-top: 20px;">
+                <label for="w-stage-format">Format of tournament <span class="req">*</span></label>
+                <select id="w-stage-format">
+                <option value="">Select format</option>
+                <option value="knockout">Knockout</option>
+                <option value="round_robin">Round Robin</option>
+                <option value="group_knockout">Group + Knockout</option>
+                </select>
+            </div>
+
+            <div id="wiz-group-count-wrap" class="field-group hidden">
+                <label for="w-group-count">How many groups? <span class="req">*</span></label>
+                <input type="number" id="w-group-count" min="2" step="1" placeholder="Enter 2, 4, 8, 16..." />
+                <p class="wiz-helper-text">Only powers of 2 are allowed.</p>
+            </div>
+            </div>
 
               <!-- Step 3: Configure events -->
-              <div class="wiz-step" data-step="2">
-                <p class="eyebrow">Step 3 of 6</p>
-                <h2 class="wiz-step-title">Configure events</h2>
-                <p class="wiz-step-sub">Set rules for each event. All fields are optional.</p>
-                <div id="wiz-event-config"></div>
-              </div>
+            <div class="wiz-step" data-step="2">
+            <p class="eyebrow">Step 3 of 6</p>
+            <h2 class="wiz-step-title">Configure events</h2>
+            <p class="wiz-step-sub">Set rules for each event. All fields are optional.</p>
+
+            <div id="wiz-event-config"></div>
+
+            <div class="wiz-section-card" style="margin-top: 20px;">
+                <h3 class="wiz-section-title">Tournament rules</h3>
+                <div class="wiz-cfg-grid">
+                <div class="field-group">
+                    <label for="w-max-matches-per-player">Maximum how many matches one player can play across a single format?</label>
+                    <input type="number" id="w-max-matches-per-player" min="1" placeholder="e.g. 3" />
+                </div>
+
+                <div class="field-group">
+                    <label for="w-best-of-sets">Best of (Sets)?</label>
+                    <input type="number" id="w-best-of-sets" min="1" placeholder="e.g. 3" />
+                </div>
+
+                <div class="field-group">
+                    <label for="w-points-per-set">Points per set</label>
+                    <input type="number" id="w-points-per-set" min="1" placeholder="e.g. 21" />
+                </div>
+                </div>
+            </div>
+
+            <div id="wiz-league-points-wrap" class="wiz-section-card hidden" style="margin-top: 20px;">
+                <h3 class="wiz-section-title">Points for league matches</h3>
+                <div class="wiz-cfg-grid">
+                <div class="field-group">
+                    <label for="w-points-win">Points for win</label>
+                    <input type="number" id="w-points-win" min="0" placeholder="e.g. 3" />
+                </div>
+
+                <div class="field-group">
+                    <label for="w-points-loss">Points for loss</label>
+                    <input type="number" id="w-points-loss" min="0" placeholder="e.g. 0" />
+                </div>
+
+                <div class="field-group">
+                    <label for="w-points-draw">Points for draw</label>
+                    <input type="number" id="w-points-draw" min="0" placeholder="e.g. 1" />
+                </div>
+                </div>
+            </div>
+            </div>
 
               <!-- Step 4: Courts -->
               <div class="wiz-step" data-step="3">
