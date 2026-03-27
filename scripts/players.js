@@ -729,162 +729,182 @@ document.addEventListener("DOMContentLoaded", async () => {
     const cat = fixturesState.fixtures?.categories?.[categoryId];
     if (!cat || !Array.isArray(cat.rounds) || !cat.rounds.length) {
       const acceptedNames = fixturesState.acceptedByCategory[categoryId] || [];
-      const catMeta = fixturesState.categories.find(
-        (x) => String(x.categoryId || x.id) === String(categoryId)
-      );
-      const teamSize = Math.max(1, Number(catMeta?.teamSize || 1));
-
       fixturesUi.groupsEl.innerHTML = `
         <div class="empty-state" style="display:flex;">
           <div class="feature-icon">🧩</div>
           <h3>No fixtures yet</h3>
           <p class="muted">
-            ${
-              acceptedNames.length < 2
-                ? "Not enough accepted players to generate fixtures."
-                : "Click “Regenerate fixtures” to create the bracket."
-            }
+            ${acceptedNames.length < 2
+              ? "Not enough accepted players to generate fixtures."
+              : 'Click \u201cRegenerate fixtures\u201d to create the bracket.'}
           </p>
-        </div>
-      `;
+        </div>`;
       return;
     }
 
     const allowedNames = fixturesState.acceptedByCategory[categoryId] || [];
-    const options = ["BYE", ...allowedNames];
+    const options      = ["BYE", ...allowedNames];
+    const totalRounds  = cat.totalRounds || cat.total_rounds || cat.rounds.length;
+    const catMeta      = fixturesState.categories.find(x => String(x.categoryId || x.id) === String(categoryId));
+    const teamSize     = Math.max(1, Number(catMeta?.teamSize || 1));
+    const scoreKey     = fixturesState.scoringSchema?.winnerLogic?.field || "points";
+    const locked       = !!fixturesState.fixtures.__locked;
+    const editMode     = fixturesState.editMode;
 
-    const roundsHtml = cat.rounds
-      .map((round, r) => {
-        const isRound1 = r === 0;
+    // Layout constants — all cards have the same fixed height so
+    // positioning is purely arithmetic (no DOM measurement needed).
+    const COL_W    = 220;   // card + column width (px)
+    const COL_GAP  = 56;    // horizontal gap between columns
+    const CARD_H   = 148;   // fixed height for every match card
+    const ROW_GAP  = 16;    // vertical gap between R0 cards
+    const HEADER_H = 32;    // round-label row height
+    const PAD_V    = 12;    // canvas top padding
+    const PAD_H    = 12;    // canvas left padding
 
-        const matchesHtml = round
-          .map((m, i) => {
-            const home = m?.home ?? "BYE";
-            const away = m?.away ?? "BYE";
+    // ── Compute top positions ─────────────────────────────────────────
+    // R0: sequential stack
+    // R1+: each card centred between the midpoints of its two feeders
+    const tops = [];
+    const UNIT  = CARD_H + ROW_GAP;
 
-            const homeBye = String(home).toUpperCase() === "BYE";
-            const awayBye = String(away).toUpperCase() === "BYE";
+    tops.push(cat.rounds[0].map((_, i) => HEADER_H + PAD_V + i * UNIT));
 
-            const catMeta = fixturesState.categories.find(
-              (x) => String(x.categoryId || x.id) === String(categoryId)
-            );
-            const teamSize = Math.max(1, Number(catMeta?.teamSize || 1));
+    for (let r = 1; r < cat.rounds.length; r++) {
+      const prev = tops[r - 1];
+      tops.push(cat.rounds[r].map((_, i) => {
+        const f1   = i * 2;
+        const f2   = i * 2 + 1;
+        const mid1 = (prev[f1] ?? prev[prev.length - 1]) + CARD_H / 2;
+        const mid2 = (prev[f2] ?? mid1)                  + CARD_H / 2;
+        return Math.round((mid1 + mid2) / 2 - CARD_H / 2);
+      }));
+    }
 
-            const homePlayers = Array.isArray(m?.homePlayers) ? m.homePlayers : splitTeamName(home);
-            const awayPlayers = Array.isArray(m?.awayPlayers) ? m.awayPlayers : splitTeamName(away);
+    // Canvas dimensions
+    const canvasH = tops.reduce((max, rt) => {
+      const last = rt[rt.length - 1] ?? 0;
+      return Math.max(max, last + CARD_H + PAD_V);
+    }, 200);
+    const canvasW = PAD_H + cat.rounds.length * (COL_W + COL_GAP);
 
-            const renderPlayerSelects = (side, playersArr) => {
-              const byeSelected = String((playersArr?.[0] || "")).toUpperCase() === "BYE";
+    // ── Match card HTML ───────────────────────────────────────────────
+    function buildCard(m, r, i) {
+      const home    = m?.home ?? "TBD";
+      const away    = m?.away ?? "TBD";
+      const homeBye = String(home).toUpperCase() === "BYE";
+      const awayBye = String(away).toUpperCase() === "BYE";
+      const hp = Array.isArray(m?.homePlayers) ? m.homePlayers : splitTeamName(home);
+      const ap = Array.isArray(m?.awayPlayers) ? m.awayPlayers : splitTeamName(away);
+      const isR1 = r === 0;
 
-              const selects = [];
-              for (let k = 0; k < teamSize; k++) {
-                const current = playersArr?.[k] || "";
-                const isFirst = k === 0;
+      function selects(side, arr) {
+        const isBye = String(arr?.[0] || "").toUpperCase() === "BYE";
+        let html = "";
+        for (let k = 0; k < teamSize; k++) {
+          const cur = arr?.[k] || "";
+          html += `<select class="fixture-player-select" data-side="${side}" data-round="${r}" data-match="${i}" data-player-index="${k}">
+            ${k === 0 ? `<option value="__BYE__" ${isBye ? "selected" : ""}>BYE</option>` : ""}
+            <option value="" ${(!cur && !isBye) ? "selected" : ""}>Select player</option>
+            ${options.filter(n => n !== "BYE").map(n =>
+              `<option value="${n}" ${n === cur ? "selected" : ""}>${n}</option>`).join("")}
+          </select>`;
+        }
+        return `<div class="fixture-player-grid">${html}</div>`;
+      }
 
-                selects.push(`
-                  <select
-                    class="fixture-player-select"
-                    data-side="${side}"
-                    data-round="${r}"
-                    data-match="${i}"
-                    data-player-index="${k}"
-                  >
-                    ${
-                      isFirst
-                        ? `<option value="__BYE__" ${byeSelected ? "selected" : ""}>BYE</option>`
-                        : ""
-                    }
-                    <option value="" ${(!current && !byeSelected) ? "selected" : ""}>Select player</option>
-                    ${options
-                      .filter((n) => n !== "BYE")
-                      .map((n) => `<option value="${n}" ${n === current ? "selected" : ""}>${n}</option>`)
-                      .join("")}
-                  </select>
-                `);
-              }
+      const homeCell = locked && editMode && isR1 ? selects("home", hp) : `<span class="player-name">${home}</span>`;
+      const awayCell = locked && editMode && isR1 ? selects("away", ap) : `<span class="player-name">${away}</span>`;
 
-              return `<div class="fixture-player-grid">${selects.join("")}</div>`;
-            };
+      const aVal = m?.score?.state?.A?.[scoreKey];
+      const bVal = m?.score?.state?.B?.[scoreKey];
+      const hasScore  = aVal !== undefined && bVal !== undefined;
+      const scoreTxt  = hasScore ? `${aVal} – ${bVal}` : "–";
+      const canScore  = !homeBye && !awayBye;
 
-            const homeCell =
-              fixturesState.fixtures.__locked && fixturesState.editMode && isRound1
-                ? renderPlayerSelects("home", homePlayers)
-                : `<span class="player-name">${home}</span>`;
-
-            const awayCell =
-              fixturesState.fixtures.__locked && fixturesState.editMode && isRound1
-                ? renderPlayerSelects("away", awayPlayers)
-                : `<span class="player-name">${away}</span>`;
-
-            const scoreKey = fixturesState.scoringSchema?.winnerLogic?.field || "points";
-            const aVal = m?.score?.state?.A?.[scoreKey];
-            const bVal = m?.score?.state?.B?.[scoreKey];
-
-            const scoreLine =
-              aVal !== undefined && bVal !== undefined
-                ? `Score: <strong>${aVal}</strong> - <strong>${bVal}</strong>`
-                : `Score: <strong>-</strong>`;
-
-            const winnerLine =
-              m?.winner ? `Winner: <strong>${m.winner}</strong>` : `Winner: <strong>-</strong>`;
-
-            return `
-              <div class="bracket-match">
-                <div class="match-label">Match ${i + 1}</div>
-
-                <div class="player-slot ${homeBye ? "bye" : ""}">${homeCell}</div>
-                <div class="player-slot ${awayBye ? "bye" : ""}">${awayCell}</div>
-
-                <div class="match-actions" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
-                  <button
-                    type="button"
-                    class="toggle-btn start-scoring-btn"
-                    data-tournament-id="${tournamentId}"
-                    data-category-id="${categoryId}"
-                    data-round="${r}"
-                    data-match="${i}"
-                    ${homeBye || awayBye ? "disabled" : ""}
-                  >
-                    Start scoring
-                  </button>
-
-                  <div class="muted" style="font-size:13px;">${scoreLine}</div>
-                  <div class="muted" style="font-size:13px;">${winnerLine}</div>
-                </div>
-              </div>
-            `;
-          })
-          .join("");
-
-        return `
-          <div class="bracket-round" data-round="${r}">
-            <div class="round-title">${getRoundLabel(r, cat.totalRounds || cat.total_rounds || 0)}</div>
-            ${matchesHtml}
+      return `
+        <div class="bk-card" style="width:${COL_W}px;height:${CARD_H}px;">
+          <div class="bk-match-label">Match ${i + 1}</div>
+          <div class="bk-slot${homeBye ? " bk-bye" : ""}">${homeCell}</div>
+          <div class="bk-slot${awayBye ? " bk-bye" : ""}">${awayCell}</div>
+          <div class="bk-footer">
+            <button type="button" class="start-scoring-btn bk-score-btn"
+              data-tournament-id="${tournamentId}"
+              data-category-id="${categoryId}"
+              data-round="${r}" data-match="${i}"
+              ${canScore ? "" : "disabled"}>▶ Score</button>
+            <span class="bk-score-txt">${scoreTxt}</span>
+            ${m?.winner ? `<span class="bk-winner-badge">🏆 ${m.winner}</span>` : ""}
           </div>
-        `;
-      })
-      .join("");
+        </div>`;
+    }
 
+    // ── Build DOM ─────────────────────────────────────────────────────
     const wrapper = document.createElement("div");
     wrapper.className = "fixtures-group";
     wrapper.innerHTML = `
       <div class="fixtures-group-header">
         <div class="fixtures-group-header-left">
           <h2 class="fixtures-group-title">${cat.label || "Fixtures"}</h2>
-          ${fixturesState.fixtures.__locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
+          ${locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
         </div>
-      </div>
+      </div>`;
 
-      <div class="fixtures-bracket">
-        <div class="bracket-rounds">
-          ${roundsHtml}
-        </div>
-      </div>
-    `;
+    const bracketOuter = document.createElement("div");
+    bracketOuter.className = "fixtures-bracket";
 
+    const canvas = document.createElement("div");
+    canvas.style.cssText = `position:relative;height:${canvasH}px;width:${canvasW}px;`;
+
+    // ── SVG elbow connectors ──────────────────────────────────────────
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;pointer-events:none;overflow:visible;`;
+
+    for (let r = 1; r < cat.rounds.length; r++) {
+      cat.rounds[r].forEach((_, i) => {
+        const x1   = PAD_H + (r - 1) * (COL_W + COL_GAP) + COL_W;
+        const x2   = PAD_H + r * (COL_W + COL_GAP);
+        const midX = (x1 + x2) / 2;
+        const myMidY = tops[r][i] + CARD_H / 2;
+        const prev   = tops[r - 1];
+
+        [i * 2, i * 2 + 1].forEach(fi => {
+          if (fi >= prev.length) return;
+          const fMidY = prev[fi] + CARD_H / 2;
+          const path  = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", `M ${x1} ${fMidY} H ${midX} V ${myMidY} H ${x2}`);
+          path.setAttribute("fill", "none");
+          path.setAttribute("stroke", "rgba(77,208,225,0.40)");
+          path.setAttribute("stroke-width", "1.5");
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("stroke-linejoin", "round");
+          svg.appendChild(path);
+        });
+      });
+    }
+    canvas.appendChild(svg);
+
+    // ── Round labels + cards ──────────────────────────────────────────
+    cat.rounds.forEach((round, r) => {
+      const colLeft = PAD_H + r * (COL_W + COL_GAP);
+
+      const lbl = document.createElement("div");
+      lbl.className = "round-title";
+      lbl.style.cssText = `position:absolute;left:${colLeft}px;top:${PAD_V}px;width:${COL_W}px;height:${HEADER_H}px;display:flex;align-items:center;`;
+      lbl.textContent = getRoundLabel(r, totalRounds);
+      canvas.appendChild(lbl);
+
+      round.forEach((m, i) => {
+        const wrap = document.createElement("div");
+        wrap.style.cssText = `position:absolute;left:${colLeft}px;top:${tops[r][i]}px;`;
+        wrap.innerHTML = buildCard(m, r, i);
+        canvas.appendChild(wrap);
+      });
+    });
+
+    bracketOuter.appendChild(canvas);
+    wrapper.appendChild(bracketOuter);
     fixturesUi.groupsEl.appendChild(wrapper);
   }
-
   async function generateAndSaveFixtures() {
     if (!fixturesState.fixtures || fixturesState.fixtures.__locked) return;
 

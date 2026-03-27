@@ -313,178 +313,149 @@
   margin: 0;
 }
 
-/* Bracket layout */
+/* ── Bracket layout — pixel-positioned, JS-driven ──────────────────── */
 .fixtures-bracket {
   margin-top: 14px;
   overflow-x: auto;
   overflow-y: auto;
-  padding-bottom: 10px;
+  padding-bottom: 16px;
   border-radius: var(--radius-md);
 }
 
-.bracket-rounds {
-  display: flex;
-  align-items: stretch;   /* columns stretch to same height */
-  gap: 28px;
-  padding: 8px 8px 14px;
-  min-width: max-content;
+.fixtures-bracket::-webkit-scrollbar { height: 10px; width: 8px; }
+.fixtures-bracket::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 999px;
+}
+.fixtures-bracket::-webkit-scrollbar-thumb {
+  background: rgba(77,208,225,0.35);
+  border-radius: 999px;
+}
+.fixtures-bracket::-webkit-scrollbar-thumb:hover {
+  background: rgba(77,208,225,0.55);
 }
 
-.bracket-round {
-  min-width: 240px;
-  display: flex;
-  flex-direction: column;
-  /* distribute matches so each sits at the midpoint of its two feeders */
-  justify-content: space-around;
-  position: relative;
-}
-
-/* Vertical connector line on the left side of each round (except first) */
-.bracket-round:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  left: -14px;
-  top: 0;
-  bottom: 0;
-  border-left: 1px dashed rgba(148, 163, 184, 0.28);
-}
-
-/* Horizontal connector from each match to the next round */
-.bracket-round:not(:last-child) .bracket-match::after {
-  content: "";
-  position: absolute;
-  right: -28px;
-  top: 50%;
-  width: 28px;
-  border-top: 1px dashed rgba(148, 163, 184, 0.35);
-  transform: translateY(-50%);
-}
-
+/* Round label — absolutely positioned above each column by JS */
 .round-title {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 2px;
-}
-
-.bracket-match {
-  position: relative;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 14, 30, 0.9);
-  padding: 10px 12px;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
-}
-
-.match-label {
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   color: var(--muted);
-  margin-bottom: 8px;
+  font-weight: 600;
 }
 
-.player-slot {
-  padding: 7px 10px;
+/* ── Match card ────────────────────────────────────────────────────── */
+.bk-card {
+  box-sizing: border-box;
+  background: rgba(8, 14, 30, 0.93);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.38);
+  transition: border-color 0.15s;
+}
+.bk-card:hover {
+  border-color: rgba(77, 208, 225, 0.35);
+}
+
+.bk-match-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+
+/* Player name slots */
+.bk-slot {
+  padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(145, 163, 196, 0.5);
-  font-size: 14px;
-  margin-bottom: 6px;
-  background: rgba(4, 10, 24, 0.96);
+  border: 1px solid rgba(145, 163, 196, 0.45);
+  font-size: 13px;
+  background: rgba(4, 10, 24, 0.95);
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bk-slot.bk-bye {
+  font-style: italic;
+  color: var(--muted);
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+/* Footer row: score button + score text + winner badge */
+.bk-footer {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
 }
 
-.player-slot:last-child { margin-bottom: 0; }
+.bk-score-btn {
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 208, 225, 0.5);
+  background: rgba(77, 208, 225, 0.08);
+  color: #4dd0e1;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.bk-score-btn:hover:not(:disabled) {
+  background: rgba(77, 208, 225, 0.18);
+  border-color: rgba(77, 208, 225, 0.8);
+}
+.bk-score-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 
+.bk-score-txt {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.bk-winner-badge {
+  font-size: 11px;
+  color: #4dd0e1;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Keep edit-mode selects working */
 .player-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* BYE styling */
-.player-slot.bye {
-  font-style: italic;
-  color: var(--muted);
-  border-style: dashed;
-  opacity: 0.8;
-}
-
-/* Edit (Round 1) selects */
-.fixture-player-grid {
-  display: grid;
-  gap: 8px;
-}
-
+.fixture-player-grid { display: grid; gap: 6px; }
 .fixture-player-select {
   width: 100%;
-  background: rgba(6, 12, 26, 1);
+  background: rgba(6,12,26,1);
   color: var(--text);
-  border: 1px solid rgba(145, 163, 196, 0.6);
+  border: 1px solid rgba(145,163,196,0.6);
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 13px;
+  padding: 5px 10px;
+  font-size: 12px;
   outline: none;
 }
-
-.fixture-player-select:hover {
-  border-color: rgba(77, 208, 225, 0.55);
-  filter: brightness(1.04);
-}
-
+.fixture-player-select:hover { border-color: rgba(77,208,225,0.55); }
 .fixture-player-select:focus {
   border-color: var(--accent);
-  box-shadow:
-    0 0 0 2px rgba(77, 208, 225, 0.20),
-    0 12px 20px rgba(0,0,0,0.24),
-    0 1px 0 rgba(255,255,255,0.08) inset;
+  box-shadow: 0 0 0 2px rgba(77,208,225,0.20);
 }
+.fixture-player-select option { background: rgba(6,12,26,1); color: var(--text); }
 
-.fixture-player-select option {
-  background: rgba(6, 12, 26, 1);
-  color: var(--text);
-}
-
-/* Start scoring button */
-.start-scoring-btn {
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
-}
-
-.start-scoring-btn:hover {
-  border-color: rgba(77, 208, 225, 0.45);
-  color: var(--text);
-}
-
-.start-scoring-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Nice scrollbar */
-.fixtures-bracket::-webkit-scrollbar { height: 10px; }
-.fixtures-bracket::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 999px;
-}
-.fixtures-bracket::-webkit-scrollbar-thumb {
-  background: rgba(77, 208, 225, 0.35);
-  border-radius: 999px;
-}
-.fixtures-bracket::-webkit-scrollbar-thumb:hover {
-  background: rgba(77, 208, 225, 0.55);
-}
 
 /* Make "Create tournament fixtures" more compact */
 #create-fixtures-btn {
