@@ -985,6 +985,30 @@ body {
   text-align: center;
 }
 
+.tournament-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.edit-btn,
+.delete-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.edit-btn {
+  background: rgba(91, 141, 239, 0.16);
+  color: #dbe7ff;
+  border: 1px solid rgba(91, 141, 239, 0.35);
+}
+
+.edit-btn:hover {
+  background: rgba(91, 141, 239, 0.24);
+}
 
 /* =====================================================================
    MULTI-STEP WIZARD — Host new tournament

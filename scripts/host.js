@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const TOTAL_STEPS = 6;
   let currentStep   = 0;
+  let editingTournamentId = null;
 
   // Wizard data model
   const wiz = {
@@ -551,19 +552,26 @@ function openNativeDatePicker(input) {
     wizSubmitBtn.disabled = true;
     wizSubmitBtn.textContent = "Saving…";
 
-    const res = await fetch("/api/host/tournaments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-      body: JSON.stringify(payload),
-    });
+    const isEditMode = !!editingTournamentId;
+
+    const res = await fetch(
+      isEditMode
+        ? `/api/host/tournaments/${editingTournamentId}`
+        : "/api/host/tournaments",
+      {
+        method: isEditMode ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+        body: JSON.stringify(payload),
+      }
+    );
 
     if (!res.ok) {
-      alert("Failed to save tournament");
+      alert(isEditMode ? "Failed to update tournament" : "Failed to save tournament");
       wizSubmitBtn.disabled = false;
-      wizSubmitBtn.textContent = "🚀 Create tournament";
+      wizSubmitBtn.textContent = isEditMode ? "💾 Save changes" : "🚀 Create tournament";
       return;
     }
 
@@ -616,9 +624,11 @@ function openNativeDatePicker(input) {
     document.getElementById("access-code").value = "";
     wizSubmitBtn.disabled = false;
     wizSubmitBtn.textContent = "🚀 Create tournament";
+    
+    editingTournamentId = null;
     showStep(0);
-
     loadMyTournaments();
+    switchHostView("my");
   });
 
   const user = await requireAuth();
@@ -800,6 +810,156 @@ function populateSportFilter(tournaments) {
   });
 }
 
+function syncCourtCount() {
+  document.getElementById("w-court-count-display").textContent = wiz.courtCount;
+  while (wiz.courtNames.length < wiz.courtCount) wiz.courtNames.push("");
+  wiz.courtNames = wiz.courtNames.slice(0, wiz.courtCount);
+}
+
+function hydrateWizardFormFromState() {
+  document.getElementById("w-name").value = wiz.name || "";
+  document.getElementById("w-sport").value = wiz.sport || "";
+  document.getElementById("w-date-start").value = wiz.dateStart || "";
+  document.getElementById("w-date-end").value = wiz.dateEnd || "";
+  document.getElementById("w-venue").value = wiz.venue || "";
+  document.getElementById("w-details").value = wiz.details || "";
+
+  document.querySelectorAll(".wiz-type-card").forEach((c) => {
+    c.classList.toggle("active", c.dataset.type === wiz.tournamentType);
+  });
+
+  const isTeam = wiz.tournamentType === "team";
+  document.getElementById("wiz-event-count-wrap")?.classList.toggle("hidden", !isTeam);
+  document.getElementById("wiz-event-names-wrap")?.classList.toggle("hidden", !isTeam);
+  document.getElementById("w-event-count-display").textContent = String(wiz.eventCount || 1);
+
+  if (isTeam) {
+    renderEventNameFields();
+  }
+
+  const stageFormat = document.getElementById("w-stage-format");
+  if (stageFormat) stageFormat.value = wiz.stageFormat || "";
+
+  const groupCountInput = document.getElementById("w-group-count");
+  const groupWrap = document.getElementById("wiz-group-count-wrap");
+  if (groupCountInput) groupCountInput.value = wiz.groupCount || "";
+  groupWrap?.classList.toggle("hidden", wiz.stageFormat !== "group_knockout");
+
+  renderEventConfig();
+
+  document.getElementById("w-max-matches-per-player").value = wiz.tournamentRules.maxMatchesPerPlayer || "";
+  document.getElementById("w-best-of-sets").value = wiz.tournamentRules.bestOfSets || "";
+  document.getElementById("w-points-per-set").value = wiz.tournamentRules.pointsPerSet || "";
+
+  document.getElementById("w-points-win").value = wiz.leaguePoints.win || "";
+  document.getElementById("w-points-loss").value = wiz.leaguePoints.loss || "";
+  document.getElementById("w-points-draw").value = wiz.leaguePoints.draw || "";
+
+  toggleLeaguePointsSection();
+
+  syncCourtCount();
+  document.getElementById("w-court-count-display").textContent = String(wiz.courtCount || 1);
+  renderCourtNameFields();
+
+  document.getElementById("w-payment-yes")?.classList.toggle("active", !!wiz.requirePayment);
+  document.getElementById("w-payment-no")?.classList.toggle("active", !wiz.requirePayment);
+  document.getElementById("wiz-amount-wrap")?.classList.toggle("hidden", !wiz.requirePayment);
+  document.getElementById("w-amount").value = wiz.amount || "";
+
+}
+
+function switchHostView(view) {
+  const modeCards = document.querySelectorAll(".host-mode-card");
+  const myView = document.getElementById("my-tournaments-view");
+  const newView = document.getElementById("new-tournament-view");
+
+  modeCards.forEach((c) => c.classList.remove("active"));
+  myView?.classList.remove("host-view--active");
+  newView?.classList.remove("host-view--active");
+
+  if (view === "my") {
+    document.querySelector('[data-host-mode="my"]')?.classList.add("active");
+    myView?.classList.add("host-view--active");
+  } else {
+    document.querySelector('[data-host-mode="new"]')?.classList.add("active");
+    newView?.classList.add("host-view--active");
+  }
+}
+
+  function openTournamentForEdit(t) {
+  editingTournamentId = t.tournamentId;
+
+  wiz.name = t.tournamentName || "";
+  wiz.sport = t.sportName || "";
+  wiz.venue = t.venue || "";
+
+  const dateStr = t.tournamentDates || "";
+  if (dateStr.includes(" to ")) {
+    const [start, end] = dateStr.split(" to ");
+    wiz.dateStart = start?.trim() || "";
+    wiz.dateEnd = end?.trim() || "";
+  } else {
+    wiz.dateStart = "";
+    wiz.dateEnd = "";
+  }
+
+  wiz.details =
+    typeof t.playerDetails === "string"
+      ? t.playerDetails
+      : Array.isArray(t.playerDetails)
+        ? t.playerDetails.join(", ")
+        : "";
+
+  wiz.tournamentType = t.tournamentType || "single";
+  wiz.stageFormat = t.stageFormat || "";
+  wiz.groupCount = t.groupCount ? String(t.groupCount) : "";
+
+  wiz.tournamentRules = {
+    maxMatchesPerPlayer: t.tournamentRules?.maxMatchesPerPlayer != null ? String(t.tournamentRules.maxMatchesPerPlayer) : "",
+    bestOfSets: t.tournamentRules?.bestOfSets != null ? String(t.tournamentRules.bestOfSets) : "",
+    pointsPerSet: t.tournamentRules?.pointsPerSet != null ? String(t.tournamentRules.pointsPerSet) : "",
+  };
+
+  wiz.leaguePoints = {
+    win: t.leaguePoints?.win != null ? String(t.leaguePoints.win) : "",
+    loss: t.leaguePoints?.loss != null ? String(t.leaguePoints.loss) : "",
+    draw: t.leaguePoints?.draw != null ? String(t.leaguePoints.draw) : "",
+  };
+
+  wiz.courtCount = Number(t.courtCount || 1);
+  wiz.courtNames = Array.isArray(t.courtNames) ? [...t.courtNames] : [];
+  wiz.requirePayment = !!t.requirePayment;
+  wiz.amount = t.entryFee != null ? String(t.entryFee) : "";
+
+  const categories = Array.isArray(t.categories) ? t.categories : [];
+
+  if (wiz.tournamentType === "team") {
+    const eventNames = categories.map(c => c.eventName || "").filter(Boolean);
+    wiz.eventNames = eventNames.length ? eventNames : [""];
+    wiz.eventCount = wiz.eventNames.length;
+  } else {
+    wiz.eventNames = [];
+    wiz.eventCount = 1;
+  }
+
+  wiz.eventConfigs = categories.length
+    ? categories.map(c => ({
+        gender: c.gender || "",
+        ageGroup: c.ageGroup || "",
+        playingLevel: c.playingLevel || "",
+        teamSize: String(c.teamSize || "1"),
+      }))
+    : [{ gender: "", ageGroup: "", playingLevel: "", teamSize: "1" }];
+
+  document.getElementById("access-code").value = t.accessCode || "";
+  hydrateWizardFormFromState();
+  switchHostView("new");
+  showStep(0);
+
+  const submitBtn = document.getElementById("wiz-submit-btn");
+  if (submitBtn) submitBtn.textContent = "💾 Save changes";
+}
+
 
 function renderMyTournaments(tournaments) {
   const container = document.getElementById("my-tournaments-list");
@@ -870,7 +1030,8 @@ function renderMyTournaments(tournaments) {
       <div class="tournament-meta">
         <span>Status: <strong>${t.registrationsOpen ? "Open" : "Closed"}</strong></span>
       </div>
-      <div class="tournament-meta">
+      <div class="tournament-meta tournament-actions">
+        <button type="button" class="edit-btn" data-id="${t.tournamentId}">Edit tournament</button>
         <button type="button" class="delete-btn" data-id="${t.tournamentId}">Delete tournament</button>
       </div>
     `;
@@ -880,6 +1041,11 @@ function renderMyTournaments(tournaments) {
     });
 
     const deleteBtn = card.querySelector(".delete-btn");
+    const editBtn = card.querySelector(".edit-btn");
+    editBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openTournamentForEdit(t);
+    });
     deleteBtn?.addEventListener("click", async (e) => {
       e.stopPropagation();
       const ok = confirm("Delete this tournament? This cannot be undone.");
