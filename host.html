@@ -120,121 +120,182 @@
     </section>
 
 
-        <!-- Host new tournament view (wrap your existing card+form) -->
-        <section
-        id="new-tournament-view"
-        class="host-view"
-        aria-label="Host new tournament"
-        >
-        <section class="host-card">
-            <h1>Host a Tournament</h1>
-            <p class="lede">
-            Set the essentials and generate a code to invite players.
-            </p>
+        <!-- Host new tournament view — multi-step wizard -->
+        <section id="new-tournament-view" class="host-view" aria-label="Host new tournament">
+          <section class="host-card wizard-card">
 
-            <form id="host-form">
-            <div class="field-group">
-                <label for="tournament-name">Tournament name</label>
-                <input
-                type="text"
-                id="tournament-name"
-                name="tournamentName"
-                placeholder="e.g., Winter Open 2025"
-                required
-                />
+            <!-- Step progress bar -->
+            <div class="wiz-progress" id="wiz-progress">
+              <div class="wiz-step-dot active" data-step="0"><span class="wiz-dot-num">1</span><span class="wiz-dot-label">Basics</span></div>
+              <div class="wiz-progress-line"></div>
+              <div class="wiz-step-dot" data-step="1"><span class="wiz-dot-num">2</span><span class="wiz-dot-label">Format</span></div>
+              <div class="wiz-progress-line"></div>
+              <div class="wiz-step-dot" data-step="2"><span class="wiz-dot-num">3</span><span class="wiz-dot-label">Events</span></div>
+              <div class="wiz-progress-line"></div>
+              <div class="wiz-step-dot" data-step="3"><span class="wiz-dot-num">4</span><span class="wiz-dot-label">Courts</span></div>
+              <div class="wiz-progress-line"></div>
+              <div class="wiz-step-dot" data-step="4"><span class="wiz-dot-num">5</span><span class="wiz-dot-label">Payment</span></div>
+              <div class="wiz-progress-line"></div>
+              <div class="wiz-step-dot" data-step="5"><span class="wiz-dot-num">6</span><span class="wiz-dot-label">Review</span></div>
             </div>
 
-            <div class="field-group">
-            <label for="sport-name">Sport</label>
-            <select id="sport-name" name="sportName" required>
-                <option value="">Select sport</option>
-                <option value="Football">Football</option>
-                <option value="Cricket">Cricket</option>
-                <option value="Badminton">Badminton</option>
-                <option value="Tennis">Tennis</option>
-                <option value="Basketball">Basketball</option>
-            </select>
-            </div>
+            <div id="wiz-steps">
 
-
-            <div class="field-group">
-                <label for="tournament-dates">Tournament dates</label>
-                <input
-                type="date"
-                id="tournament-dates"
-                name="tournamentDates"
-                required
-                />
-            </div>
-
-            <div class="field-group">
-            <label for="tournament-venue">Venue</label>
-            <input
-                type="text"
-                id="tournament-venue"
-                name="venue"
-                placeholder="e.g. Andheri Sports Complex, Mumbai"
-                required
-            />
-            </div>
-
-            <div class="field-group">
-            <label>Categories</label>
-
-            <div id="categories-container"></div>
-
-            <button
-                type="button"
-                class="btn-secondary"
-                id="add-category-btn"
-            >
-                + Add category
-            </button>
-            </div>
-
-
-            <div class="field-group">
-                <label for="access-code">Access code</label>
-                <div class="code-row">
-                <input
-                    type="text"
-                    id="access-code"
-                    name="accessCode"
-                    placeholder="Click Generate code"
-                    readonly
-                />
-                <button
-                    type="button"
-                    class="btn-dark"
-                    id="generate-code-btn"
-                >
-                    Generate code
-                </button>
+              <!-- Step 1: Basics -->
+              <div class="wiz-step active" data-step="0">
+                <p class="eyebrow">Step 1 of 6</p>
+                <h2 class="wiz-step-title">Tournament basics</h2>
+                <div class="field-group">
+                  <label for="w-name">Tournament name <span class="req">*</span></label>
+                  <input type="text" id="w-name" placeholder="e.g. Winter Open 2025" />
                 </div>
+                <div class="field-group">
+                  <label for="w-sport">Sport <span class="req">*</span></label>
+                  <select id="w-sport">
+                    <option value="">Select sport</option>
+                    <option value="Football">Football</option>
+                    <option value="Cricket">Cricket</option>
+                    <option value="Badminton">Badminton</option>
+                    <option value="Tennis">Tennis</option>
+                    <option value="Basketball">Basketball</option>
+                    <option value="Pickleball">Pickleball</option>
+                  </select>
+                </div>
+                <div class="wiz-date-row">
+                  <div class="field-group">
+                    <label for="w-date-start">Start date <span class="req">*</span></label>
+                    <input type="date" id="w-date-start" />
+                  </div>
+                  <div class="field-group">
+                    <label for="w-date-end">End date <span class="req">*</span></label>
+                    <input type="date" id="w-date-end" />
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label for="w-venue">Venue <span class="req">*</span></label>
+                  <input type="text" id="w-venue" placeholder="e.g. Andheri Sports Complex, Mumbai" />
+                </div>
+                <div class="field-group">
+                  <label for="w-details">Other details <span class="wiz-optional">(optional)</span></label>
+                  <textarea id="w-details" rows="3" placeholder="Share any special rules, timings, or notes for players."></textarea>
+                </div>
+              </div>
+
+              <!-- Step 2: Format -->
+              <div class="wiz-step" data-step="1">
+                <p class="eyebrow">Step 2 of 6</p>
+                <h2 class="wiz-step-title">Tournament format</h2>
+                <div class="field-group">
+                  <label>Tournament type <span class="req">*</span></label>
+                  <div class="wiz-type-cards">
+                    <button type="button" class="wiz-type-card active" data-type="single">
+                      <span class="wiz-type-icon">🎾</span>
+                      <span class="wiz-type-name">Single event</span>
+                      <span class="wiz-type-desc">One event per match</span>
+                    </button>
+                    <button type="button" class="wiz-type-card" data-type="team">
+                      <span class="wiz-type-icon">🏆</span>
+                      <span class="wiz-type-name">Team event</span>
+                      <span class="wiz-type-desc">Multiple events per match</span>
+                    </button>
+                  </div>
+                </div>
+                <div id="wiz-event-count-wrap" class="field-group hidden">
+                  <label>Number of events per match <span class="req">*</span></label>
+                  <div class="wiz-counter-row">
+                    <button type="button" class="counter-btn" id="wiz-event-dec">−</button>
+                    <span class="wiz-counter-val" id="w-event-count-display">3</span>
+                    <button type="button" class="counter-btn" id="wiz-event-inc">+</button>
+                  </div>
+                </div>
+                <div id="wiz-event-names-wrap" class="hidden">
+                  <p class="wiz-sublabel">Name each event</p>
+                  <div id="wiz-event-name-fields"></div>
+                </div>
+              </div>
+
+              <!-- Step 3: Configure events -->
+              <div class="wiz-step" data-step="2">
+                <p class="eyebrow">Step 3 of 6</p>
+                <h2 class="wiz-step-title">Configure events</h2>
+                <p class="wiz-step-sub">Set rules for each event. All fields are optional.</p>
+                <div id="wiz-event-config"></div>
+              </div>
+
+              <!-- Step 4: Courts -->
+              <div class="wiz-step" data-step="3">
+                <p class="eyebrow">Step 4 of 6</p>
+                <h2 class="wiz-step-title">Courts</h2>
+                <div class="field-group">
+                  <label>Number of courts</label>
+                  <div class="wiz-counter-row">
+                    <button type="button" class="counter-btn" id="wiz-court-dec">−</button>
+                    <span class="wiz-counter-val" id="w-court-count-display">1</span>
+                    <button type="button" class="counter-btn" id="wiz-court-inc">+</button>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <p class="wiz-sublabel">Court names <span class="wiz-optional">(optional)</span></p>
+                  <div id="wiz-court-name-fields"></div>
+                </div>
+              </div>
+
+              <!-- Step 5: Payment -->
+              <div class="wiz-step" data-step="4">
+                <p class="eyebrow">Step 5 of 6</p>
+                <h2 class="wiz-step-title">Payment</h2>
+                <div class="field-group">
+                  <label>Require entry fee?</label>
+                  <div class="wiz-toggle-row">
+                    <button type="button" class="wiz-toggle-btn active" id="w-payment-no">No, free entry</button>
+                    <button type="button" class="wiz-toggle-btn" id="w-payment-yes">Yes, paid entry</button>
+                  </div>
+                </div>
+                <div id="wiz-amount-wrap" class="field-group hidden">
+                  <label for="w-amount">Entry fee amount <span class="req">*</span></label>
+                  <div class="wiz-amount-row">
+                    <span class="wiz-currency">₹</span>
+                    <input type="number" id="w-amount" min="1" placeholder="e.g. 500" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 6: Review + Submit -->
+              <div class="wiz-step" data-step="5">
+                <p class="eyebrow">Step 6 of 6</p>
+                <h2 class="wiz-step-title">Review &amp; submit</h2>
+                <div id="wiz-review-body" class="wiz-review-body"></div>
+                <div class="field-group" style="margin-top:20px;">
+                  <label for="access-code">Access code</label>
+                  <div class="code-row">
+                    <input type="text" id="access-code" name="accessCode" placeholder="Click Generate code" readonly />
+                    <button type="button" class="btn-dark" id="generate-code-btn">Generate code</button>
+                  </div>
+                </div>
+                <!-- hidden legacy fields needed by host.js submit -->
+                <input type="hidden" id="tournament-name" />
+                <input type="hidden" id="sport-name" />
+                <input type="hidden" id="tournament-dates" />
+                <input type="hidden" id="tournament-venue" />
+                <textarea id="player-details" style="display:none;"></textarea>
+                <div id="categories-container" style="display:none;"></div>
+              </div>
+
+            </div><!-- /wiz-steps -->
+
+            <!-- Navigation -->
+            <div class="wiz-nav" id="wiz-nav">
+              <button type="button" class="btn-secondary" id="wiz-back-btn">← Back</button>
+              <button type="button" class="btn-primary" id="wiz-next-btn">Next →</button>
+              <button type="button" class="btn-primary hidden" id="wiz-submit-btn">🚀 Create tournament</button>
             </div>
 
-            <div class="field-group">
-                <label for="player-details">Details for players</label>
-                <textarea
-                id="player-details"
-                name="playerDetails"
-                rows="4"
-                placeholder="Share venue, timing, and any special rules."
-                ></textarea>
-            </div>
-
-            <div class="actions-row">
-            <button type="submit" class="btn-primary">
-                Save tournament
-            </button>
-            </div>
-
+            <!-- hidden legacy form for submit compat -->
+            <form id="host-form" style="display:none;">
+              <button type="submit" style="display:none;" id="host-form-submit-hidden"></button>
             </form>
-            <p class="host-note">
-            To add players manually, go to <strong>“My tournaments”</strong>.
-            </p>
 
-        </section>
+          </section>
         </section>
     </div>
     </main>

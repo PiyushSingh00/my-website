@@ -984,3 +984,312 @@ body {
   color: rgba(169, 182, 204, 0.6); /* lighter */
   text-align: center;
 }
+
+
+/* =====================================================================
+   MULTI-STEP WIZARD — Host new tournament
+   ===================================================================== */
+
+.wizard-card {
+  width: min(680px, 100%);
+  padding: 28px 28px 24px;
+}
+
+/* ── Progress bar ──────────────────────────────────────────────────── */
+.wiz-progress {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 28px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.wiz-step-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.wiz-dot-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 2px solid rgba(148,163,184,.4);
+  background: rgba(5,11,24,.9);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .2s, background .2s, color .2s;
+}
+
+.wiz-dot-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color .2s;
+}
+
+.wiz-step-dot.active .wiz-dot-num {
+  border-color: var(--accent-2);
+  background: rgba(77,208,225,.18);
+  color: var(--accent-2);
+}
+.wiz-step-dot.active .wiz-dot-label { color: var(--accent-2); }
+
+.wiz-step-dot.complete .wiz-dot-num {
+  border-color: var(--accent-2);
+  background: var(--accent-2);
+  color: #001a22;
+}
+.wiz-step-dot.complete .wiz-dot-label { color: var(--accent-2); }
+.wiz-step-dot.complete .wiz-dot-num::after { content: "✓"; }
+.wiz-step-dot.complete .wiz-dot-num { font-size: 0; }
+.wiz-step-dot.complete .wiz-dot-num::after { font-size: 13px; }
+
+.wiz-progress-line {
+  flex: 1;
+  height: 2px;
+  background: rgba(148,163,184,.25);
+  margin: 0 4px;
+  margin-bottom: 18px;
+  border-radius: 999px;
+  transition: background .2s;
+}
+.wiz-progress-line.complete { background: var(--accent-2); }
+
+/* ── Step panels ───────────────────────────────────────────────────── */
+.wiz-step { display: none; }
+.wiz-step.active { display: block; }
+
+.wiz-step-title {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 22px;
+  margin: 4px 0 18px;
+}
+
+.wiz-step-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: -12px 0 16px;
+}
+
+.wiz-optional {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.req { color: var(--accent); font-size: 12px; }
+
+/* ── Date row (two side-by-side) ───────────────────────────────────── */
+.wiz-date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 480px) { .wiz-date-row { grid-template-columns: 1fr; } }
+
+/* ── Tournament type cards ─────────────────────────────────────────── */
+.wiz-type-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+@media (max-width: 480px) { .wiz-type-cards { grid-template-columns: 1fr; } }
+
+.wiz-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(148,163,184,.3);
+  background: rgba(5,11,24,.85);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.wiz-type-card:hover { border-color: var(--accent-2); transform: translateY(-1px); }
+.wiz-type-card.active {
+  border-color: var(--accent-2);
+  background: rgba(77,208,225,.10);
+  box-shadow: 0 0 0 1px rgba(77,208,225,.35);
+}
+
+.wiz-type-icon { font-size: 22px; margin-bottom: 2px; }
+.wiz-type-name { font-weight: 600; font-size: 14px; }
+.wiz-type-desc { font-size: 12px; color: var(--muted); }
+
+/* ── Counter row ───────────────────────────────────────────────────── */
+.wiz-counter-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.wiz-counter-val {
+  font-size: 22px;
+  font-weight: 700;
+  min-width: 32px;
+  text-align: center;
+}
+
+/* ── Event name fields ─────────────────────────────────────────────── */
+.wiz-sublabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.wiz-event-name-row { margin-bottom: 10px; }
+
+/* ── Event config cards ────────────────────────────────────────────── */
+.wiz-event-cfg-card {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(5,11,24,.80);
+  margin-bottom: 14px;
+}
+
+.wiz-event-cfg-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-2);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.wiz-cfg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 500px) { .wiz-cfg-grid { grid-template-columns: 1fr; } }
+.wiz-cfg-grid .field-group { margin-bottom: 0; }
+
+/* ── Payment toggle ────────────────────────────────────────────────── */
+.wiz-toggle-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.wiz-toggle-btn {
+  padding: 9px 20px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(148,163,184,.35);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.wiz-toggle-btn:hover { border-color: var(--accent-2); color: var(--text); }
+.wiz-toggle-btn.active {
+  border-color: var(--accent-2);
+  background: rgba(77,208,225,.12);
+  color: var(--accent-2);
+}
+
+/* ── Amount row ────────────────────────────────────────────────────── */
+.wiz-amount-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.wiz-currency {
+  padding: 11px 12px;
+  background: rgba(5,11,24,.96);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+.wiz-amount-row input {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  flex: 1;
+}
+
+/* ── Review section ────────────────────────────────────────────────── */
+.wiz-review-body {
+  background: rgba(5,11,24,.75);
+  border: 1px solid rgba(148,163,184,.18);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wiz-review-section { display: flex; flex-direction: column; gap: 8px; }
+
+.wiz-review-section + .wiz-review-section {
+  padding-top: 14px;
+  border-top: 1px solid rgba(148,163,184,.15);
+}
+
+.wiz-review-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--accent-2);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.wiz-review-row {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+.wiz-review-key {
+  color: var(--muted);
+  min-width: 80px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.wiz-review-val { color: var(--text); }
+
+.wiz-review-event {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.wiz-review-event-name { font-weight: 600; color: var(--text); }
+.wiz-review-event-tags {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ── Nav row ───────────────────────────────────────────────────────── */
+.wiz-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(148,163,184,.12);
+}
+
+.wiz-nav .btn-primary { margin-left: auto; }
