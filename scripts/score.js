@@ -1072,7 +1072,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               <div class="pk-rb-outcome">
                 ${pk.server === "away"
                   ? "+1 point"
-                  : (isDoubles && pk.serverNum === 1 ? "Server 2 serves" : "Sideout")}
+                  : (isDoubles && pk.serverNum === 1 ? "Server 2 serves" : "No point unless serving")}
               </div>
             </button>
           </div>
