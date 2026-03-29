@@ -807,41 +807,44 @@ document.addEventListener("DOMContentLoaded", async () => {
   //            except first team of game (only server 2 serves).
   //  Singles:  Score called as 2 numbers. Server position = even→right, odd→left.
   // ─────────────────────────────────────────────────────────────────────────
+  
   function initPickleball() {
-    // ── Detect singles vs doubles ─────────────────────────────────────────
     const isDoubles = homePlayers.length > 1 || awayPlayers.length > 1;
-    // Game config (can be extended via schema.inputs later)
-    const GAME_TARGET  = 11;   // points to win a game
-    const GAMES_TO_WIN = 2;    // best of 3
+    const GAME_TARGET = 11;
+    const GAMES_TO_WIN = 2;
 
-    // ── State ─────────────────────────────────────────────────────────────
     const pk = Object.assign({
-      phase:         "toss",    // toss | serve_choice | playing | game_over | match_over
-      tossWinner:    null,      // "home" | "away"
-      server:        null,      // "home" | "away"  — which TEAM is serving
-      serverNum:     2,         // 1 or 2 (doubles only). Starts at 2 per rules.
-      // For doubles: track which player index (0 or 1) on each team is server1
-      homeServer1Idx: 0,        // index into homePlayers who was first server of current game
+      phase: "toss",
+      tossWinner: null,
+      server: null,
+      serverNum: 2,
+      homeServer1Idx: 0,
       awayServer1Idx: 0,
-      score:         { home: 0, away: 0 },
-      gamesWon:      { home: 0, away: 0 },
-      completedGames:[],        // [{home:N, away:N}]
-      isFirstServiceOfGame: true, // first service turn of game — only server2 serves
-      // Per-player stats
+      score: { home: 0, away: 0 },
+      gamesWon: { home: 0, away: 0 },
+      completedGames: [],
+      isFirstServiceOfGame: true,
       players: {},
-      // Rally log
       rallies: [],
     }, state.pickleball || {});
 
-    // Ensure all player stat objects exist
     [...homePlayers, ...awayPlayers].forEach(p => {
-      if (!pk.players[p]) pk.players[p] = {
-        aces: 0, doubleFaults: 0, kitchenFaults: 0,
-        winners: 0, unforcedErrors: 0, ralliesWon: 0,
-      };
+      if (!pk.players[p]) {
+        pk.players[p] = {
+          aces: 0,
+          doubleFaults: 0,
+          kitchenFaults: 0,
+          winners: 0,
+          unforcedErrors: 0,
+          ralliesWon: 0,
+        };
+      }
     });
 
-    function persist() { state.pickleball = pk; scheduleAutoSave(); }
+    function persist() {
+      state.pickleball = pk;
+      scheduleAutoSave();
+    }
 
     function syncMaster() {
       state.state.A.score = pk.score.home;
@@ -851,89 +854,68 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderPills();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────
-    function tl(side) { return side === "home" ? homeLabel : awayLabel; }
-    function other(side) { return side === "home" ? "away" : "home"; }
+    function tl(side) {
+      return side === "home" ? homeLabel : awayLabel;
+    }
 
-    // Which player names are currently serving (for display)
+    function other(side) {
+      return side === "home" ? "away" : "home";
+    }
+
     function currentServerNames() {
       if (!isDoubles) {
-        // Singles: server is whoever is on the serving team
         return pk.server === "home" ? [homePlayers[0]] : [awayPlayers[0]];
       }
-      const team  = pk.server === "home" ? homePlayers : awayPlayers;
+      const team = pk.server === "home" ? homePlayers : awayPlayers;
       const s1idx = pk.server === "home" ? pk.homeServer1Idx : pk.awayServer1Idx;
-      // server1 is at s1idx, server2 is at 1-s1idx
       const s1 = team[s1idx % team.length];
       const s2 = team[(s1idx + 1) % team.length];
       return pk.serverNum === 1 ? [s1] : [s2];
     }
 
-    // Score string for display
     function scoreCallStr() {
-      const ss = pk.score[pk.server];      // server's score
-      const rs = pk.score[other(pk.server)]; // receiver's score
+      const ss = pk.score[pk.server];
+      const rs = pk.score[other(pk.server)];
       if (!isDoubles) return `${ss} – ${rs}`;
       return `${ss} – ${rs} – ${pk.serverNum}`;
     }
 
-    // After server wins a point: switch sides (server rotates position in doubles)
     function onServerWins() {
       pk.score[pk.server]++;
-      // In doubles, partners swap positions after each point won while serving
-      // (tracked implicitly by even/odd score for starting server position)
       checkGameEnd();
     }
 
-    // After receiver wins rally: sideout
     function onReceiverWins() {
       const recv = other(pk.server);
+
       if (isDoubles) {
         if (pk.isFirstServiceOfGame) {
-          // First service turn of game: only server2 served → immediate sideout
           pk.server = recv;
           pk.serverNum = 1;
           pk.isFirstServiceOfGame = false;
-          // server1 of receiving team is whoever is on right per their score
-          setServer1ForSideout(recv);
         } else if (pk.serverNum === 1) {
-          // Server1 lost → pass to Server2 on same team
           pk.serverNum = 2;
         } else {
-          // Server2 lost → sideout to other team
           pk.server = recv;
           pk.serverNum = 1;
-          setServer1ForSideout(recv);
         }
       } else {
-        // Singles: just swap server
         pk.server = recv;
       }
     }
 
-    // In doubles, after a sideout the player on the right (per team score) serves first
-    function setServer1ForSideout(team) {
-      // The starting server of the game must be on right when score is even, left when odd.
-      // After sideout, whoever is on the right side serves first — this is tracked by
-      // comparing current score parity to original server1 starting position.
-      // For simplicity: we toggle server1Idx based on score parity.
-      // Even score → server1 (game-start server) is on right → idx stays
-      // Odd score → server1 is on left → partner serves first
-      // We store the idx of the player who STARTED as server on that team for the current game.
-      // No change needed to homeServer1Idx/awayServer1Idx — they're set at game start.
-      // The actual "who serves now" is derived from score parity in currentServerNames().
-      // serverNum is always 1 after a sideout (except first turn handled above).
-    }
-
     function checkGameEnd() {
-      const hs = pk.score.home, as = pk.score.away;
-      const target = GAME_TARGET;
-      const homeWon = hs >= target && hs - as >= 2;
-      const awayWon = as >= target && as - hs >= 2;
+      const hs = pk.score.home;
+      const as = pk.score.away;
+
+      const homeWon = hs >= GAME_TARGET && hs - as >= 2;
+      const awayWon = as >= GAME_TARGET && as - hs >= 2;
+
       if (homeWon || awayWon) {
         const winner = homeWon ? "home" : "away";
         pk.gamesWon[winner]++;
         pk.completedGames.push({ home: hs, away: as });
+
         if (pk.gamesWon[winner] >= GAMES_TO_WIN) {
           pk.phase = "match_over";
         } else {
@@ -946,59 +928,70 @@ document.addEventListener("DOMContentLoaded", async () => {
       pk.score = { home: 0, away: 0 };
       pk.isFirstServiceOfGame = true;
       pk.serverNum = 2;
-      // Sides switch: loser of previous game serves (common tournament rule)
-      // Or same server — here we let the toss winner choose again for simplicity
-      // Actually per USA Pickleball: winner of previous game chooses serve/side for next
       pk.phase = "serve_choice_new_game";
-      // homeServer1Idx/awayServer1Idx stay — will be reset when serve is chosen
     }
 
-    // ── UI root ───────────────────────────────────────────────────────────
     const root = document.createElement("div");
     root.className = "sport-ui pickleball-ui";
 
     function render() {
       root.innerHTML = "";
-      if      (pk.phase === "toss")                 rToss();
-      else if (pk.phase === "serve_choice")         rServeChoice(false);
-      else if (pk.phase === "serve_choice_new_game")rServeChoice(true);
-      else if (pk.phase === "playing")              rPlaying();
-      else if (pk.phase === "game_over")            rGameOver();
-      else if (pk.phase === "match_over")           rMatchOver();
+
+      if (pk.phase === "toss") rToss();
+      else if (pk.phase === "serve_choice") rServeChoice(false);
+      else if (pk.phase === "serve_choice_new_game") rServeChoice(true);
+      else if (pk.phase === "playing") rPlaying();
+      else if (pk.phase === "game_over") rGameOver();
+      else if (pk.phase === "match_over") rMatchOver();
+
       syncMaster();
     }
 
-    // ── Scoreboard header (shown during play) ─────────────────────────────
     function scoreboardHdr() {
       const serverNames = pk.server ? currentServerNames() : [];
-      const sideIndicator = (side) => pk.server === side
-        ? `<span class="pk-serving-dot" title="Serving">●</span>`
-        : "";
 
       return `
         <div class="pk-scoreboard">
-          <div class="pk-team ${pk.server==="home"?"pk-serving":""}">
-            <div class="pk-team-name">${sideIndicator("home")} ${homeLabel}</div>
+          <div class="pk-team ${pk.server === "home" ? "pk-serving" : ""}">
+            <div class="pk-team-top">
+              <span class="pk-serve-icon">🏓</span>
+              <div class="pk-team-name">${homeLabel}</div>
+            </div>
             <div class="pk-big-score">${pk.score.home}</div>
-            <div class="pk-games-won">${"●".repeat(pk.gamesWon.home)}${"○".repeat(Math.max(0,GAMES_TO_WIN-pk.gamesWon.home))}</div>
+            <div class="pk-games-won">${"●".repeat(pk.gamesWon.home)}${"○".repeat(Math.max(0, GAMES_TO_WIN - pk.gamesWon.home))}</div>
           </div>
+
           <div class="pk-center">
             <div class="pk-score-label">Score</div>
             <div class="pk-score-call">${scoreCallStr()}</div>
             <div class="pk-games-label">Games</div>
             <div class="pk-games-score">${pk.gamesWon.home} – ${pk.gamesWon.away}</div>
           </div>
-          <div class="pk-team ${pk.server==="away"?"pk-serving":""}">
-            <div class="pk-team-name">${sideIndicator("away")} ${awayLabel}</div>
+
+          <div class="pk-team ${pk.server === "away" ? "pk-serving" : ""}">
+            <div class="pk-team-top">
+              <span class="pk-serve-icon">🏓</span>
+              <div class="pk-team-name">${awayLabel}</div>
+            </div>
             <div class="pk-big-score">${pk.score.away}</div>
-            <div class="pk-games-won">${"●".repeat(pk.gamesWon.away)}${"○".repeat(Math.max(0,GAMES_TO_WIN-pk.gamesWon.away))}</div>
+            <div class="pk-games-won">${"●".repeat(pk.gamesWon.away)}${"○".repeat(Math.max(0, GAMES_TO_WIN - pk.gamesWon.away))}</div>
           </div>
         </div>
-        ${pk.completedGames.length ? `<div class="bt-past-sets">${pk.completedGames.map((g,i)=>`<span class="bt-past-chip">G${i+1}: ${g.home}–${g.away}</span>`).join("")}</div>` : ""}
-        ${serverNames.length ? `<div class="pk-serving-bar">🏓 Serving: <strong>${serverNames.join(" & ")}</strong>${isDoubles?` (Server ${pk.serverNum})`:""}  •  Call: <strong>${scoreCallStr()}</strong></div>` : ""}`;
+
+        ${pk.completedGames.length ? `
+          <div class="bt-past-sets">
+            ${pk.completedGames.map((g, i) => `<span class="bt-past-chip">G${i + 1}: ${g.home}–${g.away}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        ${serverNames.length ? `
+          <div class="pk-serving-bar">
+            Serving: <strong>${tl(pk.server)}</strong>${isDoubles ? ` • Server ${pk.serverNum}` : ""} • ${serverNames.join(" & ")}
+          </div>
+        ` : ""}
+      `;
     }
 
-    // ── Toss ──────────────────────────────────────────────────────────────
     function rToss() {
       root.innerHTML = `
         <div class="guided-card">
@@ -1008,113 +1001,150 @@ document.addEventListener("DOMContentLoaded", async () => {
             <button class="gc-opt" data-val="home">${homeLabel}</button>
             <button class="gc-opt" data-val="away">${awayLabel}</button>
           </div>
-        </div>`;
-      root.querySelectorAll(".gc-opt").forEach(b => b.addEventListener("click", () => {
-        pk.tossWinner = b.dataset.val;
-        pk.phase = "serve_choice";
-        persist(); render();
-      }));
+        </div>
+      `;
+
+      root.querySelectorAll(".gc-opt").forEach(btn => {
+        btn.addEventListener("click", () => {
+          pk.tossWinner = btn.dataset.val;
+          pk.phase = "serve_choice";
+          persist();
+          render();
+        });
+      });
     }
 
-    // ── Serve / Receive choice ────────────────────────────────────────────
     function rServeChoice(isNewGame) {
-      const chooser = isNewGame
-        ? tl(pk.gamesWon.home > pk.gamesWon.away ? "home" : "away") + " (previous game winner)"
-        : tl(pk.tossWinner) + " won the toss";
+      const chooserSide = isNewGame
+        ? (pk.gamesWon.home > pk.gamesWon.away ? "home" : "away")
+        : pk.tossWinner;
+
+      const chooserText = isNewGame
+        ? `${tl(chooserSide)} (previous game winner)`
+        : `${tl(chooserSide)} won the toss`;
+
       root.innerHTML = `
         <div class="guided-card">
           <div class="gc-step">${isNewGame ? "Game " + (pk.completedGames.length + 1) : "Step 2 of 2"}</div>
-          <div class="gc-title">🏓 ${chooser} — choose to…</div>
+          <div class="gc-title">🏓 ${chooserText} — choose to…</div>
           <div class="gc-options">
             <button class="gc-opt" data-val="serve">Serve first</button>
             <button class="gc-opt" data-val="receive">Receive first</button>
           </div>
-        </div>`;
-      root.querySelectorAll(".gc-opt").forEach(b => b.addEventListener("click", () => {
-        const choosingTeam = isNewGame
-          ? (pk.gamesWon.home > pk.gamesWon.away ? "home" : "away")
-          : pk.tossWinner;
-        pk.server = b.dataset.val === "serve" ? choosingTeam : other(choosingTeam);
-        // Assign server1 starting index for each team (player on right = server1)
-        // For simplicity, server1 is always index 0 at game start
-        pk.homeServer1Idx = 0;
-        pk.awayServer1Idx = 0;
-        pk.serverNum = 2;
-        pk.isFirstServiceOfGame = true;
-        pk.phase = "playing";
-        persist(); render();
-      }));
+        </div>
+      `;
+
+      root.querySelectorAll(".gc-opt").forEach(btn => {
+        btn.addEventListener("click", () => {
+          pk.server = btn.dataset.val === "serve" ? chooserSide : other(chooserSide);
+          pk.homeServer1Idx = 0;
+          pk.awayServer1Idx = 0;
+          pk.serverNum = 2;
+          pk.isFirstServiceOfGame = true;
+          pk.phase = "playing";
+          persist();
+          render();
+        });
+      });
     }
 
-    // ── Main rally screen ─────────────────────────────────────────────────
     function rPlaying() {
-      const recvTeam = other(pk.server);
+      const receivingSide = other(pk.server);
+
       root.innerHTML = `
         ${scoreboardHdr()}
+
         <div class="guided-card" style="margin-top:10px">
           <div class="gc-title" style="font-size:20px;margin-bottom:16px">🏓 Who won the rally?</div>
+
           <div class="pk-rally-btns">
-            <button class="pk-rally-btn pk-server-btn" id="pk-server-wins">
-              <div class="pk-rb-label">Serving team</div>
-              <div class="pk-rb-team">${tl(pk.server)}</div>
-              <div class="pk-rb-outcome">+1 point</div>
+            <button class="pk-rally-btn pk-server-btn" id="pk-left-team-btn">
+              <div class="pk-rb-label">${pk.server === "home" ? "Serving team" : "Team"}</div>
+              <div class="pk-rb-team">${homeLabel}</div>
+              <div class="pk-rb-outcome">
+                ${pk.server === "home" ? "+1 point" : "No point unless serving"}
+              </div>
             </button>
-            <button class="pk-rally-btn pk-receiver-btn" id="pk-receiver-wins">
-              <div class="pk-rb-label">Receiving team</div>
-              <div class="pk-rb-team">${tl(recvTeam)}</div>
-              <div class="pk-rb-outcome">${isDoubles && pk.serverNum === 1 ? "Server 2 serves" : "Sideout"}</div>
+
+            <button class="pk-rally-btn pk-receiver-btn" id="pk-right-team-btn">
+              <div class="pk-rb-label">${pk.server === "away" ? "Serving team" : "Team"}</div>
+              <div class="pk-rb-team">${awayLabel}</div>
+              <div class="pk-rb-outcome">
+                ${pk.server === "away"
+                  ? "+1 point"
+                  : (isDoubles && pk.serverNum === 1 ? "Server 2 serves" : "Sideout")}
+              </div>
             </button>
           </div>
         </div>
+
         <div class="pk-details-row">
           <button class="pk-details-btn" id="pk-more-details">+ More details for this rally</button>
           ${pk.rallies.length ? `<span class="pk-rally-count">${pk.rallies.length} rallies logged</span>` : ""}
         </div>
-        ${renderPlayerStatChips()}`;
 
-      root.querySelector("#pk-server-wins").addEventListener("click", () => {
-        logRally(pk.server, null);
-        onServerWins();
-        persist(); render();
+        ${renderPlayerStatChips()}
+      `;
+
+      root.querySelector("#pk-left-team-btn").addEventListener("click", () => {
+        if (pk.server === "home") {
+          logRally("home", null);
+          onServerWins();
+        } else {
+          logRally("home", null);
+          onReceiverWins();
+        }
+        persist();
+        render();
       });
 
-      root.querySelector("#pk-receiver-wins").addEventListener("click", () => {
-        logRally(recvTeam, null);
-        onReceiverWins();
-        persist(); render();
+      root.querySelector("#pk-right-team-btn").addEventListener("click", () => {
+        if (pk.server === "away") {
+          logRally("away", null);
+          onServerWins();
+        } else {
+          logRally("away", null);
+          onReceiverWins();
+        }
+        persist();
+        render();
       });
 
       root.querySelector("#pk-more-details").addEventListener("click", () => {
         openMoreDetailsModal();
       });
 
-      // Player chip click → individual stat editor
       root.querySelectorAll(".pk-player-chip").forEach(chip => {
-        chip.addEventListener("click", () => openPlayerStatModal(chip.dataset.player, chip.dataset.team));
+        chip.addEventListener("click", () => {
+          openPlayerStatModal(chip.dataset.player, chip.dataset.team);
+        });
       });
     }
 
-    // ── Player stat chips (compact, shown below rally buttons) ────────────
     function renderPlayerStatChips() {
       const teams = [
         { side: "home", label: homeLabel, players: homePlayers },
         { side: "away", label: awayLabel, players: awayPlayers },
       ];
-      return `<div class="pk-player-stats">
-        ${teams.map(({ side, label, players }) => `
-          <div class="fb-team-section">
-            <div class="fb-team-label">${label}</div>
-            <div class="pk-chips-row">
-              ${players.map(name => {
-                const p = pk.players[name];
-                return `<button class="player-chip pk-player-chip" data-player="${name}" data-team="${side}">
-                  <span class="pc-name">${name}</span>
-                  <span class="pc-stat">${p.ralliesWon}W ${p.aces}A</span>
-                </button>`;
-              }).join("")}
+
+      return `
+        <div class="pk-player-stats">
+          <div class="pk-player-stats-title">Add other statistics of players</div>
+
+          ${teams.map(({ side, label, players }) => `
+            <div class="fb-team-section">
+              <div class="fb-team-label">${label}</div>
+              <div class="pk-chips-row">
+                ${players.map(name => `
+                  <button class="player-chip pk-player-chip" data-player="${name}" data-team="${side}">
+                    <span class="pc-name">${name}</span>
+                  </button>
+                `).join("")}
+              </div>
             </div>
-          </div>`).join("")}
-      </div>`;
+          `).join("")}
+        </div>
+      `;
     }
 
     function logRally(winnerSide, details) {
@@ -1128,175 +1158,242 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    // ── "More details" modal ──────────────────────────────────────────────
     function openMoreDetailsModal() {
       const allPlayers = [
         ...homePlayers.map(p => ({ name: p, side: "home" })),
         ...awayPlayers.map(p => ({ name: p, side: "away" })),
       ];
-      const playerOpts = allPlayers.map(p => `<option value="${p.name}|${p.side}">${p.name} (${tl(p.side)})</option>`).join("");
+
+      const playerOpts = allPlayers
+        .map(p => `<option value="${p.name}|${p.side}">${p.name} (${tl(p.side)})</option>`)
+        .join("");
 
       openModal(`
         <div class="sm-title">📋 Rally Details</div>
+
         <label class="sm-label">Rally outcome</label>
         <div class="gc-options small" style="margin-bottom:14px">
-          <button class="gc-opt small" data-outcome="server" id="rd-server">Serving team won</button>
-          <button class="gc-opt small" data-outcome="receiver" id="rd-receiver">Receiving team won</button>
+          <button class="gc-opt small" data-outcome="server">Serving team won</button>
+          <button class="gc-opt small" data-outcome="receiver">Receiving team won</button>
         </div>
+
         <label class="sm-label">Shot type (optional)</label>
         <div class="gc-options small" style="margin-bottom:14px">
           ${["Ace","Double Fault","Kitchen Fault","Winner","Unforced Error","Other"].map(s =>
             `<button class="gc-opt small" data-shot="${s}">${s}</button>`
           ).join("")}
         </div>
+
         <label class="sm-label">Player (optional)</label>
         <select class="gc-select" id="rd-player" style="margin-bottom:14px">
           <option value="">— Select player —</option>
           ${playerOpts}
         </select>
+
         <div class="sm-actions">
           <button class="gc-confirm" id="rd-confirm">Log & apply</button>
           <button class="sm-cancel" id="rd-cancel">Cancel</button>
-        </div>`, null);
+        </div>
+      `, null);
 
-      let selectedOutcome = null, selectedShot = null;
+      let selectedOutcome = null;
+      let selectedShot = null;
 
-      document.querySelectorAll("[data-outcome]").forEach(b => b.addEventListener("click", () => {
-        document.querySelectorAll("[data-outcome]").forEach(x => x.classList.remove("selected"));
-        b.classList.add("selected"); selectedOutcome = b.dataset.outcome;
-      }));
-      document.querySelectorAll("[data-shot]").forEach(b => b.addEventListener("click", () => {
-        document.querySelectorAll("[data-shot]").forEach(x => x.classList.remove("selected"));
-        b.classList.add("selected"); selectedShot = b.dataset.shot;
-      }));
+      document.querySelectorAll("[data-outcome]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("[data-outcome]").forEach(x => x.classList.remove("selected"));
+          btn.classList.add("selected");
+          selectedOutcome = btn.dataset.outcome;
+        });
+      });
+
+      document.querySelectorAll("[data-shot]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("[data-shot]").forEach(x => x.classList.remove("selected"));
+          btn.classList.add("selected");
+          selectedShot = btn.dataset.shot;
+        });
+      });
 
       document.getElementById("rd-confirm").addEventListener("click", () => {
-        if (!selectedOutcome) { alert("Please select who won the rally."); return; }
+        if (!selectedOutcome) {
+          alert("Please select who won the rally.");
+          return;
+        }
 
         const playerVal = document.getElementById("rd-player").value;
         const [playerName, playerSide] = playerVal ? playerVal.split("|") : [null, null];
 
-        // Apply stat to player
         if (playerName && selectedShot) {
           const p = pk.players[playerName];
-          if (selectedShot === "Ace")            p.aces++;
-          if (selectedShot === "Double Fault")   p.doubleFaults++;
-          if (selectedShot === "Kitchen Fault")  p.kitchenFaults++;
-          if (selectedShot === "Winner")         p.winners++;
+          if (selectedShot === "Ace") p.aces++;
+          if (selectedShot === "Double Fault") p.doubleFaults++;
+          if (selectedShot === "Kitchen Fault") p.kitchenFaults++;
+          if (selectedShot === "Winner") p.winners++;
           if (selectedShot === "Unforced Error") p.unforcedErrors++;
         }
 
         const winnerSide = selectedOutcome === "server" ? pk.server : other(pk.server);
-        if (playerName) pk.players[playerName].ralliesWon += (winnerSide === playerSide ? 1 : 0);
+        if (playerName && winnerSide === playerSide) {
+          pk.players[playerName].ralliesWon += 1;
+        }
 
         logRally(winnerSide, { shot: selectedShot, player: playerName });
 
         if (selectedOutcome === "server") onServerWins();
-        else                              onReceiverWins();
+        else onReceiverWins();
 
-        closeModal(); persist(); render();
+        closeModal();
+        persist();
+        render();
       });
+
       document.getElementById("rd-cancel").addEventListener("click", closeModal);
     }
 
-    // ── Individual player stat editor ─────────────────────────────────────
     function openPlayerStatModal(playerName, teamSide) {
       const p = pk.players[playerName];
       const label = tl(teamSide);
 
       function statRow(lbl, key) {
-        return `<div class="sm-stat-row">
-          <span class="sm-stat-label">${lbl}</span>
-          <div class="df-counter">
-            <button type="button" class="df-counter-btn" onclick="(function(){var e=document.getElementById('pk-${key}');e.value=Math.max(0,+e.value-1);})()">−</button>
-            <input class="df-counter-val" id="pk-${key}" type="number" value="${p[key]}" style="width:50px;text-align:center;background:transparent;border:none;color:#fff;font-family:'Bebas Neue',sans-serif;font-size:28px"/>
-            <button type="button" class="df-counter-btn df-counter-plus" onclick="(function(){var e=document.getElementById('pk-${key}');e.value=+e.value+1;})()">+</button>
+        return `
+          <div class="sm-stat-row">
+            <span class="sm-stat-label">${lbl}</span>
+            <div class="df-counter">
+              <button type="button" class="df-counter-btn" onclick="(function(){var e=document.getElementById('pk-${key}');e.value=Math.max(0,+e.value-1);})()">−</button>
+              <input class="df-counter-val" id="pk-${key}" type="number" value="${p[key]}" style="width:50px;text-align:center;background:transparent;border:none;color:#fff;font-family:'Bebas Neue',sans-serif;font-size:28px"/>
+              <button type="button" class="df-counter-btn df-counter-plus" onclick="(function(){var e=document.getElementById('pk-${key}');e.value=+e.value+1;})()">+</button>
+            </div>
           </div>
-        </div>`;
+        `;
       }
 
       openModal(`
         <div class="sm-title">🏓 ${playerName} <span style="font-size:13px;opacity:.6">${label}</span></div>
-        ${statRow("Aces",           "aces")}
-        ${statRow("Double Faults",  "doubleFaults")}
+        ${statRow("Aces", "aces")}
+        ${statRow("Double Faults", "doubleFaults")}
         ${statRow("Kitchen Faults", "kitchenFaults")}
-        ${statRow("Winners",        "winners")}
-        ${statRow("Unforced Errors","unforcedErrors")}
-        ${statRow("Rallies Won",    "ralliesWon")}
+        ${statRow("Winners", "winners")}
+        ${statRow("Unforced Errors", "unforcedErrors")}
+        ${statRow("Rallies Won", "ralliesWon")}
         <div class="sm-actions">
           <button class="gc-confirm" id="pk-sv">Save</button>
-          <button class="sm-cancel"  id="pk-cx">Cancel</button>
-        </div>`, null);
+          <button class="sm-cancel" id="pk-cx">Cancel</button>
+        </div>
+      `, null);
 
       document.getElementById("pk-sv").addEventListener("click", () => {
         ["aces","doubleFaults","kitchenFaults","winners","unforcedErrors","ralliesWon"].forEach(k => {
           const el = document.getElementById(`pk-${k}`);
           if (el) p[k] = Number(el.value) || 0;
         });
-        closeModal(); persist(); render();
+        closeModal();
+        persist();
+        render();
       });
+
       document.getElementById("pk-cx").addEventListener("click", closeModal);
     }
 
-    // ── Game over (between games) ─────────────────────────────────────────
     function rGameOver() {
       const last = pk.completedGames[pk.completedGames.length - 1];
       const gameWinner = last.home > last.away ? homeLabel : awayLabel;
+
       root.innerHTML = `
         <div class="pk-scoreboard">
-          <div class="pk-team"><div class="pk-team-name">${homeLabel}</div><div class="pk-big-score">${last.home}</div></div>
-          <div class="pk-center"><div class="pk-score-label">Game ${pk.completedGames.length}</div></div>
-          <div class="pk-team"><div class="pk-team-name">${awayLabel}</div><div class="pk-big-score">${last.away}</div></div>
+          <div class="pk-team">
+            <div class="pk-team-top">
+              <span class="pk-serve-icon"></span>
+              <div class="pk-team-name">${homeLabel}</div>
+            </div>
+            <div class="pk-big-score">${last.home}</div>
+          </div>
+
+          <div class="pk-center">
+            <div class="pk-score-label">Game ${pk.completedGames.length}</div>
+          </div>
+
+          <div class="pk-team">
+            <div class="pk-team-top">
+              <span class="pk-serve-icon"></span>
+              <div class="pk-team-name">${awayLabel}</div>
+            </div>
+            <div class="pk-big-score">${last.away}</div>
+          </div>
         </div>
+
         <div class="guided-card" style="margin-top:10px">
           <div class="gc-title">🎉 Game ${pk.completedGames.length} — ${gameWinner} wins!</div>
           <div class="gc-summary">Match score: <strong>${pk.gamesWon.home} – ${pk.gamesWon.away}</strong></div>
           <button class="gc-confirm" id="pk-next-game">Start Game ${pk.completedGames.length + 1} →</button>
-        </div>`;
+        </div>
+      `;
+
       root.querySelector("#pk-next-game").addEventListener("click", () => {
-        startNewGame(); persist(); render();
+        startNewGame();
+        persist();
+        render();
       });
     }
 
-    // ── Match over ────────────────────────────────────────────────────────
     function rMatchOver() {
       const winner = pk.gamesWon.home >= GAMES_TO_WIN ? homeLabel : awayLabel;
 
-      // Build stats table
       const allPlayers = [
         ...homePlayers.map(n => ({ name: n, team: homeLabel })),
         ...awayPlayers.map(n => ({ name: n, team: awayLabel })),
       ];
+
       const rows = allPlayers.map(({ name, team }) => {
         const p = pk.players[name];
-        return `<tr>
-          <td>${name}</td><td style="opacity:.6;font-size:11px">${team}</td>
-          <td>${p.ralliesWon}</td><td>${p.aces}</td><td>${p.doubleFaults}</td>
-          <td>${p.kitchenFaults}</td><td>${p.winners}</td><td>${p.unforcedErrors}</td>
-        </tr>`;
+        return `
+          <tr>
+            <td>${name}</td>
+            <td style="opacity:.6;font-size:11px">${team}</td>
+            <td>${p.ralliesWon}</td>
+            <td>${p.aces}</td>
+            <td>${p.doubleFaults}</td>
+            <td>${p.kitchenFaults}</td>
+            <td>${p.winners}</td>
+            <td>${p.unforcedErrors}</td>
+          </tr>
+        `;
       }).join("");
 
       root.innerHTML = `
         <div class="guided-card">
           <div class="gc-title">🏆 Match over — ${winner} wins!</div>
           <div class="cs-final">
-            <div>${homeLabel}: <strong>${pk.gamesWon.home} game${pk.gamesWon.home!==1?"s":""}</strong></div>
-            <div>${awayLabel}: <strong>${pk.gamesWon.away} game${pk.gamesWon.away!==1?"s":""}</strong></div>
+            <div>${homeLabel}: <strong>${pk.gamesWon.home} game${pk.gamesWon.home !== 1 ? "s" : ""}</strong></div>
+            <div>${awayLabel}: <strong>${pk.gamesWon.away} game${pk.gamesWon.away !== 1 ? "s" : ""}</strong></div>
             <div class="cs-winner">${winner}</div>
           </div>
+
           <div class="bt-past-sets" style="margin:10px 0">
-            ${pk.completedGames.map((g,i)=>`<span class="bt-past-chip">G${i+1}: ${g.home}–${g.away}</span>`).join("")}
+            ${pk.completedGames.map((g, i) => `<span class="bt-past-chip">G${i + 1}: ${g.home}–${g.away}</span>`).join("")}
           </div>
+
           <div class="scorecard-table-wrap">
             <table class="scorecard-table">
-              <thead><tr><th>Player</th><th>Team</th><th>Won</th><th>Ace</th><th>DF</th><th>KF</th><th>Win</th><th>UE</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Team</th>
+                  <th>Won</th>
+                  <th>Ace</th>
+                  <th>DF</th>
+                  <th>KF</th>
+                  <th>Win</th>
+                  <th>UE</th>
+                </tr>
+              </thead>
               <tbody>${rows}</tbody>
             </table>
           </div>
-        </div>`;
+        </div>
+      `;
     }
 
-    // Restore state from existing save if present
     if (state.pickleball) Object.assign(pk, state.pickleball);
 
     render();
@@ -1354,38 +1451,71 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderPills();
 
   // ── Save (manual + auto) ──────────────────────────────────────────────────
-  let _saveDebounce=null;
-  function scheduleAutoSave(){ clearTimeout(_saveDebounce); _saveDebounce=setTimeout(doSave,1500); }
+  let _saveDebounce = null;
+  let _saveMsgTimer = null;
+
+  function scheduleAutoSave() {
+    clearTimeout(_saveDebounce);
+    _saveDebounce = setTimeout(doSave, 1500);
+  }
+
+  function showSaveMessage(message, isError = false, hideAfterMs = 2200) {
+    if (!saveMsg) return;
+
+    clearTimeout(_saveMsgTimer);
+    saveMsg.classList.toggle("error", Boolean(isError));
+    saveMsg.textContent = message;
+    saveMsg.style.display = "inline-flex";
+
+    if (hideAfterMs > 0) {
+      _saveMsgTimer = setTimeout(() => {
+        saveMsg.style.display = "none";
+      }, hideAfterMs);
+    }
+  }
 
   async function doSave() {
-    if(saveBtn) saveBtn.disabled=true;
-    if(saveMsg){ saveMsg.style.display="inline-flex"; saveMsg.textContent="Saving…"; saveMsg.classList.remove("error"); }
-    if(state.timer.running) tickTimer();
+    if (saveBtn) saveBtn.disabled = true;
+    if (state.timer.running) tickTimer();
+
+    showSaveMessage("Saving…", false, 0);
+
     try {
-      const payload={
-        categoryId,roundIndex,matchIndex,scoreIndex,
-        score:{
-          config:state.config, state:state.state, timer:{elapsedMs:state.timer.elapsedMs},
-          ...(state.cricket    &&{cricket:state.cricket}),
-          ...(state.football   &&{football:state.football}),
-          ...(state.basketball &&{basketball:state.basketball}),
-          ...(state.badminton   &&{badminton:state.badminton}),
-          ...(state.pickleball &&{pickleball:state.pickleball}),
+      const payload = {
+        categoryId,
+        roundIndex,
+        matchIndex,
+        scoreIndex,
+        score: {
+          config: state.config,
+          state: state.state,
+          timer: { elapsedMs: state.timer.elapsedMs },
+          ...(state.cricket && { cricket: state.cricket }),
+          ...(state.football && { football: state.football }),
+          ...(state.basketball && { basketball: state.basketball }),
+          ...(state.badminton && { badminton: state.badminton }),
+          ...(state.pickleball && { pickleball: state.pickleball }),
         },
       };
-      const resp=await apiPut(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/matches/score`,payload);
-      if(saveMsg){ saveMsg.textContent="Saved ✅"; saveMsg.style.display="inline-flex"; }
-      const computed=resp?.match?.score?.computed||null;
-      if(computed){
-        if(statusPill) statusPill.innerHTML=`Status: <strong>${computed.status}</strong>`;
-        if(winnerPill) winnerPill.innerHTML=`Winner: <strong>${computed.winnerName||"-"}</strong>`;
-        if(reasonPill) reasonPill.innerHTML=`Reason: <strong>${computed.reason||"-"}</strong>`;
+
+      const resp = await apiPut(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/matches/score`,
+        payload
+      );
+
+      showSaveMessage("Saved ✅", false, 1800);
+
+      const computed = resp?.match?.score?.computed || null;
+      if (computed) {
+        if (statusPill) statusPill.innerHTML = `Status: <strong>${computed.status}</strong>`;
+        if (winnerPill) winnerPill.innerHTML = `Winner: <strong>${computed.winnerName || "-"}</strong>`;
+        if (reasonPill) reasonPill.innerHTML = `Reason: <strong>${computed.reason || "-"}</strong>`;
       }
-    } catch(e) {
+    } catch (e) {
       console.error(e);
-      if(saveMsg){ saveMsg.classList.add("error"); saveMsg.style.display="inline-flex"; saveMsg.textContent=`Save failed: ${String(e?.message||e)}`; }
+      showSaveMessage(`Save failed: ${String(e?.message || e)}`, true, 3000);
     } finally {
-      if(saveBtn) saveBtn.disabled=false;
+      if (saveBtn) saveBtn.disabled = false;
     }
   }
 
