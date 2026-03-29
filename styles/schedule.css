@@ -1,6 +1,5 @@
-/* Reuse the same container width as join page */
 .schedule-main {
-  max-width: 1040px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 24px clamp(16px, 4vw, 32px) 40px;
   display: flex;
@@ -39,47 +38,184 @@
   margin-top: 2px;
 }
 
-/* Card around the schedule table */
-
 .schedule-card {
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(
-      circle at top left,
-      rgba(77, 208, 225, 0.12),
-      transparent 55%
-    ),
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.12), transparent 55%),
     var(--card);
   padding: 18px 18px 16px;
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
 }
 
-/* Table */
-
-.schedule-table-wrapper {
-  margin-top: 12px;
-  overflow-x: auto;
+.schedule-bracket-wrap {
+  margin-top: 10px;
 }
 
-.schedule-table {
-  width: 100%;
-  border-collapse: collapse;
+.schedule-category-toggle {
+  margin-top: 10px;
+  margin-bottom: 12px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.schedule-category-toggle .toggle-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
   font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
-.schedule-table thead th {
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+.schedule-category-toggle .toggle-btn:hover {
+  border-color: rgba(77, 208, 225, 0.45);
+  color: var(--text);
+}
+
+.schedule-category-toggle .toggle-btn.active {
+  border-color: var(--accent);
+  background: rgba(77, 208, 225, 0.18);
+  color: var(--text);
+}
+
+.schedule-group {
+  margin-top: 18px;
+  padding: 14px 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(4, 10, 24, 0.95);
+}
+
+.schedule-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.schedule-group-title {
+  font-size: 16px;
+  margin: 0;
+}
+
+.schedule-bracket {
+  margin-top: 14px;
+  overflow-x: auto;
+  overflow-y: auto;
+  padding-bottom: 16px;
+  border-radius: var(--radius-md);
+}
+
+.schedule-bracket::-webkit-scrollbar {
+  height: 10px;
+  width: 8px;
+}
+
+.schedule-bracket::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+
+.schedule-bracket::-webkit-scrollbar-thumb {
+  background: rgba(77, 208, 225, 0.35);
+  border-radius: 999px;
+}
+
+.schedule-bracket::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 208, 225, 0.55);
+}
+
+.round-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
   font-weight: 600;
 }
 
-.schedule-table tbody td {
-  padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+.bk-card {
+  box-sizing: border-box;
+  background: rgba(8, 14, 30, 0.93);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.38);
 }
 
-.schedule-table tbody tr:last-child td {
-  border-bottom: none;
+.bk-match-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+
+.bk-slot {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(145, 163, 196, 0.45);
+  font-size: 13px;
+  background: rgba(4, 10, 24, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bk-slot.bk-bye {
+  font-style: italic;
+  color: var(--muted);
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.bk-slot-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bk-slot-score {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4dd0e1;
+}
+
+.bk-slot-score.is-empty {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.bk-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.bk-score-summary {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.bk-winner-badge {
+  font-size: 11px;
+  color: #4dd0e1;
+  font-weight: 600;
+  white-space: nowrap;
 }

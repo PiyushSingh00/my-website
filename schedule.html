@@ -5,7 +5,6 @@
     <title>ScheduleIt – Tournament schedule</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,33 +12,23 @@
       rel="stylesheet"
     />
 
-    <!-- Reuse join styles + schedule-specific styles -->
     <link rel="stylesheet" href="styles/join.css" />
     <link rel="stylesheet" href="styles/schedule.css" />
   </head>
   <body>
     <div class="app-shell">
-      <!-- Top bar (same pattern as join) -->
       <header class="topbar">
         <div class="brand">ScheduleIt</div>
 
         <div class="topbar-right">
           <div class="user-menu">
-            <button
-              class="user-trigger"
-              id="user-menu-trigger"
-              type="button"
-            >
+            <button class="user-trigger" id="user-menu-trigger" type="button">
               Signed in as <span id="username-label">Player</span>
               <span class="caret">▾</span>
             </button>
 
             <div class="user-menu-dropdown" id="user-menu-dropdown">
-              <button
-                type="button"
-                class="dropdown-item"
-                id="switch-host-mode"
-              >
+              <button type="button" class="dropdown-item" id="switch-host-mode">
                 Switch to host mode
               </button>
             </div>
@@ -51,25 +40,15 @@
         </div>
       </header>
 
-      <!-- Main schedule content -->
       <main class="schedule-main">
         <header class="schedule-header">
-          <button
-            type="button"
-            id="back-to-join"
-            class="back-link-btn"
-          >
+          <button type="button" id="back-to-join" class="back-link-btn">
             ← Back to tournaments
           </button>
 
           <div class="schedule-title-block">
             <h1 id="schedule-tournament-name">Tournament</h1>
-            <p
-              id="schedule-tournament-meta"
-              class="helper-text schedule-meta"
-            >
-              <!-- sport • dates • reg status -->
-            </p>
+            <p id="schedule-tournament-meta" class="helper-text schedule-meta"></p>
           </div>
         </header>
 
@@ -78,31 +57,23 @@
             Host has not published the schedule yet. Please check again later.
           </p>
 
-          <div
-            id="schedule-table-wrapper"
-            class="schedule-table-wrapper"
-            style="display: none;"
-          >
-            <table class="schedule-table">
-              <thead>
-                <tr>
-                  <th>Round</th>
-                  <th>Match</th>
-                  <th>Player A</th>
-                  <th>Player B</th>
-                  <th>Score</th>
-                  <th>Court</th>
-                  <th>Time</th>
-                </tr>
-              </thead>
-              <tbody id="schedule-table-body"></tbody>
-            </table>
+          <div id="schedule-bracket-wrap" class="schedule-bracket-wrap" style="display: none;">
+            <div id="schedule-category-toggle" class="schedule-category-toggle"></div>
+
+            <div id="schedule-none-selected" class="empty-state" style="display:flex;">
+              <div class="feature-icon">🎯</div>
+              <h3>Choose which fixtures to view</h3>
+              <p class="muted">
+                Select a <strong>Category</strong> above to see the knockout bracket.
+              </p>
+            </div>
+
+            <div id="schedule-groups"></div>
           </div>
         </section>
       </main>
     </div>
 
-<script type="module" src="scripts/schedule.js"></script>
-
+    <script type="module" src="scripts/schedule.js"></script>
   </body>
 </html>
