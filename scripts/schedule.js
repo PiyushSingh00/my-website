@@ -35,16 +35,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     logout();
   });
 
-  const switchHostModeBtn = document.getElementById("switch-host-mode");
-  switchHostModeBtn?.addEventListener("click", async () => {
-    await fetch("/api/user/mode", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-      body: JSON.stringify({ mode: "host" }),
-    });
+  const playerBtn = document.getElementById("mode-player-btn");
+  const hostBtn = document.getElementById("mode-host-btn");
+
+  playerBtn?.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
+  playerBtn?.addEventListener("click", async () => {
+    playerBtn.classList.add("is-active");
+    hostBtn?.classList.remove("is-active");
+
+    try {
+      await fetch("/api/user/mode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+        body: JSON.stringify({ mode: "player" }),
+      });
+    } catch {}
+
+    window.location.href = "join.html";
+  });
+
+  hostBtn?.addEventListener("click", async () => {
+    hostBtn.classList.add("is-active");
+    playerBtn?.classList.remove("is-active");
+
+    try {
+      await fetch("/api/user/mode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+        body: JSON.stringify({ mode: "host" }),
+      });
+    } catch {}
+
     window.location.href = "host.html";
   });
 
