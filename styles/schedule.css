@@ -48,6 +48,92 @@
   border: 1px solid var(--border);
 }
 
+/* topbar user menu same feel as players page */
+.user-avatar-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(5, 11, 24, 0.92);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-avatar-btn:hover {
+  border-color: rgba(77, 208, 225, 0.5);
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(4, 10, 24, 0.98);
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+
+.user-menu-dropdown.is-open {
+  display: flex;
+}
+
+.dropdown-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* tabs */
+.schedule-view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.schedule-view-tab {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.schedule-view-tab.active {
+  border-color: var(--accent);
+  background: rgba(77, 208, 225, 0.18);
+  color: var(--text);
+}
+
+/* bracket */
 .schedule-bracket-wrap {
   margin-top: 10px;
 }
@@ -218,4 +304,143 @@
   color: #4dd0e1;
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* live score cards */
+.schedule-live-wrap {
+  margin-top: 10px;
+}
+
+.schedule-live-list {
+  display: grid;
+  gap: 14px;
+}
+
+.live-score-card {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(77, 208, 225, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 50%, rgba(14, 116, 144, 0.08) 0%, transparent 60%),
+    rgba(5, 11, 24, 0.90);
+  border: 1px solid rgba(77, 208, 225, 0.22);
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+.live-score-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.live-score-meta {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 208, 225, 0.35);
+  background: rgba(77, 208, 225, 0.10);
+  color: #4dd0e1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.live-scoreboard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.live-team {
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(5, 11, 24, 0.65);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.live-team-name {
+  font-size: 12px;
+  color: rgba(169, 182, 204, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.live-team-score {
+  font-size: 52px;
+  line-height: 1;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 0 30px rgba(77, 208, 225, 0.22);
+}
+
+.live-vs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: rgba(169, 182, 204, 0.55);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.live-players {
+  margin-top: 6px;
+  display: grid;
+  gap: 6px;
+}
+
+.live-player-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.live-player-name {
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-player-score {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4dd0e1;
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .live-scoreboard {
+    grid-template-columns: 1fr;
+  }
+
+  .live-vs {
+    min-height: 16px;
+  }
 }

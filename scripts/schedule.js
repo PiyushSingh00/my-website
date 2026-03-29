@@ -10,15 +10,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  const usernameLabel = document.getElementById("username-label");
-  if (usernameLabel) {
-    usernameLabel.textContent = user.username;
+  // topbar avatar style same as players page
+  const trigger = document.getElementById("schedule-user-menu-trigger");
+  const dropdown = document.getElementById("schedule-user-menu-dropdown");
+
+  if (trigger) {
+    const label = (user?.name || user?.username || user?.email || "U").trim();
+    trigger.textContent = label.charAt(0).toUpperCase();
   }
 
-  const signoutBtn = document.getElementById("signout-btn");
-  if (signoutBtn) {
-    signoutBtn.addEventListener("click", logout);
-  }
+  trigger?.addEventListener("click", () => {
+    dropdown?.classList.toggle("is-open");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dropdown || !trigger) return;
+    if (!dropdown.contains(e.target) && !trigger.contains(e.target)) {
+      dropdown.classList.remove("is-open");
+    }
+  });
+
+  document.getElementById("dropdown-signout")?.addEventListener("click", () => {
+    dropdown?.classList.remove("is-open");
+    logout();
+  });
 
   const switchHostModeBtn = document.getElementById("switch-host-mode");
   switchHostModeBtn?.addEventListener("click", async () => {
@@ -45,16 +60,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   const titleEl = document.getElementById("schedule-tournament-name");
   const metaEl = document.getElementById("schedule-tournament-meta");
   const emptyEl = document.getElementById("schedule-empty");
+
+  const contentWrap = document.getElementById("schedule-content-wrap");
   const bracketWrap = document.getElementById("schedule-bracket-wrap");
+  const liveWrap = document.getElementById("schedule-live-wrap");
+
   const categoryToggle = document.getElementById("schedule-category-toggle");
   const groupsEl = document.getElementById("schedule-groups");
   const noneSelectedEl = document.getElementById("schedule-none-selected");
+
+  const liveListEl = document.getElementById("schedule-live-list");
+  const liveEmptyEl = document.getElementById("schedule-live-empty");
 
   const state = {
     tournamentMeta: null,
     fixtures: null,
     activeCategoryId: null,
     scoringSchema: null,
+    activeView: "bracket",
   };
 
   async function apiGet(url) {
@@ -156,7 +179,45 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (bucket.points !== undefined && bucket.points !== null) return bucket.points;
     if (bucket.score !== undefined && bucket.score !== null) return bucket.score;
+    if (bucket.goals !== undefined && bucket.goals !== null) return bucket.goals;
+    if (bucket.runs !== undefined && bucket.runs !== null) return bucket.runs;
     return null;
+  }
+
+  function getPlayerLiveScore(match, side, playerName, scoreKey) {
+    const teamKey = side === "home" ? "A" : "B";
+    const playerState = match?.score?.state?.[teamKey]?.players?.[playerName];
+    if (!playerState) return null;
+
+    if (scoreKey && playerState[scoreKey] !== undefined && playerState[scoreKey] !== null) {
+      return playerState[scoreKey];
+    }
+
+    if (playerState.points !== undefined && playerState.points !== null) return playerState.points;
+    if (playerState.goals !== undefined && playerState.goals !== null) return playerState.goals;
+    if (playerState.runs !== undefined && playerState.runs !== null) return playerState.runs;
+    if (playerState.score !== undefined && playerState.score !== null) return playerState.score;
+
+    return null;
+  }
+
+  function setActiveView(view) {
+    state.activeView = view;
+
+    document.querySelectorAll(".schedule-view-tab").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.view === view);
+    });
+
+    bracketWrap.style.display = view === "bracket" ? "block" : "none";
+    liveWrap.style.display = view === "live" ? "block" : "none";
+  }
+
+  function wireViewTabs() {
+    document.querySelectorAll(".schedule-view-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setActiveView(btn.dataset.view || "bracket");
+      });
+    });
   }
 
   function renderCategoryToggles(categories) {
@@ -339,6 +400,119 @@ document.addEventListener("DOMContentLoaded", async () => {
     groupsEl.appendChild(wrapper);
   }
 
+  function renderLiveScores() {
+    if (!liveListEl) return;
+    liveListEl.innerHTML = "";
+
+    const scoreKey = state.scoringSchema?.winnerLogic?.field || "points";
+    const liveMatches = [];
+
+    const categories = state.fixtures?.categories || {};
+    Object.keys(categories).forEach((cid) => {
+      const cat = categories[cid];
+      const rounds = Array.isArray(cat?.rounds) ? cat.rounds : [];
+
+      rounds.forEach((round, roundIndex) => {
+        round.forEach((match, matchIndex) => {
+          const hasScore =
+            match?.score &&
+            match?.score?.state &&
+            (
+              match?.score?.state?.A ||
+              match?.score?.state?.B
+            );
+
+          const isActiveLike =
+            hasScore &&
+            !match?.winner &&
+            String(match?.home || "").toUpperCase() !== "BYE" &&
+            String(match?.away || "").toUpperCase() !== "BYE" &&
+            String(match?.home || "").toUpperCase() !== "TBD" &&
+            String(match?.away || "").toUpperCase() !== "TBD";
+
+          if (!isActiveLike) return;
+
+          liveMatches.push({
+            categoryLabel: cat?.label || cid,
+            roundIndex,
+            matchIndex,
+            match,
+          });
+        });
+      });
+    });
+
+    if (!liveMatches.length) {
+      liveEmptyEl.style.display = "flex";
+      return;
+    }
+
+    liveEmptyEl.style.display = "none";
+
+    liveMatches.forEach((item) => {
+      const match = item.match;
+      const homeName = match?.home || "Home";
+      const awayName = match?.away || "Away";
+
+      const homeScore = getSlotScore(match, "home", scoreKey);
+      const awayScore = getSlotScore(match, "away", scoreKey);
+
+      const homePlayers = Array.isArray(match?.homePlayers) ? match.homePlayers : splitTeamName(match?.home);
+      const awayPlayers = Array.isArray(match?.awayPlayers) ? match.awayPlayers : splitTeamName(match?.away);
+
+      const homePlayersHtml = homePlayers.length
+        ? homePlayers.map((player) => {
+            const ps = getPlayerLiveScore(match, "home", player, scoreKey);
+            return `
+              <div class="live-player-row">
+                <span class="live-player-name">${player}</span>
+                <span class="live-player-score">${ps === null || ps === undefined ? "-" : ps}</span>
+              </div>
+            `;
+          }).join("")
+        : `<div class="live-player-row"><span class="live-player-name">${homeName}</span><span class="live-player-score">${homeScore ?? "-"}</span></div>`;
+
+      const awayPlayersHtml = awayPlayers.length
+        ? awayPlayers.map((player) => {
+            const ps = getPlayerLiveScore(match, "away", player, scoreKey);
+            return `
+              <div class="live-player-row">
+                <span class="live-player-name">${player}</span>
+                <span class="live-player-score">${ps === null || ps === undefined ? "-" : ps}</span>
+              </div>
+            `;
+          }).join("")
+        : `<div class="live-player-row"><span class="live-player-name">${awayName}</span><span class="live-player-score">${awayScore ?? "-"}</span></div>`;
+
+      const card = document.createElement("div");
+      card.className = "live-score-card";
+      card.innerHTML = `
+        <div class="live-score-top">
+          <div class="live-score-meta">${item.categoryLabel} • Round ${item.roundIndex + 1} • Match ${item.matchIndex + 1}</div>
+          <div class="live-pill">Live</div>
+        </div>
+
+        <div class="live-scoreboard">
+          <div class="live-team">
+            <div class="live-team-name">${homeName}</div>
+            <div class="live-team-score">${homeScore === null || homeScore === undefined ? "-" : homeScore}</div>
+            <div class="live-players">${homePlayersHtml}</div>
+          </div>
+
+          <div class="live-vs">vs</div>
+
+          <div class="live-team">
+            <div class="live-team-name">${awayName}</div>
+            <div class="live-team-score">${awayScore === null || awayScore === undefined ? "-" : awayScore}</div>
+            <div class="live-players">${awayPlayersHtml}</div>
+          </div>
+        </div>
+      `;
+
+      liveListEl.appendChild(card);
+    });
+  }
+
   async function loadMeta() {
     const res = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}`);
     if (!res.ok || !res.data) return;
@@ -372,7 +546,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (!state.fixtures?.categories || !Object.keys(state.fixtures.categories).length) {
     emptyEl && (emptyEl.style.display = "block");
-    bracketWrap && (bracketWrap.style.display = "none");
+    contentWrap && (contentWrap.style.display = "none");
     return;
   }
 
@@ -391,9 +565,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   emptyEl && (emptyEl.style.display = "none");
-  bracketWrap && (bracketWrap.style.display = "block");
+  contentWrap && (contentWrap.style.display = "block");
 
+  wireViewTabs();
   renderCategoryToggles(categoryList);
+  renderLiveScores();
+  setActiveView("bracket");
 
   if (categoryList.length) {
     state.activeCategoryId = categoryList[0].id;

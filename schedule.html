@@ -22,21 +22,24 @@
 
         <div class="topbar-right">
           <div class="user-menu">
-            <button class="user-trigger" id="user-menu-trigger" type="button">
-              Signed in as <span id="username-label">Player</span>
-              <span class="caret">▾</span>
+            <button
+              type="button"
+              class="user-avatar-btn"
+              id="schedule-user-menu-trigger"
+              aria-label="User menu"
+            >
+              U
             </button>
 
-            <div class="user-menu-dropdown" id="user-menu-dropdown">
+            <div class="user-menu-dropdown" id="schedule-user-menu-dropdown">
               <button type="button" class="dropdown-item" id="switch-host-mode">
                 Switch to host mode
               </button>
+              <button type="button" class="dropdown-item" id="dropdown-signout">
+                Sign out
+              </button>
             </div>
           </div>
-
-          <button class="signout-btn" id="signout-btn" type="button">
-            Sign out
-          </button>
         </div>
       </header>
 
@@ -57,18 +60,43 @@
             Host has not published the schedule yet. Please check again later.
           </p>
 
-          <div id="schedule-bracket-wrap" class="schedule-bracket-wrap" style="display: none;">
-            <div id="schedule-category-toggle" class="schedule-category-toggle"></div>
-
-            <div id="schedule-none-selected" class="empty-state" style="display:flex;">
-              <div class="feature-icon">🎯</div>
-              <h3>Choose which fixtures to view</h3>
-              <p class="muted">
-                Select a <strong>Category</strong> above to see the knockout bracket.
-              </p>
+          <div id="schedule-content-wrap" style="display: none;">
+            <div class="schedule-view-tabs" id="schedule-view-tabs">
+              <button type="button" class="schedule-view-tab active" data-view="bracket">
+                Tournament schedule
+              </button>
+              <button type="button" class="schedule-view-tab" data-view="live">
+                View live score
+              </button>
             </div>
 
-            <div id="schedule-groups"></div>
+            <!-- BRACKET VIEW -->
+            <div id="schedule-bracket-wrap" class="schedule-bracket-wrap">
+              <div id="schedule-category-toggle" class="schedule-category-toggle"></div>
+
+              <div id="schedule-none-selected" class="empty-state" style="display:flex;">
+                <div class="feature-icon">🎯</div>
+                <h3>Choose which fixtures to view</h3>
+                <p class="muted">
+                  Select a <strong>Category</strong> above to see the knockout bracket.
+                </p>
+              </div>
+
+              <div id="schedule-groups"></div>
+            </div>
+
+            <!-- LIVE SCORE VIEW -->
+            <div id="schedule-live-wrap" class="schedule-live-wrap" style="display:none;">
+              <div id="schedule-live-empty" class="empty-state" style="display:none;">
+                <div class="feature-icon">📡</div>
+                <h3>No live matches right now</h3>
+                <p class="muted">
+                  Ongoing matches with saved scores will appear here.
+                </p>
+              </div>
+
+              <div id="schedule-live-list" class="schedule-live-list"></div>
+            </div>
           </div>
         </section>
       </main>
