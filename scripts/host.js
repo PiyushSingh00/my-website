@@ -20,6 +20,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const viewPlayersBtn  = document.getElementById("modalViewPlayers");
   let selectedTournamentId = null;
 
+  let dashboardMonth = new Date().getMonth();
+  let dashboardYear = new Date().getFullYear();
+
   // ─── Legacy stubs so host.js doesn't crash on refs that no longer exist ───
   const categoriesContainer = document.getElementById("categories-container");
   const addCategoryBtn      = document.getElementById("add-category-btn"); // null in new UI
@@ -628,7 +631,7 @@ function openNativeDatePicker(input) {
     editingTournamentId = null;
     showStep(0);
     loadMyTournaments();
-    switchHostView("my");
+    switchHostView("dashboard");
   });
 
   const user = await requireAuth();
@@ -771,9 +774,8 @@ async function loadMyTournaments() {
   const token = localStorage.getItem("token");
 
   const res = await fetch("/api/host/tournaments", {
-  headers: { Authorization: `Bearer ${token}` }
-});
-
+    headers: { Authorization: `Bearer ${token}` }
+  });
 
   if (!res.ok) {
     console.error("Failed to load tournaments");
@@ -781,9 +783,176 @@ async function loadMyTournaments() {
   }
 
   allTournaments = await res.json();
-  populateSportFilter(allTournaments);
-  renderMyTournaments(allTournaments);
 
+  populateSportFilter(allTournaments);
+  renderDashboard(allTournaments);
+  renderMyTournaments(allTournaments);
+}
+
+function parseTournamentDateRange(dateStr = "") {
+  if (!dateStr) return { start: null, end: null };
+
+  if (dateStr.includes(" to ")) {
+    const [startStr, endStr] = dateStr.split(" to ").map(s => s.trim());
+    return {
+      start: startStr ? new Date(startStr) : null,
+      end: endStr ? new Date(endStr) : null
+    };
+  }
+
+  const single = new Date(dateStr);
+  return { start: single, end: single };
+}
+
+function isValidDate(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime());
+}
+
+function getUpcomingTournaments(tournaments) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return [...tournaments]
+    .map(t => {
+      const { start, end } = parseTournamentDateRange(t.tournamentDates || "");
+      return { ...t, _startDate: start, _endDate: end };
+    })
+    .filter(t => isValidDate(t._endDate || t._startDate) && (t._endDate || t._startDate) >= today)
+    .sort((a, b) => (a._startDate || a._endDate) - (b._startDate || b._endDate));
+}
+
+function formatDateShort(dateStr) {
+  const date = new Date(dateStr);
+  if (!isValidDate(date)) return dateStr || "-";
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function formatTournamentDates(dateStr = "") {
+  const { start, end } = parseTournamentDateRange(dateStr);
+
+  if (isValidDate(start) && isValidDate(end)) {
+    return `${formatDateShort(start)} - ${formatDateShort(end)}`;
+  }
+  if (isValidDate(start)) return formatDateShort(start);
+  return dateStr || "-";
+}
+
+function getTotalPlayersCount(tournaments) {
+  return tournaments.reduce((sum, t) => {
+    if (typeof t.totalRegistrations === "number") return sum + t.totalRegistrations;
+    if (Array.isArray(t.players)) return sum + t.players.length;
+    if (Array.isArray(t.registrations)) return sum + t.registrations.length;
+    return sum;
+  }, 0);
+}
+
+function getActiveEventsCount(tournaments) {
+  return tournaments.reduce((sum, t) => {
+    if (Array.isArray(t.categories) && t.categories.length) return sum + t.categories.length;
+    return sum;
+  }, 0);
+}
+
+function renderUpcomingRow(tournaments) {
+  const container = document.getElementById("dashboard-upcoming-row");
+  if (!container) return;
+
+  const upcoming = getUpcomingTournaments(tournaments).slice(0, 10);
+
+  if (!upcoming.length) {
+    container.innerHTML = `<div class="dashboard-empty-card">No upcoming tournaments yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = upcoming.map(t => `
+    <div class="upcoming-tournament-card">
+      <h3>${t.tournamentName || "Untitled tournament"}</h3>
+      <p class="upcoming-meta">${t.sportName || "-"}</p>
+      <p class="upcoming-meta">${formatTournamentDates(t.tournamentDates)}</p>
+    </div>
+  `).join("");
+}
+
+function renderStats(tournaments) {
+  const totalTournamentsEl = document.getElementById("stat-total-tournaments");
+  const totalPlayersEl = document.getElementById("stat-total-players");
+  const activeEventsEl = document.getElementById("stat-active-events");
+
+  if (totalTournamentsEl) totalTournamentsEl.textContent = tournaments.length;
+  if (totalPlayersEl) totalPlayersEl.textContent = getTotalPlayersCount(tournaments);
+  if (activeEventsEl) activeEventsEl.textContent = getActiveEventsCount(tournaments);
+}
+
+function getTournamentsForDate(tournaments, dateObj) {
+  return tournaments.filter(t => {
+    const { start, end } = parseTournamentDateRange(t.tournamentDates || "");
+    if (!isValidDate(start)) return false;
+
+    const startDate = new Date(start);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = isValidDate(end) ? new Date(end) : new Date(start);
+    endDate.setHours(0, 0, 0, 0);
+
+    const current = new Date(dateObj);
+    current.setHours(0, 0, 0, 0);
+
+    return current >= startDate && current <= endDate;
+  });
+}
+
+function renderCalendar(tournaments) {
+  const monthLabel = document.getElementById("calendar-month-label");
+  const grid = document.getElementById("dashboard-calendar-grid");
+  if (!monthLabel || !grid) return;
+
+  const firstDay = new Date(dashboardYear, dashboardMonth, 1);
+  const lastDay = new Date(dashboardYear, dashboardMonth + 1, 0);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+
+  monthLabel.textContent = firstDay.toLocaleDateString("en-IN", {
+    month: "long",
+    year: "numeric"
+  });
+
+  const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let html = "";
+
+  for (let i = 0; i < totalCells; i++) {
+    const dayNumber = i - startWeekday + 1;
+    const cellDate = new Date(dashboardYear, dashboardMonth, dayNumber);
+    const inCurrentMonth = cellDate.getMonth() === dashboardMonth;
+    const isToday = cellDate.getTime() === today.getTime();
+
+    const tournamentsOnDate = inCurrentMonth ? getTournamentsForDate(tournaments, cellDate) : [];
+    const visible = tournamentsOnDate.slice(0, 2);
+    const extraCount = tournamentsOnDate.length - visible.length;
+
+    html += `
+      <div class="calendar-day ${inCurrentMonth ? "" : "is-other-month"} ${isToday ? "is-today" : ""}">
+        <div class="calendar-date">${cellDate.getDate()}</div>
+        ${visible.map(t => `<div class="calendar-marker" title="${t.tournamentName}">${t.tournamentName}</div>`).join("")}
+        ${extraCount > 0 ? `<div class="calendar-more">+${extraCount} more</div>` : ""}
+      </div>
+    `;
+  }
+
+  grid.innerHTML = html;
+}
+
+function renderDashboard(tournaments) {
+  renderUpcomingRow(tournaments);
+  renderStats(tournaments);
+  renderCalendar(tournaments);
 }
 
 function populateSportFilter(tournaments) {
@@ -800,14 +969,14 @@ function populateSportFilter(tournaments) {
     filter.appendChild(opt);
   });
 
-  filter.addEventListener("change", () => {
+  filter.onchange = () => {
     const selected = filter.value;
     const filtered = selected
       ? allTournaments.filter(t => t.sportName === selected)
       : allTournaments;
 
     renderMyTournaments(filtered);
-  });
+  };
 }
 
 function syncCourtCount() {
@@ -870,14 +1039,19 @@ function hydrateWizardFormFromState() {
 
 function switchHostView(view) {
   const modeCards = document.querySelectorAll(".host-mode-card");
+  const dashboardView = document.getElementById("dashboard-view");
   const myView = document.getElementById("my-tournaments-view");
   const newView = document.getElementById("new-tournament-view");
 
   modeCards.forEach((c) => c.classList.remove("active"));
+  dashboardView?.classList.remove("host-view--active");
   myView?.classList.remove("host-view--active");
   newView?.classList.remove("host-view--active");
 
-  if (view === "my") {
+  if (view === "dashboard") {
+    document.querySelector('[data-host-mode="dashboard"]')?.classList.add("active");
+    dashboardView?.classList.add("host-view--active");
+  } else if (view === "my") {
     document.querySelector('[data-host-mode="my"]')?.classList.add("active");
     myView?.classList.add("host-view--active");
   } else {
@@ -1071,28 +1245,34 @@ function renderMyTournaments(tournaments) {
 
 
 
-  if (myView && newView) {
-    modeCards.forEach((card) => {
-      card.addEventListener("click", () => {
-        // Remove active from all cards
-        modeCards.forEach((c) => c.classList.remove("active"));
+const dashboardView = document.getElementById("dashboard-view");
 
-        // Hide all views
-        myView.classList.remove("host-view--active");
-        newView.classList.remove("host-view--active");
-
-        // Activate clicked card
-        card.classList.add("active");
-
-        // Show correct view
-        if (card.dataset.hostMode === "my") {
-          myView.classList.add("host-view--active");
-        } else {
-          newView.classList.add("host-view--active");
-        }
-      });
+if (dashboardView && myView && newView) {
+  modeCards.forEach((card) => {
+    card.addEventListener("click", () => {
+      switchHostView(card.dataset.hostMode);
     });
-  }
+  });
+}
 
   // (form submit handled by wizard submit button above)
+
+  document.getElementById("calendar-prev-btn")?.addEventListener("click", () => {
+  dashboardMonth--;
+  if (dashboardMonth < 0) {
+    dashboardMonth = 11;
+    dashboardYear--;
+  }
+  renderCalendar(allTournaments);
+});
+
+document.getElementById("calendar-next-btn")?.addEventListener("click", () => {
+  dashboardMonth++;
+  if (dashboardMonth > 11) {
+    dashboardMonth = 0;
+    dashboardYear++;
+  }
+  renderCalendar(allTournaments);
+});
+
 });

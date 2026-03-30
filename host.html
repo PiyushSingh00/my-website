@@ -48,31 +48,105 @@
     <div class="host-layout">
         <!-- Mode toggle cards -->
         <section class="host-mode-toggle">
-        <button
-            class="host-mode-card active"
-            type="button"
-            data-host-mode="my"
-        >
-            <h2>My tournaments</h2>
-            <p>See and manage all tournaments you have hosted.</p>
-        </button>
+          <button
+              class="host-mode-card active"
+              type="button"
+              data-host-mode="dashboard"
+          >
+              <h2>Dashboard</h2>
+              <p>See upcoming tournaments, calendar and quick stats.</p>
+          </button>
 
-        <button
-            class="host-mode-card"
-            type="button"
-            data-host-mode="new"
-        >
-            <h2>Host new tournament</h2>
-            <p>Create a new tournament and share the access code.</p>
-        </button>
+          <button
+              class="host-mode-card"
+              type="button"
+              data-host-mode="my"
+          >
+              <h2>My tournaments</h2>
+              <p>See and manage all tournaments you have hosted.</p>
+          </button>
+
+          <button
+              class="host-mode-card"
+              type="button"
+              data-host-mode="new"
+          >
+              <h2>Host new tournament</h2>
+              <p>Create a new tournament and share the access code.</p>
+          </button>
         </section>
 
+    <section
+      id="dashboard-view"
+      class="host-view host-view--active"
+      aria-label="Dashboard"
+    >
+      <div class="dashboard-stack">
+        <div class="dashboard-card">
+          <div class="dashboard-head">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h2 class="dashboard-title">Upcoming tournaments</h2>
+            </div>
+          </div>
+
+          <div id="dashboard-upcoming-row" class="upcoming-scroll">
+            <div class="dashboard-empty-card">No upcoming tournaments yet.</div>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="dashboard-head">
+            <div>
+              <p class="eyebrow">Calendar</p>
+              <h2 class="dashboard-title">Tournament calendar</h2>
+            </div>
+          </div>
+
+          <div class="calendar-toolbar">
+            <button type="button" class="calendar-nav-btn" id="calendar-prev-btn">←</button>
+            <div id="calendar-month-label" class="calendar-month-label">Month Year</div>
+            <button type="button" class="calendar-nav-btn" id="calendar-next-btn">→</button>
+          </div>
+
+          <div class="calendar-grid calendar-weekdays">
+            <div>Sun</div>
+            <div>Mon</div>
+            <div>Tue</div>
+            <div>Wed</div>
+            <div>Thu</div>
+            <div>Fri</div>
+            <div>Sat</div>
+          </div>
+
+          <div id="dashboard-calendar-grid" class="calendar-grid calendar-days"></div>
+        </div>
+
+        <div class="dashboard-stats-row">
+          <div class="stat-card">
+            <p class="stat-label">Total tournaments</p>
+            <h3 id="stat-total-tournaments">0</h3>
+          </div>
+
+          <div class="stat-card">
+            <p class="stat-label">Total players</p>
+            <h3 id="stat-total-players">0</h3>
+          </div>
+
+          <div class="stat-card">
+            <p class="stat-label">Active events</p>
+            <h3 id="stat-active-events">0</h3>
+          </div>
+        </div>
+      </div>
+    </section>
+    
     <!-- My tournaments view -->
     <section
         id="my-tournaments-view"
-        class="host-view host-view--active"
+        class="host-view"
         aria-label="My tournaments"
-        >
+    >
 
         <!-- Sport filter -->
         <div class="field-group" style="max-width: 260px; margin-bottom: 12px;">
