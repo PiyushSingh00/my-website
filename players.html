@@ -62,6 +62,10 @@
         <div class="players-toolbar">
           <button class="btn-dark" type="button" id="players-back-btn">← Back</button>
 
+          <button class="btn-dark" type="button" id="add-player-btn">
+            + Add players
+          </button>
+
           <button class="btn-primary" type="button" id="create-fixtures-btn">
             View tournament fixtures
           </button>
@@ -132,6 +136,56 @@
         <!-- ✅ END EMBEDDED FIXTURES -->
       </section>
     </main>
+
+    <div class="modal-overlay hidden" id="host-add-player-modal" aria-hidden="true">
+      <div class="modal">
+        <button class="modal-close" type="button" id="host-add-player-close">&times;</button>
+
+        <h2>Add player manually</h2>
+        <p class="helper-text">
+          Enter player details to add them directly to this tournament.
+        </p>
+
+        <form id="host-add-player-form">
+          <div class="field-group">
+            <label for="host-player-name">Name of player</label>
+            <input id="host-player-name" type="text" required />
+          </div>
+
+          <div class="field-group">
+            <label for="host-player-age">Age</label>
+            <input id="host-player-age" type="number" min="1" max="120" required />
+          </div>
+
+          <div class="field-group">
+            <label for="host-player-gender">Gender</label>
+            <select id="host-player-gender" required>
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
+
+          <div class="field-group">
+            <label for="host-player-phone">Phone number</label>
+            <input id="host-player-phone" type="tel" required />
+          </div>
+
+          <div class="field-group">
+            <label for="host-player-category">Category</label>
+            <select id="host-player-category" required>
+              <option value="">Select category</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn-primary full-width">
+            Add player
+          </button>
+        </form>
+      </div>
+    </div>
 
     <script type="module" src="scripts/players.js"></script>
   </body>

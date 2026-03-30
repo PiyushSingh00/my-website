@@ -478,3 +478,101 @@
   white-space: nowrap;
   min-width: 0 !important;
 }
+
+/* =========================
+   Add player modal
+   ========================= */
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(2, 6, 16, 0.72);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  width: min(460px, 100%);
+  padding: 22px 20px 20px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.12), transparent 55%),
+    rgba(12, 20, 36, 0.98);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.modal h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.modal .helper-text {
+  margin-bottom: 16px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(132, 152, 185, 0.45);
+  border-radius: 999px;
+  background: rgba(5, 11, 24, 0.9);
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+#host-add-player-form {
+  display: grid;
+  gap: 12px;
+}
+
+.field-group {
+  display: grid;
+  gap: 6px;
+}
+
+.field-group label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.field-group input,
+.field-group select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(132, 152, 185, 0.45);
+  background: rgba(5, 11, 24, 0.92);
+  color: var(--text);
+  outline: none;
+}
+
+.field-group input:focus,
+.field-group select:focus {
+  border-color: rgba(77, 208, 225, 0.75);
+  box-shadow: 0 0 0 3px rgba(77, 208, 225, 0.14);
+}
+
+.full-width {
+  width: 100%;
+}

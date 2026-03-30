@@ -85,7 +85,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     .getElementById("players-back-btn")
     ?.addEventListener("click", () => (window.location.href = "host.html"));
 
-  // ---------- SHARED HELPERS ----------
+    addPlayerBtn?.addEventListener("click", openAddPlayerModal);
+    addPlayerClose?.addEventListener("click", closeAddPlayerModal);
+
+    addPlayerModal?.addEventListener("click", (e) => {
+      if (e.target === addPlayerModal) closeAddPlayerModal();
+    });
+
+  const addPlayerBtn = document.getElementById("add-player-btn");
+  const addPlayerModal = document.getElementById("host-add-player-modal");
+  const addPlayerClose = document.getElementById("host-add-player-close");
+  const addPlayerForm = document.getElementById("host-add-player-form");
+  const addPlayerCategory = document.getElementById("host-player-category");
+  
+    // ---------- SHARED HELPERS ----------
   function normalizeCategories(cats) {
     if (!cats) return [];
     if (Array.isArray(cats)) return cats;
@@ -111,6 +124,43 @@ document.addEventListener("DOMContentLoaded", async () => {
     const parts = [age, gender, type].filter(Boolean);
     return parts.length ? parts.join(" • ") : (c?.categoryId || c?.id || "Category");
   }
+
+    function populateAddPlayerCategoryOptions() {
+      if (!addPlayerCategory) return;
+
+      addPlayerCategory.innerHTML = `<option value="">Select category</option>`;
+
+      (tournamentCategories || []).forEach((c) => {
+        const id = c.categoryId || c.id;
+        if (!id) return;
+
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = categoryLabel(c);
+        addPlayerCategory.appendChild(opt);
+      });
+    }
+
+    function openAddPlayerModal() {
+      populateAddPlayerCategoryOptions();
+      addPlayerForm?.reset();
+      addPlayerModal?.classList.remove("hidden");
+      addPlayerModal?.setAttribute("aria-hidden", "false");
+    }
+
+    function closeAddPlayerModal() {
+      addPlayerModal?.classList.add("hidden");
+      addPlayerModal?.setAttribute("aria-hidden", "true");
+    }
+
+    function setActivePlayerTab(filterValue) {
+      activeFilter = String(filterValue || "all");
+
+      document.querySelectorAll(".players-tab").forEach((tab) => {
+        const isActive = String(tab.dataset.playerFilter || "all") === activeFilter;
+        tab.classList.toggle("active", isActive);
+      });
+    }
 
   function getPlayerCategoryId(p) {
     return p.categoryId ?? p.categoryID ?? p.category ?? p.category_id ?? null;
@@ -379,6 +429,52 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
   }
+
+    addPlayerForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById("host-player-name")?.value?.trim();
+      const age = Number(document.getElementById("host-player-age")?.value);
+      const gender = document.getElementById("host-player-gender")?.value;
+      const phone = document.getElementById("host-player-phone")?.value?.trim();
+      const categoryId = document.getElementById("host-player-category")?.value;
+
+      if (!name || !age || !gender || !phone || !categoryId) {
+        alert("Please fill all player details.");
+        return;
+      }
+
+      const newPlayer = {
+        playerId: "manual-" + Date.now(),
+        registrationId: "manual-" + Date.now(),
+        playerName: name,
+        name,
+        age,
+        gender,
+        phone,
+        playerPhone: phone,
+        categoryId,
+        category: categoryId,
+        status: "accepted",
+        registrationStatus: "accepted",
+        addedByHost: true
+      };
+
+      allPlayers.push(newPlayer);
+
+      setActivePlayerTab(categoryId);
+      renderPlayers();
+      closeAddPlayerModal();
+
+      if (fixturesUi.isOpen && !fixturesState.fixtures?.__locked) {
+        fixturesState.players = allPlayers;
+        rebuildAcceptedByCategory();
+
+        if (fixturesState.activeCategoryId) {
+          renderCategoryBracket(fixturesState.activeCategoryId);
+        }
+      }
+    });
 
   // ---------- FETCH PLAYERS ----------
   async function loadPlayers() {
