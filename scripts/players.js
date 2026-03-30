@@ -85,18 +85,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     .getElementById("players-back-btn")
     ?.addEventListener("click", () => (window.location.href = "host.html"));
 
-    addPlayerBtn?.addEventListener("click", openAddPlayerModal);
-    addPlayerClose?.addEventListener("click", closeAddPlayerModal);
-
-    addPlayerModal?.addEventListener("click", (e) => {
-      if (e.target === addPlayerModal) closeAddPlayerModal();
-    });
 
   const addPlayerBtn = document.getElementById("add-player-btn");
   const addPlayerModal = document.getElementById("host-add-player-modal");
   const addPlayerClose = document.getElementById("host-add-player-close");
   const addPlayerForm = document.getElementById("host-add-player-form");
   const addPlayerCategory = document.getElementById("host-player-category");
+
+  addPlayerBtn?.addEventListener("click", openAddPlayerModal);
+  addPlayerClose?.addEventListener("click", closeAddPlayerModal);
+
+  addPlayerModal?.addEventListener("click", (e) => {
+    if (e.target === addPlayerModal) closeAddPlayerModal();
+  });
   
     // ---------- SHARED HELPERS ----------
   function normalizeCategories(cats) {
