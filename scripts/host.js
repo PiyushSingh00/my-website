@@ -2,6 +2,9 @@
 import { requireAuth, logout } from "./auth.js";
 
 let allTournaments = [];
+let currentSportFilter = "";
+let currentSortFilter = "newest";
+let viewOnlyMode = false;
 
   function generateAccessCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -72,13 +75,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   // ── DOM refs ──────────────────────────────────────────────────────────
-  const wizStepsEl   = document.getElementById("wiz-steps");
-  const wizBackBtn   = document.getElementById("wiz-back-btn");
-  const wizNextBtn   = document.getElementById("wiz-next-btn");
-  const wizSubmitBtn = document.getElementById("wiz-submit-btn");
-  const wizDots      = document.querySelectorAll(".wiz-step-dot");
-  const wizLines     = document.querySelectorAll(".wiz-progress-line");
-
+const wizStepsEl        = document.getElementById("wiz-steps");
+const wizBackBtn        = document.getElementById("wiz-back-btn");
+const wizNextBtn        = document.getElementById("wiz-next-btn");
+const wizSubmitBtn      = document.getElementById("wiz-submit-btn");
+const wizSaveNowBtn     = document.getElementById("wiz-save-now-btn");
+const wizCancelEditBtn  = document.getElementById("wiz-cancel-edit-btn");
+const wizDots           = document.querySelectorAll(".wiz-step-dot");
+const wizLines          = document.querySelectorAll(".wiz-progress-line");
   // ── Render progress bar ───────────────────────────────────────────────
   function updateProgress() {
     wizDots.forEach((dot, i) => {
@@ -98,6 +102,173 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function setWizardModeUI() {
+  const isEditMode = !!editingTournamentId;
+  const isViewMode = !!viewOnlyMode;
+
+  if (wizSaveNowBtn) {
+    wizSaveNowBtn.classList.toggle("hidden", !isEditMode || isViewMode);
+  }
+
+  if (wizCancelEditBtn) {
+    wizCancelEditBtn.classList.toggle("hidden", !(isEditMode || isViewMode));
+    wizCancelEditBtn.textContent = isViewMode ? "← Back to My tournaments" : "Cancel";
+  }
+
+  if (wizSubmitBtn) {
+    if (isViewMode) {
+      wizSubmitBtn.classList.add("hidden");
+    } else {
+      wizSubmitBtn.textContent = isEditMode ? "💾 Save changes" : "🚀 Create tournament";
+    }
+  }
+
+  if (wizNextBtn) {
+    if (isViewMode) wizNextBtn.classList.add("hidden");
+  }
+
+  if (wizBackBtn) {
+    if (isViewMode) wizBackBtn.classList.add("hidden");
+  }
+}
+
+function resetWizardStateAndUI() {
+  Object.assign(wiz, {
+    name:"", sport:"", dateStart:"", dateEnd:"", venue:"", details:"",
+    tournamentType:"single",
+    eventCount:1,
+    eventNames:[],
+    eventConfigs:[],
+    stageFormat:"",
+    groupCount:"",
+    tournamentRules: {
+      maxMatchesPerPlayer: "",
+      bestOfSets: "",
+      pointsPerSet: ""
+    },
+    leaguePoints: {
+      win: "",
+      loss: "",
+      draw: ""
+    },
+    courtCount:1,
+    courtNames:[],
+    requirePayment:false,
+    amount:""
+  });
+
+  editingTournamentId = null;
+  viewOnlyMode = false;
+
+  document.getElementById("w-event-count-display").textContent = "1";
+  document.getElementById("w-stage-format").value = "";
+  document.getElementById("w-group-count").value = "";
+  document.getElementById("wiz-group-count-wrap").classList.add("hidden");
+  document.getElementById("wiz-league-points-wrap").classList.add("hidden");
+
+  document.getElementById("w-max-matches-per-player").value = "";
+  document.getElementById("w-best-of-sets").value = "";
+  document.getElementById("w-points-per-set").value = "";
+  document.getElementById("w-points-win").value = "";
+  document.getElementById("w-points-loss").value = "";
+  document.getElementById("w-points-draw").value = "";
+
+  document.querySelectorAll(".wiz-type-card").forEach(c => c.classList.toggle("active", c.dataset.type === "single"));
+  document.getElementById("wiz-event-count-wrap").classList.add("hidden");
+  document.getElementById("wiz-event-names-wrap").classList.add("hidden");
+  document.getElementById("w-payment-no").classList.add("active");
+  document.getElementById("w-payment-yes").classList.remove("active");
+  document.getElementById("wiz-amount-wrap").classList.add("hidden");
+  document.getElementById("access-code").value = "";
+
+  if (wizSubmitBtn) {
+    wizSubmitBtn.disabled = false;
+    wizSubmitBtn.textContent = "🚀 Create tournament";
+  }
+  if (wizSaveNowBtn) {
+    wizSaveNowBtn.disabled = false;
+    wizSaveNowBtn.textContent = "💾 Save now";
+  }
+
+  setWizardModeUI();
+}
+
+function openTournamentForView(t) {
+  viewOnlyMode = true;
+  editingTournamentId = null;
+
+  wiz.name = t.tournamentName || "";
+  wiz.sport = t.sportName || "";
+  wiz.venue = t.venue || "";
+
+  const dateStr = t.tournamentDates || "";
+  if (dateStr.includes(" to ")) {
+    const [start, end] = dateStr.split(" to ");
+    wiz.dateStart = start?.trim() || "";
+    wiz.dateEnd = end?.trim() || "";
+  } else {
+    wiz.dateStart = "";
+    wiz.dateEnd = "";
+  }
+
+  wiz.details =
+    typeof t.playerDetails === "string"
+      ? t.playerDetails
+      : Array.isArray(t.playerDetails)
+        ? t.playerDetails.join(", ")
+        : "";
+
+  wiz.tournamentType = t.tournamentType || "single";
+  wiz.stageFormat = t.stageFormat || "";
+  wiz.groupCount = t.groupCount ? String(t.groupCount) : "";
+
+  wiz.tournamentRules = {
+    maxMatchesPerPlayer: t.tournamentRules?.maxMatchesPerPlayer != null ? String(t.tournamentRules.maxMatchesPerPlayer) : "",
+    bestOfSets: t.tournamentRules?.bestOfSets != null ? String(t.tournamentRules.bestOfSets) : "",
+    pointsPerSet: t.tournamentRules?.pointsPerSet != null ? String(t.tournamentRules.pointsPerSet) : "",
+  };
+
+  wiz.leaguePoints = {
+    win: t.leaguePoints?.win != null ? String(t.leaguePoints.win) : "",
+    loss: t.leaguePoints?.loss != null ? String(t.leaguePoints.loss) : "",
+    draw: t.leaguePoints?.draw != null ? String(t.leaguePoints.draw) : "",
+  };
+
+  wiz.courtCount = Number(t.courtCount || 1);
+  wiz.courtNames = Array.isArray(t.courtNames) ? [...t.courtNames] : [];
+  wiz.requirePayment = !!t.requirePayment;
+  wiz.amount = t.entryFee != null ? String(t.entryFee) : "";
+
+  const categories = Array.isArray(t.categories) ? t.categories : [];
+
+  if (wiz.tournamentType === "team") {
+    const eventNames = categories.map(c => c.eventName || "").filter(Boolean);
+    wiz.eventNames = eventNames.length ? eventNames : [""];
+    wiz.eventCount = wiz.eventNames.length;
+  } else {
+    wiz.eventNames = [];
+    wiz.eventCount = 1;
+  }
+
+  wiz.eventConfigs = categories.length
+    ? categories.map(c => ({
+        categoryId: c.categoryId || "",
+        gender: c.gender || "",
+        ageGroup: c.ageGroup || "",
+        playingLevel: c.playingLevel || "",
+        teamSize: String(c.teamSize || "1"),
+        eventName: c.eventName || "",
+      }))
+    : [{ categoryId: "", gender: "", ageGroup: "", playingLevel: "", teamSize: "1", eventName: "" }];
+
+  document.getElementById("access-code").value = t.accessCode || "";
+  hydrateWizardFormFromState();
+  buildReview();
+  switchHostView("new");
+  showStep(5);
+  setWizardModeUI();
+}
+
   // ── Show/hide step panels ─────────────────────────────────────────────
   function showStep(n) {
     document.querySelectorAll(".wiz-step").forEach((el, i) => {
@@ -105,6 +276,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     currentStep = n;
     updateProgress();
+    setWizardModeUI();
     if (n === TOTAL_STEPS - 1) buildReview();
   }
 
@@ -499,20 +671,121 @@ function openNativeDatePicker(input) {
   });
 
   // ── Submit ────────────────────────────────────────────────────────────
-  wizSubmitBtn?.addEventListener("click", async () => {
-    const code = document.getElementById("access-code").value;
-    if (!code) { alert("Please generate an access code first."); return; }
+async function submitTournament() {
+  collectStep(currentStep);
 
-    // Build categories array from event configs (matches existing backend schema)
-    categories = wiz.eventConfigs.map((cfg, i) => ({
-      categoryId: "CAT-" + Math.random().toString(36).slice(2,8).toUpperCase(),
-      ageGroup:   cfg.ageGroup   || "",
-      gender:     cfg.gender     || "",
-      teamSize:   cfg.teamSize   || "1",
-      playingLevel: cfg.playingLevel || "",
-      eventName:  wiz.tournamentType === "single" ? "" : (wiz.eventNames[i] || ""),
-    }));
+  const code = document.getElementById("access-code").value;
+  if (!code) {
+    alert("Please generate an access code first.");
+    return;
+  }
 
+  categories = wiz.eventConfigs.map((cfg, i) => ({
+    categoryId: cfg.categoryId || ("CAT-" + Math.random().toString(36).slice(2,8).toUpperCase()),
+    ageGroup: cfg.ageGroup || "",
+    gender: cfg.gender || "",
+    teamSize: cfg.teamSize || "1",
+    playingLevel: cfg.playingLevel || "",
+    eventName: wiz.tournamentType === "single" ? "" : (wiz.eventNames[i] || cfg.eventName || ""),
+  }));
+
+  document.getElementById("tournament-name").value  = wiz.name;
+  document.getElementById("sport-name").value       = wiz.sport;
+  document.getElementById("tournament-dates").value = wiz.dateStart + (wiz.dateEnd ? " to " + wiz.dateEnd : "");
+  document.getElementById("tournament-venue").value = wiz.venue;
+  document.getElementById("player-details").value   = wiz.details;
+
+  const payload = {
+    tournamentName: wiz.name,
+    sportName: wiz.sport,
+    tournamentDates: wiz.dateStart + (wiz.dateEnd ? " to " + wiz.dateEnd : ""),
+    accessCode: code,
+    playerDetails: wiz.details,
+    venue: wiz.venue,
+    categories,
+
+    tournamentType: wiz.tournamentType,
+    eventCount: wiz.eventCount,
+    eventNames: wiz.eventNames,
+    eventConfigs: categories,
+
+    stageFormat: wiz.stageFormat,
+    groupCount: wiz.stageFormat === "group_knockout" ? Number(wiz.groupCount) : null,
+
+    tournamentRules: {
+      maxMatchesPerPlayer: wiz.tournamentRules.maxMatchesPerPlayer ? Number(wiz.tournamentRules.maxMatchesPerPlayer) : null,
+      bestOfSets: wiz.tournamentRules.bestOfSets ? Number(wiz.tournamentRules.bestOfSets) : null,
+      pointsPerSet: wiz.tournamentRules.pointsPerSet ? Number(wiz.tournamentRules.pointsPerSet) : null,
+    },
+
+    leaguePoints: shouldShowLeaguePoints() ? {
+      win: wiz.leaguePoints.win !== "" ? Number(wiz.leaguePoints.win) : null,
+      loss: wiz.leaguePoints.loss !== "" ? Number(wiz.leaguePoints.loss) : null,
+      draw: wiz.leaguePoints.draw !== "" ? Number(wiz.leaguePoints.draw) : null,
+    } : null,
+
+    courtCount: wiz.courtCount,
+    courtNames: wiz.courtNames,
+    requirePayment: wiz.requirePayment,
+    entryFee: wiz.requirePayment ? Number(wiz.amount) : 0,
+  };
+
+  const isEditMode = !!editingTournamentId;
+
+  if (wizSubmitBtn) {
+    wizSubmitBtn.disabled = true;
+    wizSubmitBtn.textContent = "Saving…";
+  }
+  if (wizSaveNowBtn) {
+    wizSaveNowBtn.disabled = true;
+    wizSaveNowBtn.textContent = "Saving…";
+  }
+
+  const res = await fetch(
+    isEditMode
+      ? `/api/host/tournaments/${editingTournamentId}`
+      : "/api/host/tournaments",
+    {
+      method: isEditMode ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + localStorage.getItem("token"),
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!res.ok) {
+    alert(isEditMode ? "Failed to update tournament" : "Failed to save tournament");
+
+    if (wizSubmitBtn) {
+      wizSubmitBtn.disabled = false;
+      wizSubmitBtn.textContent = isEditMode ? "💾 Save changes" : "🚀 Create tournament";
+    }
+    if (wizSaveNowBtn) {
+      wizSaveNowBtn.disabled = false;
+      wizSaveNowBtn.textContent = "💾 Save now";
+    }
+    return;
+  }
+
+  showCreatedToast(isEditMode ? "Tournament updated successfully" : "Tournament created successfully");
+
+  resetWizardStateAndUI();
+  showStep(0);
+  await loadMyTournaments();
+  switchHostView("my");
+}
+
+wizSubmitBtn?.addEventListener("click", submitTournament);
+wizSaveNowBtn?.addEventListener("click", submitTournament);
+
+wizCancelEditBtn?.addEventListener("click", () => {
+  resetWizardStateAndUI();
+  hydrateWizardFormFromState();
+  showStep(0);
+  switchHostView("my");
+});
     // Sync hidden fields so existing host.js submit handler still works
     document.getElementById("tournament-name").value  = wiz.name;
     document.getElementById("sport-name").value       = wiz.sport;
@@ -643,23 +916,23 @@ function openNativeDatePicker(input) {
     });
   });
 
-  function showCreatedToast() {
-    const overlay = document.createElement("div");
-    overlay.style.position = "fixed";
-    overlay.style.inset = "0";
-    overlay.style.background = "rgba(6, 12, 18, 0.7)";
-    overlay.style.display = "flex";
-    overlay.style.alignItems = "center";
-    overlay.style.justifyContent = "center";
-    overlay.style.zIndex = "9999";
-    overlay.innerHTML = `
-      <div style="background:#0f1b26;padding:24px 32px;border-radius:14px;color:#fff;font-weight:600;letter-spacing:.2px;">
-        Tournament created successfully
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    setTimeout(() => overlay.remove(), 1000);
-  }
+function showCreatedToast(message = "Tournament created successfully") {
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.inset = "0";
+  overlay.style.background = "rgba(6, 12, 18, 0.7)";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.zIndex = "9999";
+  overlay.innerHTML = `
+    <div style="background:#0f1b26;padding:24px 32px;border-radius:14px;color:#fff;font-weight:600;letter-spacing:.2px;">
+      ${message}
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 1000);
+}
 
   // (category management handled by wizard — no legacy listeners needed)
   loadMyTournaments();
@@ -786,8 +1059,7 @@ async function loadMyTournaments() {
 
   populateSportFilter(allTournaments);
   renderDashboard(allTournaments);
-  renderMyTournaments(allTournaments);
-}
+renderMyTournaments(getFilteredAndSortedTournaments());}
 
 function parseTournamentDateRange(dateStr = "") {
   if (!dateStr) return { start: null, end: null };
@@ -870,12 +1142,20 @@ function renderUpcomingRow(tournaments) {
   }
 
   container.innerHTML = upcoming.map(t => `
-    <div class="upcoming-tournament-card">
+    <div class="upcoming-tournament-card" data-id="${t.tournamentId}">
       <h3>${t.tournamentName || "Untitled tournament"}</h3>
       <p class="upcoming-meta">${t.sportName || "-"}</p>
       <p class="upcoming-meta">${formatTournamentDates(t.tournamentDates)}</p>
     </div>
   `).join("");
+
+  container.querySelectorAll(".upcoming-tournament-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const id = card.dataset.id;
+      if (!id) return;
+      window.location.href = `players.html?tournamentId=${id}`;
+    });
+  });
 }
 
 function renderStats(tournaments) {
@@ -955,11 +1235,60 @@ function renderDashboard(tournaments) {
   renderCalendar(tournaments);
 }
 
+function getFilteredAndSortedTournaments() {
+  let list = [...allTournaments];
+
+  if (currentSportFilter) {
+    list = list.filter(t => t.sportName === currentSportFilter);
+  }
+
+  const withDates = list.map(t => {
+    const { start, end } = parseTournamentDateRange(t.tournamentDates || "");
+    return {
+      ...t,
+      _startDate: isValidDate(start) ? start : null,
+      _endDate: isValidDate(end) ? end : null,
+      _createdAt: t.createdAt ? new Date(t.createdAt) : null,
+    };
+  });
+
+  if (currentSortFilter === "newest") {
+    withDates.sort((a, b) => {
+      const aTime = a._createdAt && isValidDate(a._createdAt) ? a._createdAt.getTime() : 0;
+      const bTime = b._createdAt && isValidDate(b._createdAt) ? b._createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+  } else if (currentSortFilter === "oldest") {
+    withDates.sort((a, b) => {
+      const aTime = a._createdAt && isValidDate(a._createdAt) ? a._createdAt.getTime() : 0;
+      const bTime = b._createdAt && isValidDate(b._createdAt) ? b._createdAt.getTime() : 0;
+      return aTime - bTime;
+    });
+  } else if (currentSortFilter === "active") {
+    withDates.sort((a, b) => Number(b.registrationsOpen === true) - Number(a.registrationsOpen === true));
+  } else if (currentSortFilter === "inactive") {
+    withDates.sort((a, b) => Number(a.registrationsOpen === false) - Number(b.registrationsOpen === false));
+  } else if (currentSortFilter === "upcoming") {
+    withDates.sort((a, b) => {
+      const aTime = a._startDate ? a._startDate.getTime() : Number.MAX_SAFE_INTEGER;
+      const bTime = b._startDate ? b._startDate.getTime() : Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    });
+  } else if (currentSortFilter === "name_asc") {
+    withDates.sort((a, b) => String(a.tournamentName || "").localeCompare(String(b.tournamentName || "")));
+  } else if (currentSortFilter === "name_desc") {
+    withDates.sort((a, b) => String(b.tournamentName || "").localeCompare(String(a.tournamentName || "")));
+  }
+
+  return withDates;
+}
+
 function populateSportFilter(tournaments) {
   const filter = document.getElementById("filter-sport");
+  const sort = document.getElementById("sort-tournaments");
   if (!filter) return;
 
-  const sports = [...new Set(tournaments.map(t => t.sportName))];
+  const sports = [...new Set(tournaments.map(t => t.sportName).filter(Boolean))];
 
   filter.innerHTML = `<option value="">All sports</option>`;
   sports.forEach(sport => {
@@ -969,14 +1298,20 @@ function populateSportFilter(tournaments) {
     filter.appendChild(opt);
   });
 
-  filter.onchange = () => {
-    const selected = filter.value;
-    const filtered = selected
-      ? allTournaments.filter(t => t.sportName === selected)
-      : allTournaments;
+  filter.value = currentSportFilter;
+  if (sort) sort.value = currentSortFilter;
 
-    renderMyTournaments(filtered);
+  filter.onchange = () => {
+    currentSportFilter = filter.value;
+    renderMyTournaments(getFilteredAndSortedTournaments());
   };
+
+  if (sort) {
+    sort.onchange = () => {
+      currentSortFilter = sort.value;
+      renderMyTournaments(getFilteredAndSortedTournaments());
+    };
+  }
 }
 
 function syncCourtCount() {
@@ -1060,7 +1395,8 @@ function switchHostView(view) {
   }
 }
 
-  function openTournamentForEdit(t) {
+function openTournamentForEdit(t) {
+  viewOnlyMode = false;
   editingTournamentId = t.tournamentId;
 
   wiz.name = t.tournamentName || "";
@@ -1118,20 +1454,20 @@ function switchHostView(view) {
 
   wiz.eventConfigs = categories.length
     ? categories.map(c => ({
+        categoryId: c.categoryId || "",
         gender: c.gender || "",
         ageGroup: c.ageGroup || "",
         playingLevel: c.playingLevel || "",
         teamSize: String(c.teamSize || "1"),
+        eventName: c.eventName || "",
       }))
-    : [{ gender: "", ageGroup: "", playingLevel: "", teamSize: "1" }];
+    : [{ categoryId: "", gender: "", ageGroup: "", playingLevel: "", teamSize: "1", eventName: "" }];
 
   document.getElementById("access-code").value = t.accessCode || "";
   hydrateWizardFormFromState();
   switchHostView("new");
   showStep(0);
-
-  const submitBtn = document.getElementById("wiz-submit-btn");
-  if (submitBtn) submitBtn.textContent = "💾 Save changes";
+  setWizardModeUI();
 }
 
 
@@ -1150,22 +1486,21 @@ function renderMyTournaments(tournaments) {
 
   tournaments.forEach(t => {
     const categories = (t.categories || [])
-    .map(c => {
-      const size = Number(c.teamSize);
+      .map(c => {
+        const size = Number(c.teamSize);
 
-      let type = "";
-      if (size === 1) type = "Singles";
-      else if (size === 2) type = "Doubles";
+        let type = "";
+        if (size === 1) type = "Singles";
+        else if (size === 2) type = "Doubles";
 
-      const genderLabel =
-        c.gender === "Male" ? "Men's" :
-        c.gender === "Female" ? "Women's" :
-        c.gender;
+        const genderLabel =
+          c.gender === "Male" ? "Men's" :
+          c.gender === "Female" ? "Women's" :
+          c.gender;
 
-      return `${c.ageGroup} ${genderLabel}${type ? " " + type : ""}`;
-    })
-    .join(", ");
-
+        return `${c.ageGroup} ${genderLabel}${type ? " " + type : ""}`;
+      })
+      .join(", ");
 
     const card = document.createElement("div");
     card.className = "tournament-card";
@@ -1177,36 +1512,36 @@ function renderMyTournaments(tournaments) {
       </div>
 
       <p class="muted sport-date">${t.sportName} • ${t.tournamentDates}</p>
-
       <p class="muted">📍 ${t.venue}</p>
 
       ${categories ? `<p class="muted"><strong>Categories:</strong> ${categories}</p>` : ""}
 
       ${(() => {
-      const details =
-      typeof t.playerDetails === "string"
-          ? t.playerDetails
-          : Array.isArray(t.playerDetails)
-            ? t.playerDetails.join(", ")
-            : (t.playerDetails ?? "");
+        const details =
+          typeof t.playerDetails === "string"
+            ? t.playerDetails
+            : Array.isArray(t.playerDetails)
+              ? t.playerDetails.join(", ")
+              : (t.playerDetails ?? "");
 
-      const detailsStr = String(details);
+        const detailsStr = String(details);
 
-      return detailsStr.trim() !== ""
-        ? `
-          <p class="muted details-label">Details:</p>
-          <p class="muted details-text">${detailsStr}</p>
-        `
-        : "";
+        return detailsStr.trim() !== ""
+          ? `
+            <p class="muted details-label">Details:</p>
+            <p class="muted details-text">${detailsStr}</p>
+          `
+          : "";
       })()}
-
 
       <div class="tournament-meta">
         <span>Status: <strong>${t.registrationsOpen ? "Open" : "Closed"}</strong></span>
       </div>
+
       <div class="tournament-meta tournament-actions">
-        <button type="button" class="edit-btn" data-id="${t.tournamentId}">Edit tournament</button>
-        <button type="button" class="delete-btn" data-id="${t.tournamentId}">Delete tournament</button>
+        <button type="button" class="view-btn" data-id="${t.tournamentId}">View</button>
+        <button type="button" class="edit-btn" data-id="${t.tournamentId}">Edit</button>
+        <button type="button" class="delete-btn" data-id="${t.tournamentId}">Delete</button>
       </div>
     `;
 
@@ -1214,12 +1549,20 @@ function renderMyTournaments(tournaments) {
       window.location.href = `players.html?tournamentId=${t.tournamentId}`;
     });
 
-    const deleteBtn = card.querySelector(".delete-btn");
+    const viewBtn = card.querySelector(".view-btn");
     const editBtn = card.querySelector(".edit-btn");
+    const deleteBtn = card.querySelector(".delete-btn");
+
+    viewBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openTournamentForView(t);
+    });
+
     editBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
       openTournamentForEdit(t);
     });
+
     deleteBtn?.addEventListener("click", async (e) => {
       e.stopPropagation();
       const ok = confirm("Delete this tournament? This cannot be undone.");
@@ -1236,14 +1579,13 @@ function renderMyTournaments(tournaments) {
         alert("Failed to delete tournament");
         return;
       }
+
       loadMyTournaments();
     });
 
     container.appendChild(card);
   });
 }
-
-
 
 const dashboardView = document.getElementById("dashboard-view");
 
@@ -1275,4 +1617,3 @@ document.getElementById("calendar-next-btn")?.addEventListener("click", () => {
   renderCalendar(allTournaments);
 });
 
-});

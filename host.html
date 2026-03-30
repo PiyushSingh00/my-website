@@ -149,13 +149,27 @@
     >
 
         <!-- Sport filter -->
-        <div class="field-group" style="max-width: 260px; margin-bottom: 12px;">
-            <label for="filter-sport">Filter by sport</label>
-            <select id="filter-sport">
-                <option value="">All sports</option>
-            </select>
-        </div>
+<div class="filter-toolbar">
+  <div class="field-group filter-group-inline">
+    <label for="filter-sport">Filter by sport</label>
+    <select id="filter-sport">
+      <option value="">All sports</option>
+    </select>
+  </div>
 
+  <div class="field-group filter-group-inline">
+    <label for="sort-tournaments">Sort by</label>
+    <select id="sort-tournaments">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="active">Active first</option>
+      <option value="inactive">Inactive first</option>
+      <option value="upcoming">Upcoming first</option>
+      <option value="name_asc">Name A to Z</option>
+      <option value="name_desc">Name Z to A</option>
+    </select>
+  </div>
+</div>
         <div id="my-tournaments-list" class="tournaments-list">
             <!-- initial placeholder; JS will replace when needed -->
             <div class="empty-state">
@@ -425,11 +439,18 @@
             </div><!-- /wiz-steps -->
 
             <!-- Navigation -->
-            <div class="wiz-nav" id="wiz-nav">
-              <button type="button" class="btn-secondary" id="wiz-back-btn">← Back</button>
-              <button type="button" class="btn-primary" id="wiz-next-btn">Next →</button>
-              <button type="button" class="btn-primary hidden" id="wiz-submit-btn">🚀 Create tournament</button>
-            </div>
+         <div class="wiz-nav" id="wiz-nav">
+  <div class="wiz-nav-left">
+    <button type="button" class="btn-secondary" id="wiz-back-btn">← Back</button>
+    <button type="button" class="btn-secondary hidden" id="wiz-cancel-edit-btn">Cancel</button>
+  </div>
+
+  <div class="wiz-nav-right">
+    <button type="button" class="btn-dark hidden" id="wiz-save-now-btn">💾 Save now</button>
+    <button type="button" class="btn-primary" id="wiz-next-btn">Next →</button>
+    <button type="button" class="btn-primary hidden" id="wiz-submit-btn">🚀 Create tournament</button>
+  </div>
+</div>   
 
             <!-- hidden legacy form for submit compat -->
             <form id="host-form" style="display:none;">
