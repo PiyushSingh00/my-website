@@ -1535,25 +1535,36 @@ body {
 }
 
 .stat-card {
-  padding: 18px;
+  padding: 20px 18px;
   border-radius: 18px;
   background:
     radial-gradient(circle at top left, rgba(77, 208, 225, 0.10), transparent 55%),
     rgba(12, 20, 36, 0.92);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;        /* don't stretch to fill parent */
 }
 
 .stat-label {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
   color: var(--muted);
+  line-height: 1;
 }
 
 .stat-card h3 {
   margin: 0;
-  font-size: 28px;
+  font-size: 36px;
+  line-height: 1;
   font-family: "Space Grotesk", system-ui, sans-serif;
+  color: var(--text);
 }
 
 @media (max-width: 900px) {
@@ -1774,7 +1785,7 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
   gap: 16px;
-  align-items: stretch;
+  align-items: start;   /* was stretch — stat cards no longer balloon to chart height */
 }
 
 .sport-chart-card {
@@ -1968,33 +1979,23 @@ input, select, textarea {
 .upcoming-scroll::-webkit-scrollbar { display: none; }
 .upcoming-scroll { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* ── 6. Stat cards — always 3-across on desktop, row on mobile ─────── */
+/* ── 6. Stat cards — compact, always 3-across except very small phones ── */
 .dashboard-stats-row {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
 .stat-card {
-  padding: clamp(12px, 2.5vw, 20px);
+  padding: clamp(14px, 2.5vw, 20px) clamp(12px, 2vw, 18px);
   border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .stat-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--muted);
-  margin: 0;
-  white-space: nowrap;
+  font-size: 10px;
 }
 
 .stat-card h3 {
-  font-size: clamp(22px, 5vw, 32px);
-  margin: 0;
-  line-height: 1;
+  font-size: clamp(28px, 5vw, 36px);
 }
 
 /* Stack stats vertically only on very small phones */
@@ -2008,6 +2009,7 @@ input, select, textarea {
 .dashboard-bottom-grid {
   grid-template-columns: 1fr;
   gap: 12px;
+  align-items: start;
 }
 
 @media (min-width: 1000px) {

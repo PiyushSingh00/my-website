@@ -1029,44 +1029,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.body.appendChild(tip);
     }
 
-    // Remove previous listener by cloning the canvas
-    const newCanvas = canvas.cloneNode(true);
-    canvas.parentNode.replaceChild(newCanvas, canvas);
+    // Remove previous listeners cleanly using AbortController
+    if (canvas._pieAbort) canvas._pieAbort.abort();
+    const ac = new AbortController();
+    canvas._pieAbort = ac;
+    const sig = { signal: ac.signal };
 
-    // Redraw on the new canvas reference (ctx already drawn above, re-attach events only)
-    newCanvas.addEventListener("mousemove", (e) => {
-      const rect = newCanvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-
-      // Scale mouse coords to canvas internal resolution
-      const scaleX = newCanvas.width  / rect.width;
-      const scaleY = newCanvas.height / rect.height;
-      const px = mx * scaleX;
-      const py = my * scaleY;
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width  / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const px = (e.clientX - rect.left)  * scaleX;
+      const py = (e.clientY - rect.top)   * scaleY;
 
       const dx = px - cx;
       const dy = py - cy;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      // Only inside donut ring (between inner hole and outer radius)
-      if (dist < 44 || dist > radius) {
-        tip.style.display = "none";
-        return;
-      }
+      if (dist < 44 || dist > radius) { tip.style.display = "none"; return; }
 
       let angle = Math.atan2(dy, dx);
-      // Normalise to same start as drawing (-π/2)
       if (angle < -Math.PI / 2) angle += Math.PI * 2;
 
       const hit = slices.find(s => {
-        let start = s.start;
-        let end   = s.end;
-        // Handle wrap-around past +π
-        if (end > Math.PI) {
-          return angle >= start || angle <= (end - Math.PI * 2);
-        }
-        return angle >= start && angle < end;
+        if (s.end > Math.PI) return angle >= s.start || angle <= (s.end - Math.PI * 2);
+        return angle >= s.start && angle < s.end;
       });
 
       if (hit) {
@@ -1078,11 +1065,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         tip.style.display = "none";
       }
-    });
+    }, sig);
 
-    newCanvas.addEventListener("mouseleave", () => {
+    canvas.addEventListener("mouseleave", () => {
       tip.style.display = "none";
-    });
+    }, sig);
   }
 
   function renderDashboard(tournaments) {
