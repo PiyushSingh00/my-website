@@ -752,3 +752,23 @@ body {
     padding-inline: 16px;
   }
 }
+
+.captain-btn {
+  appearance: none;
+  border: 1px solid rgba(77, 208, 225, 0.55);
+  background: rgba(77, 208, 225, 0.12);
+  color: #a5f3ff;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.captain-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(77, 208, 225, 0.18);
+  border-color: rgba(77, 208, 225, 0.75);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}

@@ -4,7 +4,13 @@ import { requireAuth, logout } from "./auth.js";
 let allTournaments = [];
 let selectedTournament = null;
 let currentSportFilter = "all";
+let currentTournamentStatusFilter = "all";
 let currentSearchTerm = "";
+
+let myTournaments = [];
+let currentMySportFilter = "all";
+let currentMyTournamentStatusFilter = "all";
+let currentMySearchTerm = "";
 
 function normalizeCategories(cats) {
   if (!cats) return [];
@@ -227,15 +233,47 @@ function renderTournamentList(tournaments) {
   });
 }
 
+function parseTournamentEndDate(tournamentDates) {
+  if (!tournamentDates) return null;
+
+  const raw = String(tournamentDates).trim();
+
+  // handles "2026-04-10 to 2026-04-15"
+  if (raw.includes("to")) {
+    const parts = raw.split("to").map(p => p.trim());
+    const end = new Date(parts[1]);
+    return Number.isNaN(end.getTime()) ? null : end;
+  }
+
+  // handles single date
+  const single = new Date(raw);
+  return Number.isNaN(single.getTime()) ? null : single;
+}
+
+function getTournamentTimeStatus(t) {
+  const endDate = parseTournamentEndDate(t.tournamentDates);
+  if (!endDate) return "upcoming";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+
+  return endDate < today ? "completed" : "upcoming";
+}
+
 function renderFilteredTournaments() {
   const bySport = currentSportFilter === "all"
     ? allTournaments
     : allTournaments.filter(t => t.sportName === currentSportFilter);
 
+  const byStatus = currentTournamentStatusFilter === "all"
+    ? bySport
+    : bySport.filter(t => getTournamentTimeStatus(t) === currentTournamentStatusFilter);
+
   const term = currentSearchTerm.trim().toLowerCase();
   const byName = term
-    ? bySport.filter(t => String(t.tournamentName || "").toLowerCase().includes(term))
-    : bySport;
+    ? byStatus.filter(t => String(t.tournamentName || "").toLowerCase().includes(term))
+    : byStatus;
 
   renderTournamentList(byName);
 }
@@ -266,6 +304,16 @@ function wireSportFilter() {
   });
 }
 
+function wireTournamentStatusFilter() {
+  const select = document.getElementById("tournament-status-filter");
+  if (!select) return;
+
+  select.addEventListener("change", (e) => {
+    currentTournamentStatusFilter = e.target.value;
+    renderFilteredTournaments();
+  });
+}
+
 function wireTournamentSearch() {
   const input = document.getElementById("tournament-search");
   if (!input) return;
@@ -276,6 +324,68 @@ function wireTournamentSearch() {
   });
 }
 
+function populateSportFilterFromMine(list) {
+  const select = document.getElementById("my-sport-filter");
+  if (!select) return;
+
+  const sports = [...new Set((list || []).map(t => t.sportName).filter(Boolean))];
+
+  select.innerHTML = `<option value="all">All sports</option>`;
+  sports.forEach((sport) => {
+    const opt = document.createElement("option");
+    opt.value = sport;
+    opt.textContent = sport;
+    select.appendChild(opt);
+  });
+}
+
+
+function renderFilteredMyTournaments() {
+  const bySport = currentMySportFilter === "all"
+    ? myTournaments
+    : myTournaments.filter(t => t.sportName === currentMySportFilter);
+
+  const byStatus = currentMyTournamentStatusFilter === "all"
+    ? bySport
+    : bySport.filter(t => getTournamentTimeStatus(t) === currentMyTournamentStatusFilter);
+
+  const term = currentMySearchTerm.trim().toLowerCase();
+  const byName = term
+    ? byStatus.filter(t => String(t.tournamentName || "").toLowerCase().includes(term))
+    : byStatus;
+
+  renderMyTournaments(byName);
+}
+
+function wireMySportFilter() {
+  const select = document.getElementById("my-sport-filter");
+  if (!select) return;
+
+  select.addEventListener("change", (e) => {
+    currentMySportFilter = e.target.value;
+    renderFilteredMyTournaments();
+  });
+}
+
+function wireMyTournamentStatusFilter() {
+  const select = document.getElementById("my-tournament-status-filter");
+  if (!select) return;
+
+  select.addEventListener("change", (e) => {
+    currentMyTournamentStatusFilter = e.target.value;
+    renderFilteredMyTournaments();
+  });
+}
+
+function wireMyTournamentSearch() {
+  const input = document.getElementById("my-tournament-search");
+  if (!input) return;
+
+  input.addEventListener("input", (e) => {
+    currentMySearchTerm = e.target.value || "";
+    renderFilteredMyTournaments();
+  });
+}
 
 async function loadAllTournaments() {
   try {
@@ -475,6 +585,45 @@ const result =
   });
 }
 
+function getLocalCaptainState(tournamentId) {
+  try {
+    const raw = localStorage.getItem(`scheduleit_captains_${tournamentId}`);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    return {
+      selectedCaptainIds: Array.isArray(parsed?.selectedCaptainIds) ? parsed.selectedCaptainIds : [],
+      confirmedCaptains: Array.isArray(parsed?.confirmedCaptains) ? parsed.confirmedCaptains : [],
+      pools: parsed?.pools || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isUserCaptainForTournament(tournament, user) {
+  const tournamentId = tournament?.tournamentId ?? tournament?.id;
+  if (!tournamentId || !user) return false;
+
+  const captainState = getLocalCaptainState(tournamentId);
+  if (!captainState?.confirmedCaptains?.length) return false;
+
+  const userName = normalizeName(user.name);
+  const userUsername = normalizeName(user.username);
+
+  return captainState.confirmedCaptains.some((captain) => {
+    const captainName = normalizeName(captain.playerName);
+    return (
+      (userName && captainName === userName) ||
+      (userUsername && captainName === userUsername)
+    );
+  });
+}
+
 /* -------------------------
    RENDER: MY TOURNAMENTS
 ------------------------- */
@@ -495,6 +644,7 @@ function renderMyTournaments(tournaments) {
   tournaments.forEach(t => {
     const tournamentId = t.tournamentId ?? t.id;
     const status = normalizeStatus(t.myPlayer || t);
+    const isCaptain = isUserCaptainForTournament(t, window.__me);
 
     const card = document.createElement("div");
     card.className = "tournament-card";
@@ -512,6 +662,7 @@ function renderMyTournaments(tournaments) {
         <span>${t.venue ?? ""}</span>
       </div>
       <div class="tournament-actions">
+        ${isCaptain ? `<button type="button" class="captain-btn create-team-btn">Create team</button>` : ""}
         <button type="button" class="btn-link leave-btn">Opt out</button>
       </div>
     `;
@@ -538,6 +689,12 @@ function renderMyTournaments(tournaments) {
       await loadMyTournaments();
     });
 
+    const createTeamBtn = card.querySelector(".create-team-btn");
+      createTeamBtn?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.location.href = `team.html?tournamentId=${tournamentId}`;
+      });
+
     list.appendChild(card);
   });
 }
@@ -545,11 +702,14 @@ function renderMyTournaments(tournaments) {
 async function loadMyTournaments() {
   try {
     const raw = await apiGet("/api/player/tournaments");
-    const tournaments = normalizeTournamentList(raw);
-    renderMyTournaments(tournaments);
+    myTournaments = normalizeTournamentList(raw);
+    populateSportFilterFromMine(myTournaments);
+    renderFilteredMyTournaments();
   } catch (err) {
     console.error("Failed to load player tournaments", err);
-    renderMyTournaments([]);
+    myTournaments = [];
+    populateSportFilterFromMine(myTournaments);
+    renderFilteredMyTournaments();
   }
 }
 
@@ -639,7 +799,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireTopbar(user);
   wireTabs();
   wireSportFilter();
+  wireTournamentStatusFilter();
   wireTournamentSearch();
+
+  wireMySportFilter();
+  wireMyTournamentStatusFilter();
+  wireMyTournamentSearch();
+
   wireModalCloseButtons();
   wireCodeForm();
   wirePlayerForm(user);

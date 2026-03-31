@@ -86,7 +86,15 @@
                 <label for="sport-filter">Filter by sport</label>
                 <select id="sport-filter">
                   <option value="all">All sports</option>
-                  <!-- more options filled by JS -->
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="tournament-status-filter">Filter by status</label>
+                <select id="tournament-status-filter">
+                  <option value="all">All tournaments</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="completed">Completed</option>
                 </select>
               </div>
 
@@ -113,22 +121,48 @@
 
         <!-- MY TOURNAMENTS PANEL -->
         <div class="tab-panel" data-panel="mine">
-            <div class="browser-header">
+          <div class="browser-header">
             <div>
-                <h2>My tournaments</h2>
-                <p class="helper-text">
+              <h2>My tournaments</h2>
+              <p class="helper-text">
                 Tournaments you have registered for using this account.
-                </p>
-            </div>
-            </div>
-
-            <div id="my-tournament-list" class="tournament-list">
-            <!-- Joined tournaments will be injected here by JS -->
+              </p>
             </div>
 
-            <p class="helper-text" id="my-empty-state" style="display: none;">
+            <div class="filters">
+              <div class="filter-group">
+                <label for="my-sport-filter">Filter by sport</label>
+                <select id="my-sport-filter">
+                  <option value="all">All sports</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="my-tournament-status-filter">Filter by status</label>
+                <select id="my-tournament-status-filter">
+                  <option value="all">All tournaments</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="my-tournament-search">Search tournament</label>
+                <input
+                  id="my-tournament-search"
+                  type="text"
+                  placeholder="Search by tournament name"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div id="my-tournament-list" class="tournament-list"></div>
+
+          <p class="helper-text" id="my-empty-state" style="display: none;">
             You haven’t joined any tournaments yet. Use “All tournaments” tab to register.
-            </p>
+          </p>
         </div>
         </section>
 
