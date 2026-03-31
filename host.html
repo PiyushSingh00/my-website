@@ -45,36 +45,44 @@
 
       <!-- Main content -->
     <main class="main">
-    <div class="host-layout">
-        <!-- Mode toggle cards -->
-        <section class="host-mode-toggle">
-          <button
+      <div class="host-shell">
+        <aside class="host-sidebar" id="host-sidebar">
+          <div class="host-sidebar-head">
+            <h2>Host panel</h2>
+            <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle-btn">☰</button>
+          </div>
+
+          <section class="host-mode-toggle host-mode-toggle--sidebar">
+            <button
               class="host-mode-card active"
               type="button"
               data-host-mode="dashboard"
-          >
+            >
               <h2>Dashboard</h2>
               <p>See upcoming tournaments, calendar and quick stats.</p>
-          </button>
+            </button>
 
-          <button
+            <button
               class="host-mode-card"
               type="button"
               data-host-mode="my"
-          >
+            >
               <h2>My tournaments</h2>
               <p>See and manage all tournaments you have hosted.</p>
-          </button>
+            </button>
 
-          <button
+            <button
               class="host-mode-card"
               type="button"
               data-host-mode="new"
-          >
+            >
               <h2>Host new tournament</h2>
               <p>Create a new tournament and share the access code.</p>
-          </button>
-        </section>
+            </button>
+          </section>
+        </aside>
+
+        <div class="host-content">
 
     <section
       id="dashboard-view"
@@ -122,6 +130,7 @@
           <div id="dashboard-calendar-grid" class="calendar-grid calendar-days"></div>
         </div>
 
+      <div class="dashboard-bottom-grid">
         <div class="dashboard-stats-row">
           <div class="stat-card">
             <p class="stat-label">Total tournaments</p>
@@ -138,6 +147,21 @@
             <h3 id="stat-active-events">0</h3>
           </div>
         </div>
+
+        <div class="dashboard-card sport-chart-card">
+          <div class="dashboard-head">
+            <div>
+              <p class="eyebrow">Insights</p>
+              <h2 class="dashboard-title">Sport distribution</h2>
+            </div>
+          </div>
+
+          <div class="sport-chart-wrap">
+            <canvas id="sports-pie-chart" width="260" height="260"></canvas>
+            <div id="sports-chart-legend" class="sports-chart-legend"></div>
+          </div>
+        </div>
+      </div>
       </div>
     </section>
     
@@ -459,7 +483,8 @@
 
           </section>
         </section>
-    </div>
+        </div>
+      </div>
     </main>
 
     

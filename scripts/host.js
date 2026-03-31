@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const accessCodeInput = document.getElementById("access-code");
   const viewPlayersBtn = document.getElementById("modalViewPlayers");
   let selectedTournamentId = null;
+  const sidebar = document.getElementById("host-sidebar");
+  const sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
 
   let dashboardMonth = new Date().getMonth();
   let dashboardYear = new Date().getFullYear();
@@ -919,10 +921,102 @@ document.addEventListener("DOMContentLoaded", async () => {
     grid.innerHTML = html;
   }
 
+  function getSportDistribution(tournaments) {
+    const counts = {};
+
+    tournaments.forEach((t) => {
+      const sport = (t.sportName || "Other").trim();
+      counts[sport] = (counts[sport] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([sport, count]) => ({ sport, count }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  function renderSportsPieChart(tournaments) {
+    const canvas = document.getElementById("sports-pie-chart");
+    const legend = document.getElementById("sports-chart-legend");
+    if (!canvas || !legend) return;
+
+    const ctx = canvas.getContext("2d");
+    const distribution = getSportDistribution(tournaments);
+    const total = distribution.reduce((sum, item) => sum + item.count, 0);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!distribution.length || total === 0) {
+      legend.innerHTML = `<div class="dashboard-empty-card" style="min-width:auto;max-width:none;">No tournaments yet.</div>`;
+      return;
+    }
+
+    const colors = [
+      "#4dd0e1",
+      "#f25f4c",
+      "#ffd166",
+      "#7c9cff",
+      "#7bd389",
+      "#c792ea",
+      "#ff9f68",
+      "#5eead4"
+    ];
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = 82;
+
+    let startAngle = -Math.PI / 2;
+
+    distribution.forEach((item, index) => {
+      const sliceAngle = (item.count / total) * Math.PI * 2;
+      const color = colors[index % colors.length];
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, startAngle, startAngle + sliceAngle);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      startAngle += sliceAngle;
+    });
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 42, 0, Math.PI * 2);
+    ctx.fillStyle = "#0b1422";
+    ctx.fill();
+
+    ctx.fillStyle = "#e6eef8";
+    ctx.font = "700 18px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(total), cx, cy - 8);
+
+    ctx.fillStyle = "#a9b6cc";
+    ctx.font = "12px Inter, sans-serif";
+    ctx.fillText("Tournaments", cx, cy + 14);
+
+    legend.innerHTML = distribution.map((item, index) => {
+      const color = colors[index % colors.length];
+      const pct = Math.round((item.count / total) * 100);
+
+      return `
+        <div class="sports-chart-legend-item">
+          <div class="sports-chart-legend-left">
+            <span class="sports-chart-swatch" style="background:${color}"></span>
+            <span class="sports-chart-name">${item.sport}</span>
+          </div>
+          <span class="sports-chart-value">${pct}% (${item.count})</span>
+        </div>
+      `;
+    }).join("");
+  }
+
   function renderDashboard(tournaments) {
     renderUpcomingRow(tournaments);
     renderStats(tournaments);
     renderCalendar(tournaments);
+    renderSportsPieChart(tournaments);
   }
 
   function getFilteredAndSortedTournaments() {
@@ -1345,6 +1439,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
+  sidebarToggleBtn?.addEventListener("click", () => {
+    sidebar?.classList.toggle("is-collapsed");
+  });
+
   if (generateCodeBtn && accessCodeInput) {
     generateCodeBtn.addEventListener("click", () => {
       accessCodeInput.value = generateAccessCode();
@@ -1545,11 +1643,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll(".host-mode-card").forEach((card) => {
     card.addEventListener("click", () => {
       const mode = card.dataset.hostMode;
-      if (mode === "new" && !editingTournamentId && !viewOnlyMode) {
+
+      if (mode === "new") {
         resetWizardStateAndUI();
         hydrateWizardFormFromState();
         showStep(0);
       }
+
       switchHostView(mode);
     });
   });
