@@ -53,6 +53,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       maxMatchesPerPlayer: "",
       bestOfSets: "",
       pointsPerSet: "",
+      minPlayersPerTeam: "",
+      maxPlayersPerTeam: "",
     },
 
     leaguePoints: {
@@ -161,6 +163,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     wrap.classList.toggle("hidden", !shouldShowLeaguePoints());
   }
 
+  function toggleTeamPlayerLimitsSection() {
+    const minWrap = document.getElementById("wiz-min-players-wrap");
+    const maxWrap = document.getElementById("wiz-max-players-wrap");
+    const show = wiz.tournamentType === "team";
+
+    minWrap?.classList.toggle("hidden", !show);
+    maxWrap?.classList.toggle("hidden", !show);
+  }
+
   function openNativeDatePicker(input) {
     if (!input) return;
     if (typeof input.showPicker === "function") {
@@ -225,8 +236,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         playingLevel: "",
         teamSize: "1",
         exactTeamSize: "",
-        minPlayersPerTeam: "",
-        maxPlayersPerTeam: "",
         eventName: "",
       });
     }
@@ -234,8 +243,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     events.forEach((ev, i) => {
       const cfg = wiz.eventConfigs[i];
-
-      const showTeamRangeFields = wiz.tournamentType === "team";
       const showExactTeamSizeField = cfg.teamSize === "4";
 
       const card = document.createElement("div");
@@ -290,52 +297,20 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
 
           ${
-            showTeamRangeFields
-              ? `
-            <div class="field-group">
-              <label>Minimum players per team</label>
-              <input
-                type="number"
-                min="1"
-                class="wiz-cfg-inp"
-                data-idx="${i}"
-                data-field="minPlayersPerTeam"
-                placeholder="e.g. 7"
-                value="${cfg.minPlayersPerTeam || ""}"
-              />
-            </div>
-
-            <div class="field-group">
-              <label>Maximum players per team</label>
-              <input
-                type="number"
-                min="1"
-                class="wiz-cfg-inp"
-                data-idx="${i}"
-                data-field="maxPlayersPerTeam"
-                placeholder="e.g. 11"
-                value="${cfg.maxPlayersPerTeam || ""}"
-              />
-            </div>
-          `
-              : ""
-          }
-
-          ${
             showExactTeamSizeField
               ? `
-            <div class="field-group">
-              <label>Exact team size</label>
-              <input
-                type="number"
-                min="4"
-                class="wiz-cfg-inp"
-                data-idx="${i}"
-                data-field="exactTeamSize"
-                placeholder="e.g. 11"
-                value="${cfg.exactTeamSize || ""}"
-              />
-            </div>
+          <div class="field-group">
+            <label>Exact team size</label>
+            <input
+              type="number"
+              min="4"
+              class="wiz-cfg-inp"
+              data-idx="${i}"
+              data-field="exactTeamSize"
+              placeholder="e.g. 11"
+              value="${cfg.exactTeamSize || ""}"
+            />
+          </div>
           `
               : ""
           }
@@ -367,6 +342,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     toggleLeaguePointsSection();
+    toggleTeamPlayerLimitsSection();
   }
 
   function renderCourtNameFields() {
@@ -462,14 +438,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       if (wiz.tournamentType === "team") {
-        const invalidMinMax = wiz.eventConfigs.some((cfg) => {
-          const min = Number(cfg.minPlayersPerTeam || 0);
-          const max = Number(cfg.maxPlayersPerTeam || 0);
-          return !min || !max || min > max;
-        });
+        const minVal = Number(wiz.tournamentRules.minPlayersPerTeam || 0);
+        const maxVal = Number(wiz.tournamentRules.maxPlayersPerTeam || 0);
 
-        if (invalidMinMax) {
-          alert("Please enter valid minimum and maximum players per team for each event.");
+        if (!minVal || !maxVal || minVal > maxVal) {
+          alert("Please enter valid minimum and maximum players per team.");
           return false;
         }
       }
@@ -504,6 +477,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       wiz.tournamentRules.maxMatchesPerPlayer = document.getElementById("w-max-matches-per-player")?.value || "";
       wiz.tournamentRules.bestOfSets = document.getElementById("w-best-of-sets")?.value || "";
       wiz.tournamentRules.pointsPerSet = document.getElementById("w-points-per-set")?.value || "";
+      wiz.tournamentRules.minPlayersPerTeam = document.getElementById("w-min-players-per-team")?.value || "";
+      wiz.tournamentRules.maxPlayersPerTeam = document.getElementById("w-max-players-per-team")?.value || "";
 
       wiz.leaguePoints.win = document.getElementById("w-points-win")?.value || "";
       wiz.leaguePoints.loss = document.getElementById("w-points-loss")?.value || "";
@@ -542,6 +517,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               : c.teamSize === "3"
                 ? "Triples"
                 : "Team",
+          c.teamSize === "4" && c.exactTeamSize ? `${c.exactTeamSize} players/team` : "",
         ]
           .filter(Boolean)
           .join(" · ");
@@ -588,6 +564,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="wiz-review-row"><span class="wiz-review-key">Max matches per player</span><span class="wiz-review-val">${wiz.tournamentRules.maxMatchesPerPlayer || "-"}</span></div>
         <div class="wiz-review-row"><span class="wiz-review-key">Best of sets</span><span class="wiz-review-val">${wiz.tournamentRules.bestOfSets || "-"}</span></div>
         <div class="wiz-review-row"><span class="wiz-review-key">Points per set</span><span class="wiz-review-val">${wiz.tournamentRules.pointsPerSet || "-"}</span></div>
+        ${wiz.tournamentType === "team" ? `<div class="wiz-review-row"><span class="wiz-review-key">Min players/team</span><span class="wiz-review-val">${wiz.tournamentRules.minPlayersPerTeam || "-"}</span></div>` : ""}
+        ${wiz.tournamentType === "team" ? `<div class="wiz-review-row"><span class="wiz-review-key">Max players/team</span><span class="wiz-review-val">${wiz.tournamentRules.maxPlayersPerTeam || "-"}</span></div>` : ""}
       </div>
 
       ${
@@ -628,6 +606,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         maxMatchesPerPlayer: "",
         bestOfSets: "",
         pointsPerSet: "",
+        minPlayersPerTeam: "",
+        maxPlayersPerTeam: "",
       },
       leaguePoints: {
         win: "",
@@ -663,6 +643,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("w-points-win").value = "";
     document.getElementById("w-points-loss").value = "";
     document.getElementById("w-points-draw").value = "";
+    document.getElementById("w-min-players-per-team").value = "";
+    document.getElementById("w-max-players-per-team").value = "";
+    document.getElementById("wiz-min-players-wrap").classList.add("hidden");
+    document.getElementById("wiz-max-players-wrap").classList.add("hidden");
 
     document.querySelectorAll(".wiz-type-card").forEach((c) => {
       c.classList.toggle("active", c.dataset.type === "single");
@@ -727,12 +711,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("w-max-matches-per-player").value = wiz.tournamentRules.maxMatchesPerPlayer || "";
     document.getElementById("w-best-of-sets").value = wiz.tournamentRules.bestOfSets || "";
     document.getElementById("w-points-per-set").value = wiz.tournamentRules.pointsPerSet || "";
+    document.getElementById("w-min-players-per-team").value = wiz.tournamentRules.minPlayersPerTeam || "";
+    document.getElementById("w-max-players-per-team").value = wiz.tournamentRules.maxPlayersPerTeam || "";
 
     document.getElementById("w-points-win").value = wiz.leaguePoints.win || "";
     document.getElementById("w-points-loss").value = wiz.leaguePoints.loss || "";
     document.getElementById("w-points-draw").value = wiz.leaguePoints.draw || "";
 
     toggleLeaguePointsSection();
+    toggleTeamPlayerLimitsSection();
 
     syncCourtCount();
     renderCourtNameFields();
@@ -770,17 +757,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-  categories = wiz.eventConfigs.map((cfg, i) => ({
-    categoryId: cfg.categoryId || ("CAT-" + Math.random().toString(36).slice(2, 8).toUpperCase()),
-    ageGroup: cfg.ageGroup || "",
-    gender: cfg.gender || "",
-    teamSize: cfg.teamSize || "1",
-    exactTeamSize: cfg.teamSize === "4" && cfg.exactTeamSize ? Number(cfg.exactTeamSize) : null,
-    minPlayersPerTeam: wiz.tournamentType === "team" && cfg.minPlayersPerTeam ? Number(cfg.minPlayersPerTeam) : null,
-    maxPlayersPerTeam: wiz.tournamentType === "team" && cfg.maxPlayersPerTeam ? Number(cfg.maxPlayersPerTeam) : null,
-    playingLevel: cfg.playingLevel || "",
-    eventName: wiz.tournamentType === "single" ? "" : (wiz.eventNames[i] || cfg.eventName || ""),
-  }));
+    categories = wiz.eventConfigs.map((cfg, i) => ({
+      categoryId: cfg.categoryId || ("CAT-" + Math.random().toString(36).slice(2, 8).toUpperCase()),
+      ageGroup: cfg.ageGroup || "",
+      gender: cfg.gender || "",
+      teamSize: cfg.teamSize || "1",
+      exactTeamSize: cfg.teamSize === "4" && cfg.exactTeamSize ? Number(cfg.exactTeamSize) : null,
+      playingLevel: cfg.playingLevel || "",
+      eventName: wiz.tournamentType === "single" ? "" : (wiz.eventNames[i] || cfg.eventName || ""),
+    }));
 
     const payload = {
       tournamentName: wiz.name,
@@ -803,6 +788,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         maxMatchesPerPlayer: wiz.tournamentRules.maxMatchesPerPlayer ? Number(wiz.tournamentRules.maxMatchesPerPlayer) : null,
         bestOfSets: wiz.tournamentRules.bestOfSets ? Number(wiz.tournamentRules.bestOfSets) : null,
         pointsPerSet: wiz.tournamentRules.pointsPerSet ? Number(wiz.tournamentRules.pointsPerSet) : null,
+        minPlayersPerTeam: wiz.tournamentType === "team" && wiz.tournamentRules.minPlayersPerTeam ? Number(wiz.tournamentRules.minPlayersPerTeam) : null,
+        maxPlayersPerTeam: wiz.tournamentType === "team" && wiz.tournamentRules.maxPlayersPerTeam ? Number(wiz.tournamentRules.maxPlayersPerTeam) : null,
       },
 
       leaguePoints: shouldShowLeaguePoints()
@@ -1112,7 +1099,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     ctx.font = "12px Inter, sans-serif";
     ctx.fillText("Tournaments", cx, cy + 14);
 
-    // Legend — sport name + count only (no % cluttering the label)
     legend.innerHTML = distribution.map((item, index) => {
       const color = colors[index % colors.length];
       return `
@@ -1126,8 +1112,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
     }).join("");
 
-    // ── Canvas hover tooltip ──────────────────────────────────────────
-    // Build slice angle map for hit-testing
     const slices = [];
     let a = -Math.PI / 2;
     distribution.forEach((item, index) => {
@@ -1136,7 +1120,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       a += sweep;
     });
 
-    // Create or reuse tooltip element
     let tip = document.getElementById("pie-tooltip");
     if (!tip) {
       tip = document.createElement("div");
@@ -1145,7 +1128,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.body.appendChild(tip);
     }
 
-    // Remove previous listeners cleanly using AbortController
     if (canvas._pieAbort) canvas._pieAbort.abort();
     const ac = new AbortController();
     canvas._pieAbort = ac;
@@ -1153,21 +1135,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     canvas.addEventListener("mousemove", (e) => {
       const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width  / rect.width;
+      const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
-      const px = (e.clientX - rect.left)  * scaleX;
-      const py = (e.clientY - rect.top)   * scaleY;
+      const px = (e.clientX - rect.left) * scaleX;
+      const py = (e.clientY - rect.top) * scaleY;
 
       const dx = px - cx;
       const dy = py - cy;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < 44 || dist > radius) { tip.style.display = "none"; return; }
+      if (dist < 44 || dist > radius) {
+        tip.style.display = "none";
+        return;
+      }
 
       let angle = Math.atan2(dy, dx);
       if (angle < -Math.PI / 2) angle += Math.PI * 2;
 
-      const hit = slices.find(s => {
+      const hit = slices.find((s) => {
         if (s.end > Math.PI) return angle >= s.start || angle <= (s.end - Math.PI * 2);
         return angle >= s.start && angle < s.end;
       });
@@ -1177,7 +1162,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         tip.textContent = `${hit.item.sport}: ${pct}% (${hit.item.count})`;
         tip.style.display = "block";
         tip.style.left = (e.clientX + 12) + "px";
-        tip.style.top  = (e.clientY - 28) + "px";
+        tip.style.top = (e.clientY - 28) + "px";
       } else {
         tip.style.display = "none";
       }
@@ -1331,6 +1316,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       maxMatchesPerPlayer: t.tournamentRules?.maxMatchesPerPlayer != null ? String(t.tournamentRules.maxMatchesPerPlayer) : "",
       bestOfSets: t.tournamentRules?.bestOfSets != null ? String(t.tournamentRules.bestOfSets) : "",
       pointsPerSet: t.tournamentRules?.pointsPerSet != null ? String(t.tournamentRules.pointsPerSet) : "",
+      minPlayersPerTeam: t.tournamentRules?.minPlayersPerTeam != null ? String(t.tournamentRules.minPlayersPerTeam) : "",
+      maxPlayersPerTeam: t.tournamentRules?.maxPlayersPerTeam != null ? String(t.tournamentRules.maxPlayersPerTeam) : "",
     };
 
     wiz.leaguePoints = {
@@ -1363,8 +1350,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           playingLevel: c.playingLevel || "",
           teamSize: String(c.teamSize || "1"),
           exactTeamSize: c.exactTeamSize != null ? String(c.exactTeamSize) : "",
-          minPlayersPerTeam: c.minPlayersPerTeam != null ? String(c.minPlayersPerTeam) : "",
-          maxPlayersPerTeam: c.maxPlayersPerTeam != null ? String(c.maxPlayersPerTeam) : "",
           eventName: c.eventName || "",
         }))
       : [{
@@ -1374,8 +1359,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           playingLevel: "",
           teamSize: "1",
           exactTeamSize: "",
-          minPlayersPerTeam: "",
-          maxPlayersPerTeam: "",
           eventName: "",
         }];
 
@@ -1420,6 +1403,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       maxMatchesPerPlayer: t.tournamentRules?.maxMatchesPerPlayer != null ? String(t.tournamentRules.maxMatchesPerPlayer) : "",
       bestOfSets: t.tournamentRules?.bestOfSets != null ? String(t.tournamentRules.bestOfSets) : "",
       pointsPerSet: t.tournamentRules?.pointsPerSet != null ? String(t.tournamentRules.pointsPerSet) : "",
+      minPlayersPerTeam: t.tournamentRules?.minPlayersPerTeam != null ? String(t.tournamentRules.minPlayersPerTeam) : "",
+      maxPlayersPerTeam: t.tournamentRules?.maxPlayersPerTeam != null ? String(t.tournamentRules.maxPlayersPerTeam) : "",
     };
 
     wiz.leaguePoints = {
@@ -1451,9 +1436,18 @@ document.addEventListener("DOMContentLoaded", async () => {
           ageGroup: c.ageGroup || "",
           playingLevel: c.playingLevel || "",
           teamSize: String(c.teamSize || "1"),
+          exactTeamSize: c.exactTeamSize != null ? String(c.exactTeamSize) : "",
           eventName: c.eventName || "",
         }))
-      : [{ categoryId: "", gender: "", ageGroup: "", playingLevel: "", teamSize: "1", eventName: "" }];
+      : [{
+          categoryId: "",
+          gender: "",
+          ageGroup: "",
+          playingLevel: "",
+          teamSize: "1",
+          exactTeamSize: "",
+          eventName: "",
+        }];
 
     document.getElementById("access-code").value = t.accessCode || "";
     hydrateWizardFormFromState();
@@ -1485,6 +1479,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           let type = "";
           if (size === 1) type = "Singles";
           else if (size === 2) type = "Doubles";
+          else if (size === 3) type = "Triples";
+          else if (size >= 4) type = c.exactTeamSize ? `${c.exactTeamSize}-a-side` : "Team";
 
           const genderLabel =
             c.gender === "Male"
@@ -1717,6 +1713,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.getElementById("w-event-count-display").textContent = "1";
         wiz.eventNames = [];
       }
+
+      toggleTeamPlayerLimitsSection();
     });
   });
 
