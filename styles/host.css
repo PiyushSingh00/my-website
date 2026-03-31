@@ -674,7 +674,7 @@ body {
 
 /* Simple utility */
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 /* Details panel under the list */
