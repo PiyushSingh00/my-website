@@ -438,6 +438,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       makeCaptainsList.querySelectorAll('input[type="checkbox"]:checked')
     ).map((el) => String(el.value));
 
+    if (!selected.length) {
+      alert("Please select at least one captain.");
+      return;
+    }
+
     captainState.selectedCaptainIds = selected;
 
     captainState.confirmedCaptains = captainState.confirmedCaptains.filter((item) =>
@@ -447,13 +452,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     captainState.pools = null;
     persistCaptainState();
     refreshCaptainButtons();
-    renderCaptainsSummary();
-    closeMakeCaptainsModal();
 
-    if (!selected.length) {
-      alert("Please select at least one captain.");
-      return;
-    }
+    closeMakeCaptainsModal();
+    openConfirmCaptainsModal();
   });
 
   function renderConfirmCaptainsForm() {
@@ -482,6 +483,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             <div class="confirm-captain-name">${getPlayerDisplayName(player)}</div>
             <div class="confirm-captain-category">${getCategoryNameById(getPlayerCategoryId(player))}</div>
           </div>
+
+          <button
+            type="button"
+            class="action-btn reject remove-captain-btn"
+            data-player-id="${playerId}"
+          >
+            Remove captain
+          </button>
         </div>
 
         <div class="field-group">
@@ -498,10 +507,39 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       confirmCaptainsList.appendChild(card);
     });
+
+    confirmCaptainsList.querySelectorAll(".remove-captain-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const playerId = String(btn.dataset.playerId || "");
+
+        captainState.selectedCaptainIds = captainState.selectedCaptainIds.filter(
+          (id) => String(id) !== playerId
+        );
+
+        captainState.confirmedCaptains = captainState.confirmedCaptains.filter(
+          (item) => String(item.playerId) !== playerId
+        );
+
+        captainState.pools = null;
+        persistCaptainState();
+        refreshCaptainButtons();
+        renderConfirmCaptainsForm();
+        renderCaptainsSummary();
+
+        if (!captainState.selectedCaptainIds.length) {
+          closeConfirmCaptainsModal();
+        }
+      });
+    });
   }
 
   confirmCaptainsForm?.addEventListener("submit", (e) => {
     e.preventDefault();
+
+    if (!captainState.selectedCaptainIds.length) {
+      alert("Please select at least one captain.");
+      return;
+    }
 
     const confirmed = captainState.selectedCaptainIds
       .map((playerId) => {
