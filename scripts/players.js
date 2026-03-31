@@ -1,11 +1,9 @@
-// scripts/players.js
 import { requireAuth, logout } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
-  // ===== Topbar wiring (same as before) =====
   document.querySelectorAll(".brand").forEach((el) => {
     el.addEventListener("click", () => {
       window.location.href = "index.html";
@@ -63,7 +61,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     playerBtn?.classList.remove("is-active");
   });
 
-  // ---------- READ TOURNAMENT ID ----------
   const params = new URLSearchParams(window.location.search);
   const tournamentId = params.get("tournamentId");
   if (!tournamentId) {
@@ -71,7 +68,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // ---------- PLAYERS ELEMENTS ----------
   const tableWrapper = document.getElementById("players-table-wrapper");
   const tableBody = document.getElementById("players-table-body");
   const emptyState = document.getElementById("players-empty-state");
@@ -85,12 +81,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     .getElementById("players-back-btn")
     ?.addEventListener("click", () => (window.location.href = "host.html"));
 
-
   const addPlayerBtn = document.getElementById("add-player-btn");
   const addPlayerModal = document.getElementById("host-add-player-modal");
   const addPlayerClose = document.getElementById("host-add-player-close");
   const addPlayerForm = document.getElementById("host-add-player-form");
   const addPlayerCategory = document.getElementById("host-player-category");
+
+  const makeCaptainsBtn = document.getElementById("make-captains-btn");
+  const viewConfirmCaptainsBtn = document.getElementById("view-confirm-captains-btn");
+  const createPoolsBtn = document.getElementById("create-pools-btn");
+
+  const makeCaptainsModal = document.getElementById("make-captains-modal");
+  const makeCaptainsClose = document.getElementById("make-captains-close");
+  const makeCaptainsCancelBtn = document.getElementById("make-captains-cancel-btn");
+  const makeCaptainsSaveBtn = document.getElementById("make-captains-save-btn");
+  const makeCaptainsList = document.getElementById("make-captains-list");
+  const makeCaptainsEmpty = document.getElementById("make-captains-empty");
+
+  const confirmCaptainsModal = document.getElementById("confirm-captains-modal");
+  const confirmCaptainsClose = document.getElementById("confirm-captains-close");
+  const confirmCaptainsCancelBtn = document.getElementById("confirm-captains-cancel-btn");
+  const confirmCaptainsForm = document.getElementById("confirm-captains-form");
+  const confirmCaptainsList = document.getElementById("confirm-captains-list");
+  const confirmCaptainsEmpty = document.getElementById("confirm-captains-empty");
+
+  const captainsSummarySection = document.getElementById("captains-summary-section");
+  const captainsSummaryEmpty = document.getElementById("captains-summary-empty");
+  const captainsSummaryList = document.getElementById("captains-summary-list");
+
+  const poolsSection = document.getElementById("pools-section");
+  const poolsGrid = document.getElementById("pools-grid");
+  const unassignedTeams = document.getElementById("unassigned-teams");
+  const resetPoolsBtn = document.getElementById("reset-pools-btn");
 
   addPlayerBtn?.addEventListener("click", openAddPlayerModal);
   addPlayerClose?.addEventListener("click", closeAddPlayerModal);
@@ -98,8 +120,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   addPlayerModal?.addEventListener("click", (e) => {
     if (e.target === addPlayerModal) closeAddPlayerModal();
   });
-  
-    // ---------- SHARED HELPERS ----------
+
+  makeCaptainsBtn?.addEventListener("click", openMakeCaptainsModal);
+  viewConfirmCaptainsBtn?.addEventListener("click", openConfirmCaptainsModal);
+  createPoolsBtn?.addEventListener("click", openPoolsSection);
+
+  makeCaptainsClose?.addEventListener("click", closeMakeCaptainsModal);
+  makeCaptainsCancelBtn?.addEventListener("click", closeMakeCaptainsModal);
+  makeCaptainsModal?.addEventListener("click", (e) => {
+    if (e.target === makeCaptainsModal) closeMakeCaptainsModal();
+  });
+
+  confirmCaptainsClose?.addEventListener("click", closeConfirmCaptainsModal);
+  confirmCaptainsCancelBtn?.addEventListener("click", closeConfirmCaptainsModal);
+  confirmCaptainsModal?.addEventListener("click", (e) => {
+    if (e.target === confirmCaptainsModal) closeConfirmCaptainsModal();
+  });
+
+  resetPoolsBtn?.addEventListener("click", () => {
+    captainState.pools = buildEmptyPools();
+    const teams = getConfirmedTeams();
+    teams.forEach((team) => {
+      captainState.pools.unassigned.push(team.teamKey);
+    });
+    persistCaptainState();
+    renderPools();
+  });
+
   function normalizeCategories(cats) {
     if (!cats) return [];
     if (Array.isArray(cats)) return cats;
@@ -126,42 +173,64 @@ document.addEventListener("DOMContentLoaded", async () => {
     return parts.length ? parts.join(" • ") : (c?.categoryId || c?.id || "Category");
   }
 
-    function populateAddPlayerCategoryOptions() {
-      if (!addPlayerCategory) return;
+  function populateAddPlayerCategoryOptions() {
+    if (!addPlayerCategory) return;
 
-      addPlayerCategory.innerHTML = `<option value="">Select category</option>`;
+    addPlayerCategory.innerHTML = `<option value="">Select category</option>`;
 
-      (tournamentCategories || []).forEach((c) => {
-        const id = c.categoryId || c.id;
-        if (!id) return;
+    (tournamentCategories || []).forEach((c) => {
+      const id = c.categoryId || c.id;
+      if (!id) return;
 
-        const opt = document.createElement("option");
-        opt.value = id;
-        opt.textContent = categoryLabel(c);
-        addPlayerCategory.appendChild(opt);
-      });
-    }
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = categoryLabel(c);
+      addPlayerCategory.appendChild(opt);
+    });
+  }
 
-    function openAddPlayerModal() {
-      populateAddPlayerCategoryOptions();
-      addPlayerForm?.reset();
-      addPlayerModal?.classList.remove("hidden");
-      addPlayerModal?.setAttribute("aria-hidden", "false");
-    }
+  function openAddPlayerModal() {
+    populateAddPlayerCategoryOptions();
+    addPlayerForm?.reset();
+    addPlayerModal?.classList.remove("hidden");
+    addPlayerModal?.setAttribute("aria-hidden", "false");
+  }
 
-    function closeAddPlayerModal() {
-      addPlayerModal?.classList.add("hidden");
-      addPlayerModal?.setAttribute("aria-hidden", "true");
-    }
+  function closeAddPlayerModal() {
+    addPlayerModal?.classList.add("hidden");
+    addPlayerModal?.setAttribute("aria-hidden", "true");
+  }
 
-    function setActivePlayerTab(filterValue) {
-      activeFilter = String(filterValue || "all");
+  function openMakeCaptainsModal() {
+    renderCaptainPickList();
+    makeCaptainsModal?.classList.remove("hidden");
+    makeCaptainsModal?.setAttribute("aria-hidden", "false");
+  }
 
-      document.querySelectorAll(".players-tab").forEach((tab) => {
-        const isActive = String(tab.dataset.playerFilter || "all") === activeFilter;
-        tab.classList.toggle("active", isActive);
-      });
-    }
+  function closeMakeCaptainsModal() {
+    makeCaptainsModal?.classList.add("hidden");
+    makeCaptainsModal?.setAttribute("aria-hidden", "true");
+  }
+
+  function openConfirmCaptainsModal() {
+    renderConfirmCaptainsForm();
+    confirmCaptainsModal?.classList.remove("hidden");
+    confirmCaptainsModal?.setAttribute("aria-hidden", "false");
+  }
+
+  function closeConfirmCaptainsModal() {
+    confirmCaptainsModal?.classList.add("hidden");
+    confirmCaptainsModal?.setAttribute("aria-hidden", "true");
+  }
+
+  function setActivePlayerTab(filterValue) {
+    activeFilter = String(filterValue || "all");
+
+    document.querySelectorAll(".players-tab").forEach((tab) => {
+      const isActive = String(tab.dataset.playerFilter || "all") === activeFilter;
+      tab.classList.toggle("active", isActive);
+    });
+  }
 
   function getPlayerCategoryId(p) {
     return p.categoryId ?? p.categoryID ?? p.category ?? p.category_id ?? null;
@@ -224,17 +293,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Try multiple possible backend routes so it works across versions.
   async function updateRegistrationStatus(player, nextStatus) {
     const playerId = getPlayerId(player);
     const body = JSON.stringify({ status: nextStatus });
 
     const candidates = [
       { method: "PATCH", url: `/api/host/tournaments/${tournamentId}/players/${playerId}`, body },
-      { method: "POST",  url: `/api/host/tournaments/${tournamentId}/players/${playerId}/${nextStatus}`, body: null },
+      { method: "POST", url: `/api/host/tournaments/${tournamentId}/players/${playerId}/${nextStatus}`, body: null },
       { method: "PATCH", url: `/api/tournaments/${tournamentId}/players/${playerId}`, body },
       { method: "PATCH", url: `/api/host/tournaments/${tournamentId}/registrations/${playerId}`, body },
-      { method: "POST",  url: `/api/host/tournaments/${tournamentId}/registrations/${playerId}/${nextStatus}`, body: null },
+      { method: "POST", url: `/api/host/tournaments/${tournamentId}/registrations/${playerId}/${nextStatus}`, body: null },
     ].filter(
       (c) => c.url && !c.url.includes("null") && !c.url.includes("undefined")
     );
@@ -265,15 +333,432 @@ document.addEventListener("DOMContentLoaded", async () => {
     throw new Error("No matching accept/reject API route responded successfully.");
   }
 
-  // ---------- STATE (Players) ----------
   let allPlayers = [];
   let activeFilter = "all";
   let tournamentCategories = [];
   let tournamentMetaCache = null;
 
-  // ---------- LOAD TOURNAMENT META ----------
+  const captainStorageKey = `scheduleit_captains_${tournamentId}`;
+
+  let captainState = {
+    selectedCaptainIds: [],
+    confirmedCaptains: [],
+    pools: null,
+  };
+
+  function getDefaultCaptainState() {
+    return {
+      selectedCaptainIds: [],
+      confirmedCaptains: [],
+      pools: null,
+    };
+  }
+
+  function loadCaptainState() {
+    try {
+      const raw = localStorage.getItem(captainStorageKey);
+      if (!raw) return getDefaultCaptainState();
+      const parsed = JSON.parse(raw);
+      return {
+        selectedCaptainIds: Array.isArray(parsed?.selectedCaptainIds) ? parsed.selectedCaptainIds : [],
+        confirmedCaptains: Array.isArray(parsed?.confirmedCaptains) ? parsed.confirmedCaptains : [],
+        pools: parsed?.pools && typeof parsed.pools === "object" ? parsed.pools : null,
+      };
+    } catch {
+      return getDefaultCaptainState();
+    }
+  }
+
+  function persistCaptainState() {
+    localStorage.setItem(captainStorageKey, JSON.stringify(captainState));
+  }
+
+  function getAcceptedPlayers() {
+    return allPlayers.filter((p) => normalizeStatusPlayersPage(p) === "accepted");
+  }
+
+  function getPlayerDisplayName(p) {
+    return p.playerName ?? p.name ?? p.fullName ?? p.username ?? "Player";
+  }
+
+  function findPlayerById(id) {
+    return allPlayers.find((p) => String(getPlayerId(p)) === String(id));
+  }
+
+  function getCategoryNameById(categoryId) {
+    const cat = tournamentCategories.find(
+      (c) => String(c.categoryId || c.id) === String(categoryId)
+    );
+    return cat ? categoryLabel(cat) : "Category";
+  }
+
+  function refreshCaptainButtons() {
+    const hasSelected = captainState.selectedCaptainIds.length > 0;
+    const hasConfirmed = captainState.confirmedCaptains.length > 0;
+    viewConfirmCaptainsBtn?.classList.toggle("hidden", !hasSelected);
+
+    const shouldShowPoolsButton =
+      tournamentMetaCache?.stageFormat === "group_knockout" && hasConfirmed;
+    createPoolsBtn?.classList.toggle("hidden", !shouldShowPoolsButton);
+  }
+
+  function renderCaptainPickList() {
+    const acceptedPlayers = getAcceptedPlayers();
+    makeCaptainsList.innerHTML = "";
+
+    if (!acceptedPlayers.length) {
+      makeCaptainsEmpty?.classList.remove("hidden");
+      return;
+    }
+
+    makeCaptainsEmpty?.classList.add("hidden");
+
+    acceptedPlayers.forEach((player) => {
+      const playerId = String(getPlayerId(player));
+      const checked = captainState.selectedCaptainIds.includes(playerId);
+      const categoryId = getPlayerCategoryId(player);
+
+      const row = document.createElement("label");
+      row.className = "captain-pick-row";
+      row.innerHTML = `
+        <div class="captain-pick-left">
+          <input class="captain-checkbox" type="checkbox" value="${playerId}" ${checked ? "checked" : ""} />
+          <div>
+            <div class="captain-pick-name">${getPlayerDisplayName(player)}</div>
+            <div class="captain-pick-meta">${getCategoryNameById(categoryId)}</div>
+          </div>
+        </div>
+      `;
+      makeCaptainsList.appendChild(row);
+    });
+  }
+
+  makeCaptainsSaveBtn?.addEventListener("click", () => {
+    const selected = Array.from(
+      makeCaptainsList.querySelectorAll('input[type="checkbox"]:checked')
+    ).map((el) => String(el.value));
+
+    captainState.selectedCaptainIds = selected;
+
+    captainState.confirmedCaptains = captainState.confirmedCaptains.filter((item) =>
+      selected.includes(String(item.playerId))
+    );
+
+    captainState.pools = null;
+    persistCaptainState();
+    refreshCaptainButtons();
+    renderCaptainsSummary();
+    closeMakeCaptainsModal();
+
+    if (!selected.length) {
+      alert("Please select at least one captain.");
+      return;
+    }
+  });
+
+  function renderConfirmCaptainsForm() {
+    confirmCaptainsList.innerHTML = "";
+
+    if (!captainState.selectedCaptainIds.length) {
+      confirmCaptainsEmpty?.classList.remove("hidden");
+      return;
+    }
+
+    confirmCaptainsEmpty?.classList.add("hidden");
+
+    captainState.selectedCaptainIds.forEach((playerId) => {
+      const player = findPlayerById(playerId);
+      if (!player) return;
+
+      const existing = captainState.confirmedCaptains.find(
+        (item) => String(item.playerId) === String(playerId)
+      );
+
+      const card = document.createElement("div");
+      card.className = "confirm-captain-card";
+      card.innerHTML = `
+        <div class="confirm-captain-head">
+          <div>
+            <div class="confirm-captain-name">${getPlayerDisplayName(player)}</div>
+            <div class="confirm-captain-category">${getCategoryNameById(getPlayerCategoryId(player))}</div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Team name (optional)</label>
+          <input
+            type="text"
+            class="confirm-team-name-input"
+            data-player-id="${playerId}"
+            placeholder="Enter team name"
+            value="${existing?.teamName ? escapeHtml(existing.teamName) : ""}"
+          />
+        </div>
+      `;
+
+      confirmCaptainsList.appendChild(card);
+    });
+  }
+
+  confirmCaptainsForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const confirmed = captainState.selectedCaptainIds
+      .map((playerId) => {
+        const player = findPlayerById(playerId);
+        if (!player) return null;
+
+        const input = confirmCaptainsList.querySelector(
+          `.confirm-team-name-input[data-player-id="${CSS.escape(String(playerId))}"]`
+        );
+
+        const teamName = input?.value?.trim() || "";
+
+        return {
+          playerId: String(playerId),
+          playerName: getPlayerDisplayName(player),
+          categoryId: getPlayerCategoryId(player),
+          teamName,
+        };
+      })
+      .filter(Boolean);
+
+    captainState.confirmedCaptains = confirmed;
+    captainState.pools = null;
+    persistCaptainState();
+    refreshCaptainButtons();
+    renderCaptainsSummary();
+    closeConfirmCaptainsModal();
+
+    if (
+      tournamentMetaCache?.stageFormat === "group_knockout" &&
+      captainState.confirmedCaptains.length
+    ) {
+      createPoolsBtn?.classList.remove("hidden");
+    }
+  });
+
+  function renderCaptainsSummary() {
+    captainsSummaryList.innerHTML = "";
+
+    if (!captainState.confirmedCaptains.length) {
+      captainsSummarySection?.classList.add("hidden");
+      captainsSummaryEmpty?.classList.remove("hidden");
+      return;
+    }
+
+    captainsSummarySection?.classList.remove("hidden");
+    captainsSummaryEmpty?.classList.add("hidden");
+
+    captainState.confirmedCaptains.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "captain-summary-card";
+      card.innerHTML = `
+        <div class="captain-summary-left">
+          <div class="captain-summary-name">${escapeHtml(item.playerName || "Captain")}</div>
+          <div class="captain-summary-meta">
+            Captain • ${escapeHtml(getCategoryNameById(item.categoryId))}
+          </div>
+        </div>
+        <div class="team-name-chip">
+          ${escapeHtml(item.teamName?.trim() || item.playerName || "Unnamed team")}
+        </div>
+      `;
+      captainsSummaryList.appendChild(card);
+    });
+  }
+
+  function getConfirmedTeams() {
+    return captainState.confirmedCaptains.map((item) => ({
+      teamKey: String(item.playerId),
+      teamName: item.teamName?.trim() || item.playerName,
+      captainName: item.playerName,
+      categoryId: item.categoryId,
+    }));
+  }
+
+  function buildEmptyPools() {
+    const groupCount = Number(tournamentMetaCache?.groupCount || 0);
+    const pools = {
+      unassigned: [],
+      groups: {},
+    };
+
+    for (let i = 1; i <= groupCount; i++) {
+      pools.groups[`Pool ${i}`] = [];
+    }
+
+    return pools;
+  }
+
+  function ensurePoolsState() {
+    const teams = getConfirmedTeams();
+    const validKeys = new Set(teams.map((t) => t.teamKey));
+    const groupCount = Number(tournamentMetaCache?.groupCount || 0);
+
+    if (
+      !captainState.pools ||
+      !captainState.pools.groups ||
+      Object.keys(captainState.pools.groups).length !== groupCount
+    ) {
+      captainState.pools = buildEmptyPools();
+    }
+
+    const allPlaced = new Set();
+
+    Object.keys(captainState.pools.groups).forEach((poolName) => {
+      captainState.pools.groups[poolName] = (captainState.pools.groups[poolName] || []).filter((teamKey) => {
+        const ok = validKeys.has(teamKey) && !allPlaced.has(teamKey);
+        if (ok) allPlaced.add(teamKey);
+        return ok;
+      });
+    });
+
+    captainState.pools.unassigned = (captainState.pools.unassigned || []).filter((teamKey) => {
+      const ok = validKeys.has(teamKey) && !allPlaced.has(teamKey);
+      if (ok) allPlaced.add(teamKey);
+      return ok;
+    });
+
+    teams.forEach((team) => {
+      if (!allPlaced.has(team.teamKey)) {
+        captainState.pools.unassigned.push(team.teamKey);
+      }
+    });
+
+    persistCaptainState();
+  }
+
+  function openPoolsSection() {
+    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
+
+    if (!captainState.confirmedCaptains.length) {
+      alert("Please confirm captains first.");
+      return;
+    }
+
+    ensurePoolsState();
+    poolsSection?.classList.remove("hidden");
+    renderPools();
+    poolsSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderPools() {
+    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
+    if (!captainState.pools) ensurePoolsState();
+
+    const teams = getConfirmedTeams();
+    const teamMap = new Map(teams.map((team) => [team.teamKey, team]));
+
+    unassignedTeams.innerHTML = "";
+    poolsGrid.innerHTML = "";
+
+    function createTeamCard(teamKey) {
+      const team = teamMap.get(teamKey);
+      if (!team) return null;
+
+      const card = document.createElement("div");
+      card.className = "team-card";
+      card.draggable = true;
+      card.dataset.teamKey = team.teamKey;
+      card.innerHTML = `
+        <div class="team-card-name">${escapeHtml(team.teamName)}</div>
+        <div class="team-card-meta">Captain: ${escapeHtml(team.captainName)}</div>
+      `;
+
+      card.addEventListener("dragstart", () => {
+        card.classList.add("dragging");
+      });
+
+      card.addEventListener("dragend", () => {
+        card.classList.remove("dragging");
+      });
+
+      return card;
+    }
+
+    function wireDropzone(dropzone, zoneName) {
+      dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("drag-over");
+      });
+
+      dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("drag-over");
+      });
+
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("drag-over");
+
+        const dragged = document.querySelector(".team-card.dragging");
+        const teamKey = dragged?.dataset.teamKey;
+        if (!teamKey) return;
+
+        moveTeamToZone(teamKey, zoneName);
+      });
+    }
+
+    captainState.pools.unassigned.forEach((teamKey) => {
+      const card = createTeamCard(teamKey);
+      if (card) unassignedTeams.appendChild(card);
+    });
+
+    wireDropzone(unassignedTeams, "unassigned");
+
+    Object.keys(captainState.pools.groups).forEach((poolName) => {
+      const col = document.createElement("div");
+      col.className = "pool-column";
+      col.innerHTML = `
+        <h3>${escapeHtml(poolName)}</h3>
+        <div class="team-dropzone" data-pool-name="${escapeHtml(poolName)}"></div>
+      `;
+
+      const zone = col.querySelector(".team-dropzone");
+      captainState.pools.groups[poolName].forEach((teamKey) => {
+        const card = createTeamCard(teamKey);
+        if (card) zone.appendChild(card);
+      });
+
+      wireDropzone(zone, poolName);
+      poolsGrid.appendChild(col);
+    });
+  }
+
+  function moveTeamToZone(teamKey, zoneName) {
+    if (!captainState.pools) return;
+
+    captainState.pools.unassigned = (captainState.pools.unassigned || []).filter(
+      (key) => key !== teamKey
+    );
+
+    Object.keys(captainState.pools.groups).forEach((poolName) => {
+      captainState.pools.groups[poolName] = captainState.pools.groups[poolName].filter(
+        (key) => key !== teamKey
+      );
+    });
+
+    if (zoneName === "unassigned") {
+      captainState.pools.unassigned.push(teamKey);
+    } else {
+      captainState.pools.groups[zoneName] = captainState.pools.groups[zoneName] || [];
+      captainState.pools.groups[zoneName].push(teamKey);
+    }
+
+    persistCaptainState();
+    renderPools();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   async function loadTournamentMeta() {
-    // Host tournaments list
     const host = await apiGet("/api/host/tournaments");
     if (host.ok && Array.isArray(host.data)) {
       const t = host.data.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
@@ -284,11 +769,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         datesEl && (datesEl.textContent = t.tournamentDates ?? "");
         codeEl && (codeEl.textContent = t.accessCode ?? "");
         tournamentCategories = normalizeCategories(t.categories);
+        refreshStageSpecificUi();
         return;
       }
     }
 
-    // Fallback: public list
     const pub = await apiGet("/api/tournaments");
     if (pub.ok && Array.isArray(pub.data)) {
       const t = pub.data.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
@@ -299,11 +784,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         datesEl && (datesEl.textContent = t.tournamentDates ?? "");
         codeEl && (codeEl.textContent = t.accessCode ?? "");
         tournamentCategories = normalizeCategories(t.categories);
+        refreshStageSpecificUi();
       }
     }
   }
 
-  // ---------- RENDER (Players) ----------
+  function refreshStageSpecificUi() {
+    const isGroupKnockout = tournamentMetaCache?.stageFormat === "group_knockout";
+    const hasConfirmed = captainState.confirmedCaptains.length > 0;
+
+    if (!isGroupKnockout) {
+      createPoolsBtn?.classList.add("hidden");
+      poolsSection?.classList.add("hidden");
+    } else {
+      createPoolsBtn?.classList.toggle("hidden", !hasConfirmed);
+    }
+  }
+
   function computeCounts(players) {
     const counts = { all: players.length, byCategory: {} };
     players.forEach((p) => {
@@ -350,9 +847,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${name}</td>
-        <td>${age}</td>
-        <td>${gender}</td>
+        <td>${escapeHtml(name)}</td>
+        <td>${escapeHtml(age)}</td>
+        <td>${escapeHtml(gender)}</td>
         <td><span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span></td>
         <td>
           <div class="row-actions">
@@ -375,9 +872,24 @@ document.addEventListener("DOMContentLoaded", async () => {
             await updateRegistrationStatus(p, nextStatus);
             p.status = nextStatus;
             p.registrationStatus = nextStatus;
-            renderPlayers();
 
-            // if fixtures are open and not locked (not yet generated), refresh accepted pool
+            if (nextStatus !== "accepted") {
+              const playerId = String(getPlayerId(p));
+              captainState.selectedCaptainIds = captainState.selectedCaptainIds.filter(
+                (id) => String(id) !== playerId
+              );
+              captainState.confirmedCaptains = captainState.confirmedCaptains.filter(
+                (item) => String(item.playerId) !== playerId
+              );
+              captainState.pools = null;
+              persistCaptainState();
+            }
+
+            renderPlayers();
+            renderCaptainsSummary();
+            refreshCaptainButtons();
+            refreshStageSpecificUi();
+
             if (fixturesUi.isOpen && !fixturesState.fixtures?.__locked) {
               fixturesState.players = allPlayers;
               rebuildAcceptedByCategory();
@@ -431,53 +943,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-    addPlayerForm?.addEventListener("submit", async (e) => {
-      e.preventDefault();
+  addPlayerForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      const name = document.getElementById("host-player-name")?.value?.trim();
-      const age = Number(document.getElementById("host-player-age")?.value);
-      const gender = document.getElementById("host-player-gender")?.value;
-      const phone = document.getElementById("host-player-phone")?.value?.trim();
-      const categoryId = document.getElementById("host-player-category")?.value;
+    const name = document.getElementById("host-player-name")?.value?.trim();
+    const age = Number(document.getElementById("host-player-age")?.value);
+    const gender = document.getElementById("host-player-gender")?.value;
+    const phone = document.getElementById("host-player-phone")?.value?.trim();
+    const categoryId = document.getElementById("host-player-category")?.value;
 
-      if (!name || !age || !gender || !phone || !categoryId) {
-        alert("Please fill all player details.");
-        return;
+    if (!name || !age || !gender || !phone || !categoryId) {
+      alert("Please fill all player details.");
+      return;
+    }
+
+    const newPlayer = {
+      playerId: "manual-" + Date.now(),
+      registrationId: "manual-" + Date.now(),
+      playerName: name,
+      name,
+      age,
+      gender,
+      phone,
+      playerPhone: phone,
+      categoryId,
+      category: categoryId,
+      status: "accepted",
+      registrationStatus: "accepted",
+      addedByHost: true
+    };
+
+    allPlayers.push(newPlayer);
+
+    setActivePlayerTab(categoryId);
+    renderPlayers();
+    closeAddPlayerModal();
+
+    if (fixturesUi.isOpen && !fixturesState.fixtures?.__locked) {
+      fixturesState.players = allPlayers;
+      rebuildAcceptedByCategory();
+
+      if (fixturesState.activeCategoryId) {
+        renderCategoryBracket(fixturesState.activeCategoryId);
       }
+    }
+  });
 
-      const newPlayer = {
-        playerId: "manual-" + Date.now(),
-        registrationId: "manual-" + Date.now(),
-        playerName: name,
-        name,
-        age,
-        gender,
-        phone,
-        playerPhone: phone,
-        categoryId,
-        category: categoryId,
-        status: "accepted",
-        registrationStatus: "accepted",
-        addedByHost: true
-      };
-
-      allPlayers.push(newPlayer);
-
-      setActivePlayerTab(categoryId);
-      renderPlayers();
-      closeAddPlayerModal();
-
-      if (fixturesUi.isOpen && !fixturesState.fixtures?.__locked) {
-        fixturesState.players = allPlayers;
-        rebuildAcceptedByCategory();
-
-        if (fixturesState.activeCategoryId) {
-          renderCategoryBracket(fixturesState.activeCategoryId);
-        }
-      }
-    });
-
-  // ---------- FETCH PLAYERS ----------
   async function loadPlayers() {
     const primary = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/players`);
     if (!primary.ok) {
@@ -495,10 +1006,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     allPlayers = players;
     renderPlayers();
   }
-
-  // =========================================================
-  // ✅ EMBEDDED FIXTURES (copied from fixtures.js behaviour)
-  // =========================================================
 
   const fixturesUi = {
     wrap: document.getElementById("fixtures-embed"),
@@ -589,7 +1096,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const entrants = [];
     const dropped = [];
-    const teamMap = {}; // teamName -> [players...]
+    const teamMap = {};
 
     if (size === 1) {
       shuffled.forEach((n) => (teamMap[n] = [n]));
@@ -626,82 +1133,73 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function createBracket(names, teamMap = {}) {
-  // 1. Get real players and shuffle them first
-  let players = names.filter(Boolean);
-  if (players.length < 2) return null;
-  
-  players = shuffle(players); // Randomize player order
+    let players = names.filter(Boolean);
+    if (players.length < 2) return null;
 
-  // 2. Determine bracket size and how many BYEs are needed
-  const size = nextPow2(players.length);
-  const byeCount = size - players.length;
+    players = shuffle(players);
+    const size = nextPow2(players.length);
+    const byeCount = size - players.length;
 
-  // 3. Construct the list by interleaving players and BYEs
-  const list = [];
-  let playerIdx = 0;
-  let byesAllocated = 0;
+    const list = [];
+    let playerIdx = 0;
+    let byesAllocated = 0;
 
-  // We iterate by match (2 slots at a time)
-  for (let i = 0; i < size / 2; i++) {
-    // Slot 1: Always a player
-    list.push(players[playerIdx++]);
-
-    // Slot 2: A BYE if we have any left, otherwise the next player
-    if (byesAllocated < byeCount) {
-      list.push("BYE");
-      byesAllocated++;
-    } else {
+    for (let i = 0; i < size / 2; i++) {
       list.push(players[playerIdx++]);
+
+      if (byesAllocated < byeCount) {
+        list.push("BYE");
+        byesAllocated++;
+      } else {
+        list.push(players[playerIdx++]);
+      }
     }
-  }
 
-  const totalRounds = Math.log2(size);
-  const rounds = [];
+    const totalRounds = Math.log2(size);
+    const rounds = [];
 
-  const getRoster = (teamName) => {
-    const t = String(teamName || "").trim();
-    const up = t.toUpperCase();
-    if (!t || up === "BYE" || up === "TBD") return [];
-    if (Array.isArray(teamMap[t])) return teamMap[t];
-    return splitTeamName(t);
-  };
+    const getRoster = (teamName) => {
+      const t = String(teamName || "").trim();
+      const up = t.toUpperCase();
+      if (!t || up === "BYE" || up === "TBD") return [];
+      if (Array.isArray(teamMap[t])) return teamMap[t];
+      return splitTeamName(t);
+    };
 
-  // 4. Build Round 1 using the interleaved list
-  const r1 = [];
-  for (let i = 0; i < list.length; i += 2) {
-    const home = list[i];
-    const away = list[i + 1];
-    r1.push(
-      ensureMatchMeta({
-        home,
-        away,
-        homePlayers: getRoster(home),
-        awayPlayers: getRoster(away),
-      })
-    );
-  }
-  rounds.push(r1);
-
-  // 5. Build subsequent rounds (Semi-finals, Finals, etc.)
-  for (let r = 1; r < totalRounds; r++) {
-    const prevMatchCount = rounds[r - 1].length;
-    const matchCount = Math.ceil(prevMatchCount / 2);
-    const rr = [];
-    for (let i = 0; i < matchCount; i++) {
-      rr.push(
+    const r1 = [];
+    for (let i = 0; i < list.length; i += 2) {
+      const home = list[i];
+      const away = list[i + 1];
+      r1.push(
         ensureMatchMeta({
-          home: "TBD",
-          away: "TBD",
-          homePlayers: [],
-          awayPlayers: [],
+          home,
+          away,
+          homePlayers: getRoster(home),
+          awayPlayers: getRoster(away),
         })
       );
     }
-    rounds.push(rr);
-  }
+    rounds.push(r1);
 
-  return { rounds, totalRounds };
-}
+    for (let r = 1; r < totalRounds; r++) {
+      const prevMatchCount = rounds[r - 1].length;
+      const matchCount = Math.ceil(prevMatchCount / 2);
+      const rr = [];
+      for (let i = 0; i < matchCount; i++) {
+        rr.push(
+          ensureMatchMeta({
+            home: "TBD",
+            away: "TBD",
+            homePlayers: [],
+            awayPlayers: [],
+          })
+        );
+      }
+      rounds.push(rr);
+    }
+
+    return { rounds, totalRounds };
+  }
 
   function normalizeStatusFixtures(p) {
     const raw =
@@ -733,7 +1231,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesState.players.forEach((p) => {
       const cid = getPlayerCategoryId(p);
       if (!cid) return;
-      if (normalizeStatusFixtures(p) !== "accepted") return; // only accepted
+      if (normalizeStatusFixtures(p) !== "accepted") return;
       fixturesState.acceptedByCategory[cid] = fixturesState.acceptedByCategory[cid] || [];
       fixturesState.acceptedByCategory[cid].push(getPlayerName(p));
     });
@@ -833,61 +1331,54 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p class="muted">
             ${acceptedNames.length < 2
               ? "Not enough accepted players to generate fixtures."
-              : 'Click \u201cRegenerate fixtures\u201d to create the bracket.'}
+              : 'Click “Regenerate fixtures” to create the bracket.'}
           </p>
         </div>`;
       return;
     }
 
     const allowedNames = fixturesState.acceptedByCategory[categoryId] || [];
-    const options      = ["BYE", ...allowedNames];
-    const totalRounds  = cat.totalRounds || cat.total_rounds || cat.rounds.length;
-    const catMeta      = fixturesState.categories.find(x => String(x.categoryId || x.id) === String(categoryId));
-    const teamSize     = Math.max(1, Number(catMeta?.teamSize || 1));
-    const scoreKey     = fixturesState.scoringSchema?.winnerLogic?.field || "points";
-    const locked       = !!fixturesState.fixtures.__locked;
-    const editMode     = fixturesState.editMode;
+    const options = ["BYE", ...allowedNames];
+    const totalRounds = cat.totalRounds || cat.total_rounds || cat.rounds.length;
+    const catMeta = fixturesState.categories.find(x => String(x.categoryId || x.id) === String(categoryId));
+    const teamSize = Math.max(1, Number(catMeta?.teamSize || 1));
+    const scoreKey = fixturesState.scoringSchema?.winnerLogic?.field || "points";
+    const locked = !!fixturesState.fixtures.__locked;
+    const editMode = fixturesState.editMode;
 
-    // Layout constants — all cards have the same fixed height so
-    // positioning is purely arithmetic (no DOM measurement needed).
-    const COL_W    = 220;   // card + column width (px)
-    const COL_GAP  = 56;    // horizontal gap between columns
-    const CARD_H   = 148;   // fixed height for every match card
-    const ROW_GAP  = 16;    // vertical gap between R0 cards
-    const HEADER_H = 32;    // round-label row height
-    const PAD_V    = 12;    // canvas top padding
-    const PAD_H    = 12;    // canvas left padding
+    const COL_W = 220;
+    const COL_GAP = 56;
+    const CARD_H = 148;
+    const ROW_GAP = 16;
+    const HEADER_H = 32;
+    const PAD_V = 12;
+    const PAD_H = 12;
 
-    // ── Compute top positions ─────────────────────────────────────────
-    // R0: sequential stack
-    // R1+: each card centred between the midpoints of its two feeders
     const tops = [];
-    const UNIT  = CARD_H + ROW_GAP;
+    const UNIT = CARD_H + ROW_GAP;
 
     tops.push(cat.rounds[0].map((_, i) => HEADER_H + PAD_V + i * UNIT));
 
     for (let r = 1; r < cat.rounds.length; r++) {
       const prev = tops[r - 1];
       tops.push(cat.rounds[r].map((_, i) => {
-        const f1   = i * 2;
-        const f2   = i * 2 + 1;
+        const f1 = i * 2;
+        const f2 = i * 2 + 1;
         const mid1 = (prev[f1] ?? prev[prev.length - 1]) + CARD_H / 2;
-        const mid2 = (prev[f2] ?? mid1)                  + CARD_H / 2;
+        const mid2 = (prev[f2] ?? mid1) + CARD_H / 2;
         return Math.round((mid1 + mid2) / 2 - CARD_H / 2);
       }));
     }
 
-    // Canvas dimensions
     const canvasH = tops.reduce((max, rt) => {
       const last = rt[rt.length - 1] ?? 0;
       return Math.max(max, last + CARD_H + PAD_V);
     }, 200);
     const canvasW = PAD_H + cat.rounds.length * (COL_W + COL_GAP);
 
-    // ── Match card HTML ───────────────────────────────────────────────
     function buildCard(m, r, i) {
-      const home    = m?.home ?? "TBD";
-      const away    = m?.away ?? "TBD";
+      const home = m?.home ?? "TBD";
+      const away = m?.away ?? "TBD";
       const homeBye = String(home).toUpperCase() === "BYE";
       const awayBye = String(away).toUpperCase() === "BYE";
       const hp = Array.isArray(m?.homePlayers) ? m.homePlayers : splitTeamName(home);
@@ -903,20 +1394,20 @@ document.addEventListener("DOMContentLoaded", async () => {
             ${k === 0 ? `<option value="__BYE__" ${isBye ? "selected" : ""}>BYE</option>` : ""}
             <option value="" ${(!cur && !isBye) ? "selected" : ""}>Select player</option>
             ${options.filter(n => n !== "BYE").map(n =>
-              `<option value="${n}" ${n === cur ? "selected" : ""}>${n}</option>`).join("")}
+              `<option value="${escapeHtml(n)}" ${n === cur ? "selected" : ""}>${escapeHtml(n)}</option>`).join("")}
           </select>`;
         }
         return `<div class="fixture-player-grid">${html}</div>`;
       }
 
-      const homeCell = locked && editMode && isR1 ? selects("home", hp) : `<span class="player-name">${home}</span>`;
-      const awayCell = locked && editMode && isR1 ? selects("away", ap) : `<span class="player-name">${away}</span>`;
+      const homeCell = locked && editMode && isR1 ? selects("home", hp) : `<span class="player-name">${escapeHtml(home)}</span>`;
+      const awayCell = locked && editMode && isR1 ? selects("away", ap) : `<span class="player-name">${escapeHtml(away)}</span>`;
 
       const aVal = m?.score?.state?.A?.[scoreKey];
       const bVal = m?.score?.state?.B?.[scoreKey];
-      const hasScore  = aVal !== undefined && bVal !== undefined;
-      const scoreTxt  = hasScore ? `${aVal} – ${bVal}` : "–";
-      const canScore  = !homeBye && !awayBye;
+      const hasScore = aVal !== undefined && bVal !== undefined;
+      const scoreTxt = hasScore ? `${aVal} – ${bVal}` : "–";
+      const canScore = !homeBye && !awayBye;
 
       return `
         <div class="bk-card" style="width:${COL_W}px;height:${CARD_H}px;">
@@ -930,18 +1421,17 @@ document.addEventListener("DOMContentLoaded", async () => {
               data-round="${r}" data-match="${i}"
               ${canScore ? "" : "disabled"}>▶ Start Scoring</button>
             <span class="bk-score-txt">${scoreTxt}</span>
-            ${m?.winner ? `<span class="bk-winner-badge">🏆 ${m.winner}</span>` : ""}
+            ${m?.winner ? `<span class="bk-winner-badge">🏆 ${escapeHtml(m.winner)}</span>` : ""}
           </div>
         </div>`;
     }
 
-    // ── Build DOM ─────────────────────────────────────────────────────
     const wrapper = document.createElement("div");
     wrapper.className = "fixtures-group";
     wrapper.innerHTML = `
       <div class="fixtures-group-header">
         <div class="fixtures-group-header-left">
-          <h2 class="fixtures-group-title">${cat.label || "Fixtures"}</h2>
+          <h2 class="fixtures-group-title">${escapeHtml(cat.label || "Fixtures")}</h2>
           ${locked ? `<p class="muted">Fixtures locked (edit Round 1 if needed).</p>` : ""}
         </div>
       </div>`;
@@ -952,22 +1442,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     const canvas = document.createElement("div");
     canvas.style.cssText = `position:relative;height:${canvasH}px;width:${canvasW}px;`;
 
-    // ── SVG elbow connectors ──────────────────────────────────────────
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;pointer-events:none;overflow:visible;`;
 
     for (let r = 1; r < cat.rounds.length; r++) {
       cat.rounds[r].forEach((_, i) => {
-        const x1   = PAD_H + (r - 1) * (COL_W + COL_GAP) + COL_W;
-        const x2   = PAD_H + r * (COL_W + COL_GAP);
+        const x1 = PAD_H + (r - 1) * (COL_W + COL_GAP) + COL_W;
+        const x2 = PAD_H + r * (COL_W + COL_GAP);
         const midX = (x1 + x2) / 2;
         const myMidY = tops[r][i] + CARD_H / 2;
-        const prev   = tops[r - 1];
+        const prev = tops[r - 1];
 
         [i * 2, i * 2 + 1].forEach(fi => {
           if (fi >= prev.length) return;
           const fMidY = prev[fi] + CARD_H / 2;
-          const path  = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
           path.setAttribute("d", `M ${x1} ${fMidY} H ${midX} V ${myMidY} H ${x2}`);
           path.setAttribute("fill", "none");
           path.setAttribute("stroke", "rgba(77,208,225,0.40)");
@@ -980,7 +1469,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     canvas.appendChild(svg);
 
-    // ── Round labels + cards ──────────────────────────────────────────
     cat.rounds.forEach((round, r) => {
       const colLeft = PAD_H + r * (COL_W + COL_GAP);
 
@@ -1002,6 +1490,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     wrapper.appendChild(bracketOuter);
     fixturesUi.groupsEl.appendChild(wrapper);
   }
+
   async function generateAndSaveFixtures() {
     if (!fixturesState.fixtures || fixturesState.fixtures.__locked) return;
 
@@ -1048,10 +1537,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (again) {
           fixturesState.fixtures = migrateFixtures(again);
           fixturesState.fixtures.__locked = true;
-        if (fixturesUi.generateBtn) {
-        fixturesUi.generateBtn.disabled = false;
-        fixturesUi.generateBtn.textContent = "Regenerate fixtures";
-      }
+          if (fixturesUi.generateBtn) {
+            fixturesUi.generateBtn.disabled = false;
+            fixturesUi.generateBtn.textContent = "Regenerate fixtures";
+          }
           setEditUI();
         }
         return;
@@ -1064,9 +1553,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesState.fixtures = r.data || newFixtures;
     fixturesState.fixtures.__locked = true;
     if (fixturesUi.generateBtn) {
-    fixturesUi.generateBtn.disabled = false;
-    fixturesUi.generateBtn.textContent = "Regenerate fixtures";
-  }
+      fixturesUi.generateBtn.disabled = false;
+      fixturesUi.generateBtn.textContent = "Regenerate fixtures";
+    }
     setEditUI();
     showToast("Fixtures generated");
 
@@ -1075,79 +1564,72 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function forceRegenerateFixtures() {
-  // Always rebuild from latest accepted players
-  rebuildAcceptedByCategory();
+    rebuildAcceptedByCategory();
 
-  const newFixtures = { categories: {} };
-  let createdAny = false;
+    const newFixtures = { categories: {} };
+    let createdAny = false;
 
-  fixturesState.categories.forEach((c) => {
-    const cid = c.categoryId || c.id;
-    if (!cid) return;
+    fixturesState.categories.forEach((c) => {
+      const cid = c.categoryId || c.id;
+      if (!cid) return;
 
-    const names = fixturesState.acceptedByCategory[cid] || [];
-    const teamSize = Number(c.teamSize || 1);
+      const names = fixturesState.acceptedByCategory[cid] || [];
+      const teamSize = Number(c.teamSize || 1);
 
-    const { entrants, dropped, teamMap } = buildEntrants(names, teamSize);
+      const { entrants, dropped, teamMap } = buildEntrants(names, teamSize);
 
-    if (dropped.length) {
-      showToast(`⚠️ ${dropped.length} player(s) left out (need teams of ${teamSize})`);
-    }
+      if (dropped.length) {
+        showToast(`⚠️ ${dropped.length} player(s) left out (need teams of ${teamSize})`);
+      }
 
-    const bracket = createBracket(entrants, teamMap);
+      const bracket = createBracket(entrants, teamMap);
 
-    newFixtures.categories[cid] = {
-      categoryId: cid,
-      label: categoryLabel(c),
-      ...(bracket ? bracket : { rounds: [], totalRounds: 0 }),
-    };
+      newFixtures.categories[cid] = {
+        categoryId: cid,
+        label: categoryLabel(c),
+        ...(bracket ? bracket : { rounds: [], totalRounds: 0 }),
+      };
 
-    if (bracket) createdAny = true;
-  });
+      if (bracket) createdAny = true;
+    });
 
-  if (!createdAny) {
-    showToast("Not enough accepted players to regenerate fixtures");
-    return;
-  }
-
-  try {
-    // 🔥 overwrite existing fixtures (same endpoint)
-    const r = await apiPost(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
-      newFixtures
-    );
-
-    if (!r.ok) {
-      showToast("Failed to regenerate fixtures");
-      console.error("Regenerate failed:", r);
+    if (!createdAny) {
+      showToast("Not enough accepted players to regenerate fixtures");
       return;
     }
 
-    // ✅ replace state completely (old scores gone automatically)
-    fixturesState.fixtures = r.data || newFixtures;
-    fixturesState.fixtures.__locked = true;
+    try {
+      const r = await apiPost(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
+        newFixtures
+      );
 
-    fixturesState.editMode = false;
+      if (!r.ok) {
+        showToast("Failed to regenerate fixtures");
+        console.error("Regenerate failed:", r);
+        return;
+      }
 
-    showToast("Fixtures regenerated");
+      fixturesState.fixtures = r.data || newFixtures;
+      fixturesState.fixtures.__locked = true;
+      fixturesState.editMode = false;
 
-    renderCategoryToggles();
-    if (fixturesState.activeCategoryId) {
-      renderCategoryBracket(fixturesState.activeCategoryId);
+      showToast("Fixtures regenerated");
+
+      renderCategoryToggles();
+      if (fixturesState.activeCategoryId) {
+        renderCategoryBracket(fixturesState.activeCategoryId);
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Something went wrong while regenerating");
     }
-
-  } catch (e) {
-    console.error(e);
-    showToast("Something went wrong while regenerating");
   }
-}
 
-  
   async function initFixturesIfNeeded() {
     if (fixturesUi.didInit) return;
     fixturesUi.didInit = true;
 
-    // Wire "start scoring" click delegation (same as fixtures.js)
     fixturesUi.groupsEl?.addEventListener("click", (e) => {
       const btn = e.target.closest(".start-scoring-btn");
       if (!btn) return;
@@ -1160,7 +1642,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.location.href = `score.html?tournamentId=${tId}&categoryId=${cId}&round=${round}&match=${match}`;
     });
 
-    // Configure scoring fields button (same redirect behaviour)
     fixturesUi.configureBtn?.addEventListener("click", () => {
       if (!fixturesState.activeCategoryId) {
         showToast("Select a category first");
@@ -1171,24 +1652,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         `&categoryId=${encodeURIComponent(fixturesState.activeCategoryId)}`;
     });
 
-    // Generate button
     fixturesUi.generateBtn?.addEventListener("click", async () => {
-    const alreadyGenerated = fixturesState.fixtures?.__locked;
+      const alreadyGenerated = fixturesState.fixtures?.__locked;
 
-    if (alreadyGenerated) {
-      const confirmReset = window.confirm(
-        "Are you sure you want to regenerate fixtures?\n\nIt will erase all scores and results of the current tournament."
-      );
+      if (alreadyGenerated) {
+        const confirmReset = window.confirm(
+          "Are you sure you want to regenerate fixtures?\n\nIt will erase all scores and results of the current tournament."
+        );
 
-      if (!confirmReset) return;
+        if (!confirmReset) return;
+        await forceRegenerateFixtures();
+      } else {
+        await generateAndSaveFixtures();
+      }
+    });
 
-      await forceRegenerateFixtures(); // new function
-    } else {
-      await generateAndSaveFixtures();
-    }
-  });
-
-    // Edit / Save (Round 1 only) — same logic as fixtures.js
     fixturesUi.editBtn?.addEventListener("click", async () => {
       if (!fixturesState.fixtures?.__locked) return;
 
@@ -1288,26 +1766,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesUi.wrap?.classList.remove("hidden");
     fixturesUi.isOpen = true;
 
-    // Fill fixtures header from already loaded tournament meta / DOM
-    fixturesUi.titleEl && (fixturesUi.titleEl.textContent = titleEl?.textContent || "Tournament");
-    fixturesUi.sportEl && (fixturesUi.sportEl.textContent = sportEl?.textContent || "");
-    fixturesUi.datesEl && (fixturesUi.datesEl.textContent = datesEl?.textContent || "");
-    fixturesUi.codeEl && (fixturesUi.codeEl.textContent = codeEl?.textContent || "");
-
     await initFixturesIfNeeded();
 
     fixturesState.categories = tournamentCategories || [];
     fixturesState.players = allPlayers || [];
 
-    // Load existing fixtures first
     const existing = await loadFixturesFromDb();
     if (existing) {
       fixturesState.fixtures = migrateFixtures(existing);
       fixturesState.fixtures.__locked = true;
-    if (fixturesUi.generateBtn) {
-      fixturesUi.generateBtn.disabled = false;
-      fixturesUi.generateBtn.textContent = "Regenerate fixtures";
-    }
+      if (fixturesUi.generateBtn) {
+        fixturesUi.generateBtn.disabled = false;
+        fixturesUi.generateBtn.textContent = "Regenerate fixtures";
+      }
       setEditUI();
       rebuildAcceptedFromFixturesRound1();
     } else {
@@ -1324,14 +1795,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       fixturesState.fixtures.__locked = false;
       if (fixturesUi.generateBtn) {
-      fixturesUi.generateBtn.disabled = false;
-      fixturesUi.generateBtn.textContent = "Generate fixtures";
-    }
+        fixturesUi.generateBtn.disabled = false;
+        fixturesUi.generateBtn.textContent = "Generate fixtures";
+      }
       setEditUI();
       rebuildAcceptedByCategory();
     }
 
-    // Load scoring schema (same endpoint)
     const schemaResp = await apiGet(
       `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`
     );
@@ -1340,22 +1810,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderCategoryToggles();
     ensureEmptyState(true);
 
-    // ✅ requirement: clicking "Create tournament fixtures" should create them here
     if (autoGenerateIfMissing && fixturesState.fixtures && !fixturesState.fixtures.__locked) {
       await generateAndSaveFixtures();
     }
 
-    // Scroll into view nicely
     fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // Hook "Create tournament fixtures" on players page
   fixturesUi.openBtn?.addEventListener("click", async () => {
     await openAndLoadFixtures(true);
   });
 
-  // ---------- INIT ----------
+  captainState = loadCaptainState();
+
   await loadTournamentMeta();
   wireTabs();
   await loadPlayers();
+  renderCaptainsSummary();
+  refreshCaptainButtons();
+  refreshStageSpecificUi();
 });

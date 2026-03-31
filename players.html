@@ -5,7 +5,6 @@
     <title>ScheduleIt – Tournament players</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Fonts to match the rest of the app -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,12 +15,10 @@
     <link rel="stylesheet" href="styles/players.css" />
   </head>
   <body>
-    <!-- Same topbar structure as host page -->
     <header class="topbar">
       <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
       <div class="topbar-right">
-        <!-- User avatar + dropdown (same as host.html) -->
         <div class="user-menu">
           <button
             type="button"
@@ -39,7 +36,6 @@
           </div>
         </div>
 
-        <!-- Mode toggle (same as host.html) -->
         <div class="mode-toggle" role="group" aria-label="Mode toggle">
           <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
           <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
@@ -64,6 +60,18 @@
 
           <button class="btn-dark" type="button" id="add-player-btn">
             + Add players
+          </button>
+
+          <button class="btn-dark" type="button" id="make-captains-btn">
+            Make captains
+          </button>
+
+          <button class="btn-dark hidden" type="button" id="view-confirm-captains-btn">
+            View & Confirm captains
+          </button>
+
+          <button class="btn-dark hidden" type="button" id="create-pools-btn">
+            Create Pools
           </button>
 
           <button class="btn-primary" type="button" id="create-fixtures-btn">
@@ -94,7 +102,47 @@
           </table>
         </div>
 
-        <!-- ✅ EMBEDDED FIXTURES (replaces fixtures.html) -->
+        <!-- CAPTAINS SUMMARY -->
+        <section id="captains-summary-section" class="captains-summary-section hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Team setup</p>
+              <h2 class="section-title">Confirmed captains</h2>
+            </div>
+          </div>
+
+          <div id="captains-summary-empty" class="empty-state compact-empty">
+            <div class="feature-icon">🧢</div>
+            <h3>No captains confirmed yet</h3>
+            <p class="muted">Select captains first, then confirm them with team names.</p>
+          </div>
+
+          <div id="captains-summary-list" class="captains-summary-list"></div>
+        </section>
+
+        <!-- POOLS -->
+        <section id="pools-section" class="pools-section hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Group stage</p>
+              <h2 class="section-title">Create pools</h2>
+            </div>
+            <button type="button" class="btn-dark" id="reset-pools-btn">Reset pools</button>
+          </div>
+
+          <p class="helper-text">
+            Drag and drop teams into pools. Teams are built from confirmed captains and optional team names.
+          </p>
+
+          <div id="pools-unassigned-wrap" class="pools-unassigned-wrap">
+            <h3>Unassigned teams</h3>
+            <div id="unassigned-teams" class="team-dropzone"></div>
+          </div>
+
+          <div id="pools-grid" class="pools-grid"></div>
+        </section>
+
+        <!-- EMBEDDED FIXTURES -->
         <section id="fixtures-embed" class="fixtures-embed hidden">
           <header class="fixtures-header">
             <p class="eyebrow">Knockout fixtures</p>
@@ -133,10 +181,10 @@
 
           <div id="fixtures-groups"></div>
         </section>
-        <!-- ✅ END EMBEDDED FIXTURES -->
       </section>
     </main>
 
+    <!-- ADD PLAYER MODAL -->
     <div class="modal-overlay hidden" id="host-add-player-modal" aria-hidden="true">
       <div class="modal">
         <button class="modal-close" type="button" id="host-add-player-close">&times;</button>
@@ -183,6 +231,58 @@
           <button type="submit" class="btn-primary full-width">
             Add player
           </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MAKE CAPTAINS MODAL -->
+    <div class="modal-overlay hidden" id="make-captains-modal" aria-hidden="true">
+      <div class="modal modal-lg">
+        <button class="modal-close" type="button" id="make-captains-close">&times;</button>
+
+        <h2>Make captains</h2>
+        <p class="helper-text">
+          Select captains from the accepted players list.
+        </p>
+
+        <div id="make-captains-empty" class="empty-state compact-empty hidden">
+          <div class="feature-icon">👤</div>
+          <h3>No accepted players available</h3>
+          <p class="muted">Only accepted players can be selected as captains.</p>
+        </div>
+
+        <div id="make-captains-list" class="captain-pick-list"></div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-dark" id="make-captains-cancel-btn">Cancel</button>
+          <button type="button" class="btn-primary" id="make-captains-save-btn">Save selected captains</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIRM CAPTAINS MODAL -->
+    <div class="modal-overlay hidden" id="confirm-captains-modal" aria-hidden="true">
+      <div class="modal modal-lg">
+        <button class="modal-close" type="button" id="confirm-captains-close">&times;</button>
+
+        <h2>View & Confirm captains</h2>
+        <p class="helper-text">
+          Review captain names and optionally assign team names before submitting.
+        </p>
+
+        <div id="confirm-captains-empty" class="empty-state compact-empty hidden">
+          <div class="feature-icon">🧢</div>
+          <h3>No captains selected</h3>
+          <p class="muted">Use “Make captains” first.</p>
+        </div>
+
+        <form id="confirm-captains-form">
+          <div id="confirm-captains-list" class="confirm-captains-list"></div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-dark" id="confirm-captains-cancel-btn">Cancel</button>
+            <button type="submit" class="btn-primary">Submit captains</button>
+          </div>
         </form>
       </div>
     </div>
