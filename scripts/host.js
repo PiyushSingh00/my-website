@@ -224,6 +224,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         ageGroup: "",
         playingLevel: "",
         teamSize: "1",
+        exactTeamSize: "",
+        minPlayersPerTeam: "",
+        maxPlayersPerTeam: "",
         eventName: "",
       });
     }
@@ -231,6 +234,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     events.forEach((ev, i) => {
       const cfg = wiz.eventConfigs[i];
+
+      const showTeamRangeFields = wiz.tournamentType === "team";
+      const showExactTeamSizeField = cfg.teamSize === "4";
+
       const card = document.createElement("div");
       card.className = "wiz-event-cfg-card";
       card.innerHTML = `
@@ -245,6 +252,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               <option value="Mixed" ${cfg.gender === "Mixed" ? "selected" : ""}>Mixed</option>
             </select>
           </div>
+
           <div class="field-group">
             <label>Age group</label>
             <select class="wiz-cfg-sel" data-idx="${i}" data-field="ageGroup">
@@ -259,6 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               <option value="50+" ${cfg.ageGroup === "50+" ? "selected" : ""}>50+</option>
             </select>
           </div>
+
           <div class="field-group">
             <label>Playing level</label>
             <select class="wiz-cfg-sel" data-idx="${i}" data-field="playingLevel">
@@ -269,6 +278,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               <option value="Professional" ${cfg.playingLevel === "Professional" ? "selected" : ""}>Professional</option>
             </select>
           </div>
+
           <div class="field-group">
             <label>Format</label>
             <select class="wiz-cfg-sel" data-idx="${i}" data-field="teamSize">
@@ -278,12 +288,78 @@ document.addEventListener("DOMContentLoaded", async () => {
               <option value="4" ${cfg.teamSize === "4" ? "selected" : ""}>Team (4+)</option>
             </select>
           </div>
+
+          ${
+            showTeamRangeFields
+              ? `
+            <div class="field-group">
+              <label>Minimum players per team</label>
+              <input
+                type="number"
+                min="1"
+                class="wiz-cfg-inp"
+                data-idx="${i}"
+                data-field="minPlayersPerTeam"
+                placeholder="e.g. 7"
+                value="${cfg.minPlayersPerTeam || ""}"
+              />
+            </div>
+
+            <div class="field-group">
+              <label>Maximum players per team</label>
+              <input
+                type="number"
+                min="1"
+                class="wiz-cfg-inp"
+                data-idx="${i}"
+                data-field="maxPlayersPerTeam"
+                placeholder="e.g. 11"
+                value="${cfg.maxPlayersPerTeam || ""}"
+              />
+            </div>
+          `
+              : ""
+          }
+
+          ${
+            showExactTeamSizeField
+              ? `
+            <div class="field-group">
+              <label>Exact team size</label>
+              <input
+                type="number"
+                min="4"
+                class="wiz-cfg-inp"
+                data-idx="${i}"
+                data-field="exactTeamSize"
+                placeholder="e.g. 11"
+                value="${cfg.exactTeamSize || ""}"
+              />
+            </div>
+          `
+              : ""
+          }
         </div>
       `;
 
       card.querySelectorAll(".wiz-cfg-sel").forEach((sel) => {
         sel.addEventListener("change", () => {
-          wiz.eventConfigs[Number(sel.dataset.idx)][sel.dataset.field] = sel.value;
+          const idx = Number(sel.dataset.idx);
+          const field = sel.dataset.field;
+          wiz.eventConfigs[idx][field] = sel.value;
+
+          if (field === "teamSize") {
+            if (sel.value !== "4") {
+              wiz.eventConfigs[idx].exactTeamSize = "";
+            }
+            renderEventConfig();
+          }
+        });
+      });
+
+      card.querySelectorAll(".wiz-cfg-inp").forEach((inp) => {
+        inp.addEventListener("input", () => {
+          wiz.eventConfigs[Number(inp.dataset.idx)][inp.dataset.field] = inp.value;
         });
       });
 
@@ -370,6 +446,30 @@ document.addEventListener("DOMContentLoaded", async () => {
         const anyEmpty = wiz.eventNames.some((name) => !name.trim());
         if (anyEmpty) {
           alert("Please name all events.");
+          return false;
+        }
+      }
+    }
+
+    if (n === 2) {
+      const missingExactTeamSize = wiz.eventConfigs.some(
+        (cfg) => cfg.teamSize === "4" && !String(cfg.exactTeamSize || "").trim()
+      );
+
+      if (missingExactTeamSize) {
+        alert('Please enter the exact team size for every event where format is "Team (4+)".');
+        return false;
+      }
+
+      if (wiz.tournamentType === "team") {
+        const invalidMinMax = wiz.eventConfigs.some((cfg) => {
+          const min = Number(cfg.minPlayersPerTeam || 0);
+          const max = Number(cfg.maxPlayersPerTeam || 0);
+          return !min || !max || min > max;
+        });
+
+        if (invalidMinMax) {
+          alert("Please enter valid minimum and maximum players per team for each event.");
           return false;
         }
       }
@@ -670,14 +770,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    categories = wiz.eventConfigs.map((cfg, i) => ({
-      categoryId: cfg.categoryId || ("CAT-" + Math.random().toString(36).slice(2, 8).toUpperCase()),
-      ageGroup: cfg.ageGroup || "",
-      gender: cfg.gender || "",
-      teamSize: cfg.teamSize || "1",
-      playingLevel: cfg.playingLevel || "",
-      eventName: wiz.tournamentType === "single" ? "" : (wiz.eventNames[i] || cfg.eventName || ""),
-    }));
+  categories = wiz.eventConfigs.map((cfg, i) => ({
+    categoryId: cfg.categoryId || ("CAT-" + Math.random().toString(36).slice(2, 8).toUpperCase()),
+    ageGroup: cfg.ageGroup || "",
+    gender: cfg.gender || "",
+    teamSize: cfg.teamSize || "1",
+    exactTeamSize: cfg.teamSize === "4" && cfg.exactTeamSize ? Number(cfg.exactTeamSize) : null,
+    minPlayersPerTeam: wiz.tournamentType === "team" && cfg.minPlayersPerTeam ? Number(cfg.minPlayersPerTeam) : null,
+    maxPlayersPerTeam: wiz.tournamentType === "team" && cfg.maxPlayersPerTeam ? Number(cfg.maxPlayersPerTeam) : null,
+    playingLevel: cfg.playingLevel || "",
+    eventName: wiz.tournamentType === "single" ? "" : (wiz.eventNames[i] || cfg.eventName || ""),
+  }));
 
     const payload = {
       tournamentName: wiz.name,
@@ -1259,9 +1362,22 @@ document.addEventListener("DOMContentLoaded", async () => {
           ageGroup: c.ageGroup || "",
           playingLevel: c.playingLevel || "",
           teamSize: String(c.teamSize || "1"),
+          exactTeamSize: c.exactTeamSize != null ? String(c.exactTeamSize) : "",
+          minPlayersPerTeam: c.minPlayersPerTeam != null ? String(c.minPlayersPerTeam) : "",
+          maxPlayersPerTeam: c.maxPlayersPerTeam != null ? String(c.maxPlayersPerTeam) : "",
           eventName: c.eventName || "",
         }))
-      : [{ categoryId: "", gender: "", ageGroup: "", playingLevel: "", teamSize: "1", eventName: "" }];
+      : [{
+          categoryId: "",
+          gender: "",
+          ageGroup: "",
+          playingLevel: "",
+          teamSize: "1",
+          exactTeamSize: "",
+          minPlayersPerTeam: "",
+          maxPlayersPerTeam: "",
+          eventName: "",
+        }];
 
     document.getElementById("access-code").value = t.accessCode || "";
     hydrateWizardFormFromState();
