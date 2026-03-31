@@ -1837,3 +1837,531 @@ body {
     grid-template-columns: 1fr;
   }
 }
+/* =====================================================================
+   MOBILE-FIRST RESPONSIVE OVERHAUL
+   All rules here override or extend the existing stylesheet.
+   Organised: base improvements → component fixes → breakpoints.
+   ===================================================================== */
+
+/* ── 1. Global touch targets & font sizing ─────────────────────────── */
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: 16px; /* prevents iOS zoom on focus */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure inputs don't overflow on small screens */
+input, select, textarea {
+  max-width: 100%;
+}
+
+/* ── 2. Topbar ─────────────────────────────────────────────────────── */
+.topbar {
+  padding: 12px clamp(14px, 4vw, 40px);
+  gap: 10px;
+}
+
+.topbar-right {
+  gap: 8px;
+}
+
+/* Shrink mode toggle labels on very small screens */
+@media (max-width: 400px) {
+  .mode-btn {
+    font-size: 11px;
+    padding: 6px 9px;
+  }
+  .brand {
+    font-size: 15px;
+  }
+}
+
+/* ── 3. Main padding ───────────────────────────────────────────────── */
+.main {
+  padding: clamp(12px, 3vw, 32px) clamp(10px, 3vw, 20px) 48px;
+  align-items: flex-start;
+}
+
+/* ── 4. Host shell — sidebar + content ────────────────────────────── */
+.host-shell {
+  width: 100%;
+  max-width: 1280px;
+  gap: 12px;
+}
+
+/* On mobile: sidebar above content, full width */
+@media (max-width: 860px) {
+  .host-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .host-sidebar {
+    position: relative;
+    top: 0;
+    padding: 14px 12px;
+  }
+
+  /* Collapsed sidebar shows only the toggle + title */
+  .host-sidebar.is-collapsed .host-sidebar-head h2,
+  .host-sidebar.is-collapsed .host-mode-card p {
+    display: block;
+  }
+
+  .host-sidebar.is-collapsed .host-mode-toggle--sidebar {
+    display: none;
+  }
+
+  .host-sidebar.is-collapsed {
+    width: 100%;
+  }
+}
+
+/* Sidebar nav cards — more compact on mobile */
+@media (max-width: 860px) {
+  .host-mode-toggle--sidebar .host-mode-card {
+    padding: 11px 12px;
+    border-radius: 14px;
+  }
+  .host-mode-card h2 { font-size: 14px; }
+  .host-mode-card p  { font-size: 12px; }
+}
+
+/* ── 5. Dashboard ──────────────────────────────────────────────────── */
+.dashboard-stack {
+  gap: 12px;
+}
+
+.dashboard-card {
+  padding: clamp(14px, 3vw, 22px);
+  border-radius: 20px;
+}
+
+.dashboard-title {
+  font-size: clamp(16px, 3.5vw, 20px);
+}
+
+/* Upcoming scroll cards */
+.upcoming-tournament-card,
+.dashboard-empty-card {
+  min-width: clamp(180px, 55vw, 240px);
+  max-width: clamp(180px, 55vw, 240px);
+  padding: 12px;
+}
+
+.upcoming-tournament-card h3 {
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.upcoming-meta { font-size: 12px; }
+
+/* Scrollbar hidden on mobile (still scrollable via touch) */
+.upcoming-scroll::-webkit-scrollbar { display: none; }
+.upcoming-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── 6. Stat cards — always 3-across on desktop, row on mobile ─────── */
+.dashboard-stats-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stat-card {
+  padding: clamp(12px, 2.5vw, 20px);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.stat-card h3 {
+  font-size: clamp(22px, 5vw, 32px);
+  margin: 0;
+  line-height: 1;
+}
+
+/* Stack stats vertically only on very small phones */
+@media (max-width: 360px) {
+  .dashboard-stats-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 7. Dashboard bottom grid ──────────────────────────────────────── */
+.dashboard-bottom-grid {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 1000px) {
+  .dashboard-bottom-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  }
+}
+
+/* Sport chart — side by side on tablets, stacked on mobile */
+.sport-chart-wrap {
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+@media (min-width: 560px) {
+  .sport-chart-wrap {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+}
+
+#sports-pie-chart {
+  width: clamp(160px, 40vw, 220px) !important;
+  height: clamp(160px, 40vw, 220px) !important;
+  justify-self: center;
+}
+
+.sports-chart-legend-item {
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.sports-chart-name,
+.sports-chart-value {
+  font-size: 12px;
+}
+
+/* ── 8. Calendar ───────────────────────────────────────────────────── */
+.calendar-grid {
+  gap: clamp(3px, 1vw, 8px);
+}
+
+.calendar-day {
+  min-height: clamp(44px, 9vw, 72px);
+  padding: clamp(4px, 1.2vw, 8px) clamp(3px, 1vw, 6px);
+  border-radius: 10px;
+}
+
+.calendar-date {
+  font-size: clamp(10px, 2.2vw, 13px);
+}
+
+.calendar-marker {
+  font-size: 9px;
+  padding: 0 4px;
+  min-height: 15px;
+}
+
+.calendar-weekdays div {
+  font-size: clamp(9px, 2vw, 12px);
+}
+
+.calendar-month-label {
+  font-size: clamp(13px, 3vw, 16px);
+}
+
+.calendar-nav-btn {
+  padding: 7px 12px;
+  font-size: 14px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+/* ── 9. Tournament cards ───────────────────────────────────────────── */
+.tournament-card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  gap: 6px;
+}
+
+.tournament-head h3 {
+  font-size: clamp(15px, 3.5vw, 18px);
+  line-height: 1.3;
+}
+
+.tournament-card .sport-date {
+  font-size: 13px;
+}
+
+/* Tournament list — 1 col on mobile, 2 on wider */
+.tournaments-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 700px) {
+  .tournaments-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Action buttons inside tournament cards */
+.tournament-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.view-btn, .edit-btn, .delete-btn {
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  min-height: 36px;
+}
+
+/* ── 10. Filter toolbar ────────────────────────────────────────────── */
+.filter-toolbar {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-group-inline {
+  min-width: 0;
+  flex: 1 1 140px;
+  max-width: 260px;
+}
+
+@media (max-width: 480px) {
+  .filter-toolbar {
+    flex-direction: column;
+  }
+  .filter-group-inline {
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+/* ── 11. Wizard card ───────────────────────────────────────────────── */
+.wizard-card {
+  width: min(700px, 100%);
+  padding: clamp(16px, 4vw, 28px) clamp(14px, 4vw, 28px) 20px;
+}
+
+/* Progress bar — hide labels on very small screens */
+.wiz-progress {
+  margin-bottom: 20px;
+  gap: 0;
+  scrollbar-width: none;
+}
+.wiz-progress::-webkit-scrollbar { display: none; }
+
+.wiz-dot-num {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+
+@media (max-width: 420px) {
+  .wiz-dot-label { display: none; }
+  .wiz-dot-num   { width: 24px; height: 24px; font-size: 10px; }
+}
+
+/* Wizard nav — back left, next right on all sizes */
+.wiz-nav {
+  flex-wrap: nowrap;
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+.wiz-nav-left,
+.wiz-nav-right {
+  gap: 8px;
+}
+
+/* Buttons full-width on tiny screens */
+@media (max-width: 360px) {
+  .wiz-nav {
+    flex-direction: column;
+  }
+  .wiz-nav-left,
+  .wiz-nav-right {
+    width: 100%;
+  }
+  .wiz-nav-left button,
+  .wiz-nav-right button {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+/* Wizard step title */
+.wiz-step-title {
+  font-size: clamp(18px, 4vw, 22px);
+  margin: 4px 0 16px;
+}
+
+/* Type cards — 1 col on mobile */
+.wiz-type-cards {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 420px) {
+  .wiz-type-cards { grid-template-columns: 1fr; }
+}
+
+/* Event config grid — 1 col on mobile */
+.wiz-cfg-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 440px) {
+  .wiz-cfg-grid { grid-template-columns: 1fr; }
+}
+
+/* Counter buttons — bigger tap target */
+.counter-btn {
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  border-radius: 12px;
+}
+
+/* Toggle buttons — full-width row on narrow screens */
+@media (max-width: 380px) {
+  .wiz-toggle-row {
+    flex-direction: column;
+  }
+  .wiz-toggle-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* Code row — stack on mobile */
+.code-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+@media (max-width: 420px) {
+  .code-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 12. Form inputs — consistent height across all ────────────────── */
+.field-group input,
+.field-group select,
+.field-group textarea {
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  line-height: 1.4;
+  min-height: 46px;
+}
+
+.field-group textarea {
+  min-height: auto;
+  resize: vertical;
+}
+
+.field-group input:focus,
+.field-group select:focus,
+.field-group textarea:focus {
+  outline: none;
+  border-color: rgba(77, 208, 225, 0.85);
+  box-shadow: 0 0 0 3px rgba(77, 208, 225, 0.15);
+}
+
+.field-group label {
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+/* ── 13. Primary / secondary buttons — proper touch sizes ─────────── */
+.btn-primary {
+  padding: 12px 22px;
+  font-size: 14px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .15s, box-shadow .15s;
+  white-space: nowrap;
+}
+
+.btn-secondary {
+  padding: 11px 18px;
+  font-size: 14px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: background .15s;
+}
+
+.btn-dark {
+  padding: 11px 18px;
+  font-size: 14px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* ── 14. Scrollbars — thin and themed ─────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,.04); border-radius: 999px; }
+::-webkit-scrollbar-thumb { background: rgba(77,208,225,.3); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(77,208,225,.5); }
+
+/* ── 15. Modal — full-screen on mobile ─────────────────────────────── */
+.modal {
+  width: min(420px, 92vw);
+  padding: clamp(16px, 4vw, 22px);
+  border-radius: 20px;
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+
+@media (max-width: 420px) {
+  .modal-overlay {
+    align-items: flex-end;
+  }
+  .modal {
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+  }
+}
+
+/* ── 16. Misc layout helpers ───────────────────────────────────────── */
+
+/* Ensure no horizontal overflow anywhere */
+.host-content,
+.host-view,
+.dashboard-stack,
+.wizard-card,
+.host-card {
+  min-width: 0;
+}
+
+/* Section card inside wizard */
+.wiz-section-card {
+  padding: clamp(12px, 3vw, 18px);
+  border-radius: 18px;
+}
+
+/* Review body */
+.wiz-review-body {
+  padding: clamp(12px, 3vw, 16px);
+  border-radius: 14px;
+}
+
+.wiz-review-row {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wiz-review-key {
+  min-width: 70px;
+}
