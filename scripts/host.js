@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const TOTAL_STEPS = 6;
   let currentStep = 0;
   let editingTournamentId = null;
+  let viewingTournamentId = null;
 
   const wiz = {
     name: "",
@@ -71,6 +72,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const wizSubmitBtn = document.getElementById("wiz-submit-btn");
   const wizSaveNowBtn = document.getElementById("wiz-save-now-btn");
   const wizCancelEditBtn = document.getElementById("wiz-cancel-edit-btn");
+  const wizViewPlayersBtn = document.getElementById("wiz-view-players-btn");
+  const wizEditViewBtn = document.getElementById("wiz-edit-view-btn");
   const wizDots = document.querySelectorAll(".wiz-step-dot");
   const wizLines = document.querySelectorAll(".wiz-progress-line");
 
@@ -88,14 +91,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       wizBackBtn.classList.toggle("hidden", currentStep === 0 || viewOnlyMode);
     }
 
-    if (currentStep === TOTAL_STEPS - 1 && !viewOnlyMode) {
-      wizNextBtn?.classList.add("hidden");
-      wizSubmitBtn?.classList.remove("hidden");
-    } else {
-      wizNextBtn?.classList.remove("hidden");
-      wizSubmitBtn?.classList.add("hidden");
-    }
-
     setWizardModeUI();
   }
 
@@ -103,8 +98,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     const isEditMode = !!editingTournamentId;
     const isViewMode = !!viewOnlyMode;
 
+    if (wizBackBtn) {
+      wizBackBtn.classList.toggle("hidden", isViewMode || currentStep === 0);
+    }
+
+    if (wizNextBtn) {
+      wizNextBtn.classList.toggle("hidden", isViewMode);
+    }
+
     if (wizSaveNowBtn) {
       wizSaveNowBtn.classList.toggle("hidden", !isEditMode || isViewMode);
+    }
+
+    if (wizSubmitBtn) {
+      if (isViewMode) {
+        wizSubmitBtn.classList.add("hidden");
+      } else {
+        wizSubmitBtn.classList.toggle("hidden", currentStep !== TOTAL_STEPS - 1);
+        wizSubmitBtn.textContent = isEditMode ? "💾 Save changes" : "🚀 Create tournament";
+      }
     }
 
     if (wizCancelEditBtn) {
@@ -112,16 +124,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       wizCancelEditBtn.textContent = isViewMode ? "← Back to My tournaments" : "Cancel";
     }
 
-    if (wizSubmitBtn) {
-      if (isViewMode) {
-        wizSubmitBtn.classList.add("hidden");
-      } else {
-        wizSubmitBtn.textContent = isEditMode ? "💾 Save changes" : "🚀 Create tournament";
-      }
+    if (wizViewPlayersBtn) {
+      wizViewPlayersBtn.classList.toggle("hidden", !isViewMode);
     }
 
-    if (wizNextBtn && isViewMode) {
-      wizNextBtn.classList.add("hidden");
+    if (wizEditViewBtn) {
+      wizEditViewBtn.classList.toggle("hidden", !isViewMode);
+    }
+
+    if (generateCodeBtn) {
+      generateCodeBtn.classList.toggle("hidden", isViewMode);
     }
   }
 
@@ -530,6 +542,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     editingTournamentId = null;
     viewOnlyMode = false;
+    viewingTournamentId = null;
 
     document.getElementById("w-name").value = "";
     document.getElementById("w-sport").value = "";
@@ -1184,6 +1197,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function openTournamentForView(t) {
     viewOnlyMode = true;
     editingTournamentId = null;
+    viewingTournamentId = t.tournamentId;
 
     wiz.name = t.tournamentName || "";
     wiz.sport = t.sportName || "";
@@ -1259,6 +1273,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function openTournamentForEdit(t) {
     viewOnlyMode = false;
     editingTournamentId = t.tournamentId;
+    viewingTournamentId = null;
 
     wiz.name = t.tournamentName || "";
     wiz.sport = t.sportName || "";
@@ -1698,6 +1713,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     hydrateWizardFormFromState();
     showStep(0);
     switchHostView("my");
+  });
+
+  wizViewPlayersBtn?.addEventListener("click", () => {
+    const id = viewingTournamentId || editingTournamentId;
+    if (!id) {
+      alert("Tournament not found");
+      return;
+    }
+    window.location.href = `players.html?tournamentId=${id}`;
+  });
+
+  wizEditViewBtn?.addEventListener("click", () => {
+    const id = viewingTournamentId;
+    if (!id) {
+      alert("Tournament not found");
+      return;
+    }
+
+    const tournament = allTournaments.find((t) => t.tournamentId === id);
+    if (!tournament) {
+      alert("Tournament not found");
+      return;
+    }
+
+    openTournamentForEdit(tournament);
   });
 
   document.querySelectorAll(".host-mode-card").forEach((card) => {
