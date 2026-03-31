@@ -21,7 +21,12 @@
 
         <div class="topbar-right">
           <div class="user-menu">
-            <button type="button" class="user-avatar-btn" id="team-user-menu-trigger" aria-label="User menu">
+            <button
+              type="button"
+              class="user-avatar-btn"
+              id="team-user-menu-trigger"
+              aria-label="User menu"
+            >
               U
             </button>
 
@@ -33,8 +38,12 @@
           </div>
 
           <div class="mode-toggle" role="group" aria-label="Mode toggle">
-            <button class="mode-btn is-active" id="mode-player-btn" type="button">Join mode</button>
-            <button class="mode-btn" id="mode-host-btn" type="button">Host mode</button>
+            <button class="mode-btn is-active" id="mode-player-btn" type="button">
+              Join mode
+            </button>
+            <button class="mode-btn" id="mode-host-btn" type="button">
+              Host mode
+            </button>
           </div>
         </div>
       </header>
@@ -85,9 +94,9 @@
               />
             </div>
 
-            <div class="field-group">
-              <label for="team-category-select">Category / event</label>
-              <select id="team-category-select" required>
+            <div class="field-group" id="team-category-wrap">
+              <label for="team-category-select">Category</label>
+              <select id="team-category-select">
                 <option value="">Select category</option>
               </select>
             </div>
@@ -95,7 +104,7 @@
             <div class="rules-box">
               <h3>Selection rules</h3>
               <p class="helper-text" id="team-rule-text">
-                Choose a category to see how many players can be added.
+                Choose players to continue.
               </p>
             </div>
 

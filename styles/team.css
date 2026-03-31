@@ -32,6 +32,10 @@ body {
   background: transparent;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;

@@ -16,11 +16,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   let tournamentMeta = null;
   let allPlayers = [];
   let currentRule = {
-    mode: "range", // "range" | "exact"
+    mode: "range",
     min: 1,
     max: 1,
     exact: 1,
-    text: "Select players."
+    text: "Select players.",
   };
 
   const draftKey = `scheduleit_team_draft_${tournamentId}_${user.username || user.name || "user"}`;
@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const backBtn = document.getElementById("team-back-btn");
   const teamForm = document.getElementById("team-form");
+  const categoryWrap = document.getElementById("team-category-wrap");
   const categorySelect = document.getElementById("team-category-select");
   const teamRowsWrap = document.getElementById("team-player-rows");
   const addPlayerRowBtn = document.getElementById("add-player-row-btn");
@@ -189,8 +190,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     return allPlayers.filter((p) => normalizeStatus(p) === "accepted");
   }
 
+  function getCurrentCategory() {
+    const categories = normalizeCategories(tournamentMeta?.categories);
+
+    if (tournamentMeta?.tournamentType === "team") {
+      return null;
+    }
+
+    return categories.find(
+      (c) => String(c.categoryId || c.id) === String(categorySelect.value)
+    ) || null;
+  }
+
   function getPlayersForCategory(categoryId) {
-    return getAcceptedPlayers().filter(
+    const accepted = getAcceptedPlayers();
+
+    if (tournamentMeta?.tournamentType === "team") {
+      return accepted;
+    }
+
+    return accepted.filter(
       (p) => String(getPlayerCategoryId(p)) === String(categoryId)
     );
   }
@@ -201,21 +220,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       .filter(Boolean);
   }
 
-  function getCurrentCategory() {
-    const categories = normalizeCategories(tournamentMeta?.categories);
-    return categories.find(
-      (c) => String(c.categoryId || c.id) === String(categorySelect.value)
-    ) || null;
-  }
-
   function getRuleForCategory(category) {
-    if (!category || !tournamentMeta) {
+    if (!tournamentMeta) {
       return {
         mode: "range",
         min: 1,
         max: 1,
         exact: 1,
-        text: "Select a category to continue.",
+        text: "Select players.",
       };
     }
 
@@ -229,6 +241,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         max,
         exact: null,
         text: `You must select minimum ${min} and maximum ${max} players.`,
+      };
+    }
+
+    if (!category) {
+      return {
+        mode: "exact",
+        min: 1,
+        max: 1,
+        exact: 1,
+        text: "Select a category to continue.",
       };
     }
 
@@ -265,22 +287,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     const categoryPlayers = getPlayersForCategory(categoryId);
     const selectedValues = new Set(getSelectedValues());
 
-    return categoryPlayers.map((player) => {
-      const value = String(getPlayerId(player));
-      const disabled = selectedValues.has(value) && value !== selectedValue;
-      return `
-        <option value="${escapeHtml(value)}" ${value === selectedValue ? "selected" : ""} ${disabled ? "disabled" : ""}>
-          ${escapeHtml(getPlayerName(player))}
-        </option>
-      `;
-    }).join("");
+    return categoryPlayers
+      .map((player) => {
+        const value = String(getPlayerId(player));
+        const disabled = selectedValues.has(value) && value !== selectedValue;
+        return `
+          <option value="${escapeHtml(value)}" ${value === selectedValue ? "selected" : ""} ${disabled ? "disabled" : ""}>
+            ${escapeHtml(getPlayerName(player))}
+          </option>
+        `;
+      })
+      .join("");
   }
 
   function renderPlayerRows(savedValues = []) {
-    const categoryId = categorySelect.value;
+    const category = getCurrentCategory();
+    const categoryId =
+      tournamentMeta?.tournamentType === "team"
+        ? "__team_event__"
+        : (category ? String(category.categoryId || category.id) : "");
+
     teamRowsWrap.innerHTML = "";
 
-    const count = savedValues.length || (currentRule.mode === "exact" ? currentRule.exact : currentRule.min);
+    if (!categoryId) {
+      updateRuleUi();
+      return;
+    }
+
+    const count =
+      savedValues.length ||
+      (currentRule.mode === "exact" ? currentRule.exact : currentRule.min);
 
     for (let i = 0; i < count; i++) {
       const selectedValue = savedValues[i] || "";
@@ -292,9 +328,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         <div class="field-group" style="margin-bottom:0;">
           <label>Select player</label>
-          <select class="team-player-select" data-row-index="${i}" ${!categoryId ? "disabled" : ""}>
+          <select class="team-player-select" data-row-index="${i}">
             <option value="">Select player</option>
-            ${categoryId ? makePlayerOptions(categoryId, selectedValue) : ""}
+            ${makePlayerOptions(categoryId, selectedValue)}
           </select>
         </div>
 
@@ -336,7 +372,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function refreshAllPlayerDropdowns() {
-    const categoryId = categorySelect.value;
+    const category = getCurrentCategory();
+    const categoryId =
+      tournamentMeta?.tournamentType === "team"
+        ? "__team_event__"
+        : (category ? String(category.categoryId || category.id) : "");
+
     if (!categoryId) return;
 
     const selects = Array.from(teamRowsWrap.querySelectorAll(".team-player-select"));
@@ -372,7 +413,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function saveDraft(showMessage = true) {
     const payload = {
       teamName: teamNameInput.value.trim(),
-      categoryId: categorySelect.value,
+      categoryId: tournamentMeta?.tournamentType === "team" ? "" : categorySelect.value,
       playerIds: getSelectedValues(),
       updatedAt: new Date().toISOString(),
     };
@@ -429,17 +470,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     tournamentSportEl.textContent = tournamentMeta?.sportName || "-";
     tournamentDatesEl.textContent = tournamentMeta?.tournamentDates || "-";
 
-    populateCategoryDropdown();
-
     const draft = loadDraft();
     if (draft?.teamName) teamNameInput.value = draft.teamName;
-    if (draft?.categoryId) categorySelect.value = draft.categoryId;
+
+    if (tournamentMeta?.tournamentType === "team") {
+      categoryWrap?.classList.add("hidden");
+    } else {
+      categoryWrap?.classList.remove("hidden");
+      populateCategoryDropdown();
+      if (draft?.categoryId) categorySelect.value = draft.categoryId;
+    }
 
     const category = getCurrentCategory();
     currentRule = getRuleForCategory(category);
     updateRuleUi();
 
-    if (draft?.categoryId && category) {
+    if (tournamentMeta?.tournamentType === "team") {
+      renderPlayerRows(Array.isArray(draft?.playerIds) ? draft.playerIds : []);
+    } else if (draft?.categoryId && category) {
       renderPlayerRows(Array.isArray(draft.playerIds) ? draft.playerIds : []);
     } else {
       teamRowsWrap.innerHTML = "";
@@ -447,6 +495,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   categorySelect?.addEventListener("change", () => {
+    if (tournamentMeta?.tournamentType === "team") return;
+
     const category = getCurrentCategory();
     currentRule = getRuleForCategory(category);
     renderPlayerRows([]);
@@ -454,10 +504,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   addPlayerRowBtn?.addEventListener("click", () => {
-    const categoryId = categorySelect.value;
-    if (!categoryId) {
-      alert("Please select a category first.");
-      return;
+    let categoryId = "";
+
+    if (tournamentMeta?.tournamentType === "team") {
+      categoryId = "__team_event__";
+    } else {
+      const category = getCurrentCategory();
+      categoryId = category ? String(category.categoryId || category.id) : "";
+      if (!categoryId) {
+        alert("Please select a category first.");
+        return;
+      }
     }
 
     const selectedValues = getSelectedValues();
@@ -478,10 +535,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   teamForm?.addEventListener("submit", (e) => {
     e.preventDefault();
 
-    const categoryId = categorySelect.value;
-    if (!categoryId) {
-      alert("Please select a category.");
-      return;
+    let categoryId = "";
+    let category = null;
+
+    if (tournamentMeta?.tournamentType === "team") {
+      categoryId = "";
+    } else {
+      category = getCurrentCategory();
+      categoryId = category ? String(category.categoryId || category.id) : "";
+      if (!categoryId) {
+        alert("Please select a category.");
+        return;
+      }
     }
 
     const selectedValues = getSelectedValues();
@@ -507,9 +572,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    const categoryPlayers = getPlayersForCategory(categoryId);
+    const playerPool =
+      tournamentMeta?.tournamentType === "team"
+        ? getAcceptedPlayers()
+        : getPlayersForCategory(categoryId);
+
     const selectedPlayers = selectedValues
-      .map((id) => categoryPlayers.find((p) => String(getPlayerId(p)) === String(id)))
+      .map((id) => playerPool.find((p) => String(getPlayerId(p)) === String(id)))
       .filter(Boolean);
 
     const payload = {
@@ -517,7 +586,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       tournamentName: tournamentMeta?.tournamentName || "",
       teamName: teamNameInput.value.trim(),
       categoryId,
-      categoryLabel: categoryLabel(getCurrentCategory()),
+      categoryLabel: category ? categoryLabel(category) : "",
       createdBy: user.username || user.name || "",
       players: selectedPlayers.map((p) => ({
         playerId: getPlayerId(p),
@@ -527,12 +596,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       savedAt: new Date().toISOString(),
     };
 
-    localStorage.setItem(draftKey, JSON.stringify({
-      teamName: payload.teamName,
-      categoryId: payload.categoryId,
-      playerIds: payload.players.map((p) => String(p.playerId)),
-      updatedAt: payload.savedAt,
-    }));
+    localStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        teamName: payload.teamName,
+        categoryId: payload.categoryId,
+        playerIds: payload.players.map((p) => String(p.playerId)),
+        updatedAt: payload.savedAt,
+      })
+    );
 
     localStorage.setItem(
       `scheduleit_team_submission_${tournamentId}_${user.username || user.name || "user"}`,
