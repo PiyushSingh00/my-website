@@ -996,20 +996,93 @@ document.addEventListener("DOMContentLoaded", async () => {
     ctx.font = "12px Inter, sans-serif";
     ctx.fillText("Tournaments", cx, cy + 14);
 
+    // Legend — sport name + count only (no % cluttering the label)
     legend.innerHTML = distribution.map((item, index) => {
       const color = colors[index % colors.length];
-      const pct = Math.round((item.count / total) * 100);
-
       return `
         <div class="sports-chart-legend-item">
           <div class="sports-chart-legend-left">
             <span class="sports-chart-swatch" style="background:${color}"></span>
             <span class="sports-chart-name">${item.sport}</span>
           </div>
-          <span class="sports-chart-value">${pct}% (${item.count})</span>
+          <span class="sports-chart-value">${item.count}</span>
         </div>
       `;
     }).join("");
+
+    // ── Canvas hover tooltip ──────────────────────────────────────────
+    // Build slice angle map for hit-testing
+    const slices = [];
+    let a = -Math.PI / 2;
+    distribution.forEach((item, index) => {
+      const sweep = (item.count / total) * Math.PI * 2;
+      slices.push({ item, color: colors[index % colors.length], start: a, end: a + sweep });
+      a += sweep;
+    });
+
+    // Create or reuse tooltip element
+    let tip = document.getElementById("pie-tooltip");
+    if (!tip) {
+      tip = document.createElement("div");
+      tip.id = "pie-tooltip";
+      tip.className = "pie-tooltip";
+      document.body.appendChild(tip);
+    }
+
+    // Remove previous listener by cloning the canvas
+    const newCanvas = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+
+    // Redraw on the new canvas reference (ctx already drawn above, re-attach events only)
+    newCanvas.addEventListener("mousemove", (e) => {
+      const rect = newCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      // Scale mouse coords to canvas internal resolution
+      const scaleX = newCanvas.width  / rect.width;
+      const scaleY = newCanvas.height / rect.height;
+      const px = mx * scaleX;
+      const py = my * scaleY;
+
+      const dx = px - cx;
+      const dy = py - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Only inside donut ring (between inner hole and outer radius)
+      if (dist < 44 || dist > radius) {
+        tip.style.display = "none";
+        return;
+      }
+
+      let angle = Math.atan2(dy, dx);
+      // Normalise to same start as drawing (-π/2)
+      if (angle < -Math.PI / 2) angle += Math.PI * 2;
+
+      const hit = slices.find(s => {
+        let start = s.start;
+        let end   = s.end;
+        // Handle wrap-around past +π
+        if (end > Math.PI) {
+          return angle >= start || angle <= (end - Math.PI * 2);
+        }
+        return angle >= start && angle < end;
+      });
+
+      if (hit) {
+        const pct = Math.round((hit.item.count / total) * 100);
+        tip.textContent = `${hit.item.sport}: ${pct}% (${hit.item.count})`;
+        tip.style.display = "block";
+        tip.style.left = (e.clientX + 12) + "px";
+        tip.style.top  = (e.clientY - 28) + "px";
+      } else {
+        tip.style.display = "none";
+      }
+    });
+
+    newCanvas.addEventListener("mouseleave", () => {
+      tip.style.display = "none";
+    });
   }
 
   function renderDashboard(tournaments) {
