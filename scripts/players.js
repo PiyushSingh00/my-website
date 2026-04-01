@@ -112,6 +112,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const poolsGrid = document.getElementById("pools-grid");
   const unassignedTeams = document.getElementById("unassigned-teams");
   const resetPoolsBtn = document.getElementById("reset-pools-btn");
+  const randomizePoolsBtn = document.getElementById("randomize-pools-btn");
 
   addPlayerBtn?.addEventListener("click", openAddPlayerModal);
   addPlayerClose?.addEventListener("click", closeAddPlayerModal);
@@ -135,12 +136,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.target === confirmCaptainsModal) closeConfirmCaptainsModal();
   });
 
-  resetPoolsBtn?.addEventListener("click", () => {
-    captainState.pools = buildEmptyPools();
+  randomizePoolsBtn?.addEventListener("click", () => {
+    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
+
     const teams = getConfirmedTeams();
-    teams.forEach((team) => {
-      captainState.pools.unassigned.push(team.teamKey);
-    });
+    if (!teams.length) {
+      alert("Please confirm captains first.");
+      return;
+    }
+
+    const groupCount = Number(tournamentMetaCache?.groupCount || 0);
+    if (!groupCount) {
+      alert("Number of pools not found.");
+      return;
+    }
+
+    captainState.pools = buildRandomPools(teams, groupCount);
     persistCaptainState();
     renderPools();
   });
@@ -611,8 +622,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }));
   }
 
-  function buildEmptyPools() {
-    const groupCount = Number(tournamentMetaCache?.groupCount || 0);
+  function buildRandomPools(teams, groupCount) {
     const pools = {
       unassigned: [],
       groups: {},
@@ -621,6 +631,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (let i = 1; i <= groupCount; i++) {
       pools.groups[`Pool ${i}`] = [];
     }
+
+    const shuffledTeams = shuffle([...teams]);
+    const poolNames = Object.keys(pools.groups);
+
+    shuffledTeams.forEach((team, index) => {
+      const poolIndex = index % groupCount;
+      const poolName = poolNames[poolIndex];
+      pools.groups[poolName].push(team.teamKey);
+    });
 
     return pools;
   }
