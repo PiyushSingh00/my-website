@@ -705,11 +705,13 @@ async function loadMyTournaments() {
     myTournaments = normalizeTournamentList(raw);
     populateSportFilterFromMine(myTournaments);
     renderFilteredMyTournaments();
+    renderTeamInvites(window.__me);
   } catch (err) {
     console.error("Failed to load player tournaments", err);
     myTournaments = [];
     populateSportFilterFromMine(myTournaments);
     renderFilteredMyTournaments();
+    renderTeamInvites(window.__me);
   }
 }
 
@@ -785,6 +787,123 @@ async function switchToPlayer() {
 /* -------------------------
    BOOT
 ------------------------- */
+
+function normalizeIdentity(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getTeamInvitesForUser(user) {
+  const tournamentIds = myTournaments.map((t) => t.tournamentId ?? t.id).filter(Boolean);
+
+  let allInvites = [];
+
+  tournamentIds.forEach((tid) => {
+    try {
+      const raw = localStorage.getItem(`scheduleit_team_invites_${tid}`);
+      const parsed = JSON.parse(raw || "[]");
+      if (Array.isArray(parsed)) {
+        allInvites.push(...parsed);
+      }
+    } catch {}
+  });
+
+  const myName = normalizeIdentity(user?.name);
+  const myUsername = normalizeIdentity(user?.username);
+
+  return allInvites.filter((invite) => {
+    if (invite.status !== "pending") return false;
+
+    const inviteName = normalizeIdentity(invite.inviteeName);
+    const inviteUsername = normalizeIdentity(invite.inviteeUsername);
+
+    const nameMatch = myName && inviteName && myName === inviteName;
+    const usernameMatch = myUsername && inviteUsername && myUsername === inviteUsername;
+
+    return nameMatch || usernameMatch;
+  });
+}
+
+function saveUpdatedInvite(inviteToUpdate, nextStatus) {
+  const key = `scheduleit_team_invites_${inviteToUpdate.tournamentId}`;
+
+  let existing = [];
+  try {
+    existing = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!Array.isArray(existing)) existing = [];
+  } catch {
+    existing = [];
+  }
+
+  const updated = existing.map((invite) => {
+    if (String(invite.requestId) === String(inviteToUpdate.requestId)) {
+      return {
+        ...invite,
+        status: nextStatus,
+        respondedAt: new Date().toISOString(),
+      };
+    }
+    return invite;
+  });
+
+  localStorage.setItem(key, JSON.stringify(updated));
+}
+
+function renderTeamInvites(user) {
+  const section = document.getElementById("team-invite-section");
+  const list = document.getElementById("team-invite-list");
+  if (!section || !list) return;
+
+  const invites = getTeamInvitesForUser(user);
+  list.innerHTML = "";
+
+  if (!invites.length) {
+    section.classList.add("hidden");
+    return;
+  }
+
+  section.classList.remove("hidden");
+
+  invites.forEach((invite) => {
+    const card = document.createElement("div");
+    card.className = "team-invite-card";
+    card.innerHTML = `
+      <div class="team-invite-head">
+        <div>
+          <h3>${invite.teamName || "Team request"}</h3>
+          <p class="helper-text">
+            ${invite.captainName || "Captain"} invited you to join team in
+            <strong>${invite.tournamentName || "Tournament"}</strong>
+          </p>
+          ${
+            invite.categoryLabel
+              ? `<p class="helper-text">Category: ${invite.categoryLabel}</p>`
+              : ""
+          }
+        </div>
+      </div>
+
+      <div class="team-invite-actions">
+        <button type="button" class="btn-primary accept-team-invite-btn">Accept</button>
+        <button type="button" class="btn-dark reject-team-invite-btn">Reject</button>
+      </div>
+    `;
+
+    card.querySelector(".accept-team-invite-btn")?.addEventListener("click", () => {
+      saveUpdatedInvite(invite, "accepted");
+      renderTeamInvites(user);
+      alert("Team invite accepted.");
+    });
+
+    card.querySelector(".reject-team-invite-btn")?.addEventListener("click", () => {
+      saveUpdatedInvite(invite, "rejected");
+      renderTeamInvites(user);
+      alert("Team invite rejected.");
+    });
+
+    list.appendChild(card);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   window.__me = user;
@@ -811,4 +930,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   wirePlayerForm(user);
 
   await loadAllTournaments(); // ✅ All tournaments tab
+  await loadMyTournaments();
+  renderTeamInvites(user);
 });

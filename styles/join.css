@@ -772,3 +772,36 @@ body {
   border-color: rgba(77, 208, 225, 0.75);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
 }
+
+.team-invite-section {
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(77, 208, 225, 0.22);
+  background: rgba(77, 208, 225, 0.06);
+}
+
+.team-invite-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.team-invite-card {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(5, 11, 24, 0.78);
+}
+
+.team-invite-head h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.team-invite-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}

@@ -581,16 +581,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       .map((id) => playerPool.find((p) => String(getPlayerId(p)) === String(id)))
       .filter(Boolean);
 
+    const captainName = user.name || user.username || "";
+    const captainUsername = user.username || "";
+    const normalizedCaptainName = String(captainName).trim().toLowerCase();
+    const normalizedCaptainUsername = String(captainUsername).trim().toLowerCase();
+
     const payload = {
       tournamentId,
       tournamentName: tournamentMeta?.tournamentName || "",
       teamName: teamNameInput.value.trim(),
       categoryId,
       categoryLabel: category ? categoryLabel(category) : "",
-      createdBy: user.username || user.name || "",
+      createdBy: captainUsername || captainName,
+      captainName,
+      captainUsername,
       players: selectedPlayers.map((p) => ({
         playerId: getPlayerId(p),
         playerName: getPlayerName(p),
+        username: p.username || p.userName || "",
         categoryId: getPlayerCategoryId(p),
       })),
       savedAt: new Date().toISOString(),
@@ -611,7 +619,61 @@ document.addEventListener("DOMContentLoaded", async () => {
       JSON.stringify(payload)
     );
 
-    alert("Team saved in browser for now. Backend can be connected later.");
+    const invitesKey = `scheduleit_team_invites_${tournamentId}`;
+    let existingInvites = [];
+    try {
+      existingInvites = JSON.parse(localStorage.getItem(invitesKey) || "[]");
+      if (!Array.isArray(existingInvites)) existingInvites = [];
+    } catch {
+      existingInvites = [];
+    }
+
+    const now = new Date().toISOString();
+
+    const newInvites = payload.players
+      .filter((player) => {
+        const playerName = String(player.playerName || "").trim().toLowerCase();
+        const playerUsername = String(player.username || "").trim().toLowerCase();
+
+        const isCaptainByName = playerName && playerName === normalizedCaptainName;
+        const isCaptainByUsername =
+          playerUsername && normalizedCaptainUsername && playerUsername === normalizedCaptainUsername;
+
+        return !isCaptainByName && !isCaptainByUsername;
+      })
+      .map((player) => ({
+        requestId:
+          "invite_" + tournamentId + "_" + String(player.playerId || Math.random().toString(36).slice(2)),
+        tournamentId,
+        tournamentName: payload.tournamentName,
+        teamName: payload.teamName || captainName,
+        categoryId: payload.categoryId,
+        categoryLabel: payload.categoryLabel,
+        captainName,
+        captainUsername,
+        inviteePlayerId: player.playerId,
+        inviteeName: player.playerName || "",
+        inviteeUsername: player.username || "",
+        allPlayers: payload.players,
+        status: "pending",
+        createdAt: now,
+      }));
+
+    const filteredExisting = existingInvites.filter((invite) => {
+      return !newInvites.some(
+        (newInvite) =>
+          String(newInvite.inviteePlayerId) === String(invite.inviteePlayerId) &&
+          String(newInvite.tournamentId) === String(invite.tournamentId) &&
+          String(newInvite.captainUsername || newInvite.captainName) ===
+            String(invite.captainUsername || invite.captainName) &&
+          String(invite.status) === "pending"
+      );
+    });
+
+    localStorage.setItem(invitesKey, JSON.stringify([...filteredExisting, ...newInvites]));
+
+    alert("Team invites sent in browser for now. Invited players can accept from Join page.");
+    window.location.href = "join.html";
   });
 
   tournamentMeta = await loadTournamentMeta();
