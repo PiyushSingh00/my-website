@@ -88,7 +88,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const addPlayerCategory = document.getElementById("host-player-category");
 
   const makeCaptainsBtn = document.getElementById("make-captains-btn");
-  const viewConfirmCaptainsBtn = document.getElementById("view-confirm-captains-btn");
   const createPoolsBtn = document.getElementById("create-pools-btn");
 
   const makeCaptainsModal = document.getElementById("make-captains-modal");
@@ -122,7 +121,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   makeCaptainsBtn?.addEventListener("click", openMakeCaptainsModal);
-  viewConfirmCaptainsBtn?.addEventListener("click", openConfirmCaptainsModal);
   createPoolsBtn?.addEventListener("click", openPoolsSection);
 
   makeCaptainsClose?.addEventListener("click", closeMakeCaptainsModal);
@@ -393,9 +391,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function refreshCaptainButtons() {
-    const hasSelected = captainState.selectedCaptainIds.length > 0;
     const hasConfirmed = captainState.confirmedCaptains.length > 0;
-    viewConfirmCaptainsBtn?.classList.toggle("hidden", !hasSelected);
 
     const shouldShowPoolsButton =
       tournamentMetaCache?.stageFormat === "group_knockout" && hasConfirmed;
