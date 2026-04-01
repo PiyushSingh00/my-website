@@ -156,6 +156,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderPools();
   });
 
+  resetPoolsBtn?.addEventListener("click", () => {
+    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
+
+    const teams = getConfirmedTeams();
+    if (!teams.length) {
+      alert("Please confirm captains first.");
+      return;
+    }
+
+    captainState.pools = buildEmptyPools();
+
+    teams.forEach((team) => {
+      captainState.pools.unassigned.push(team.teamKey);
+    });
+
+    persistCaptainState();
+    renderPools();
+  });
+
   function normalizeCategories(cats) {
     if (!cats) return [];
     if (Array.isArray(cats)) return cats;
@@ -620,6 +639,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       captainName: item.playerName,
       categoryId: item.categoryId,
     }));
+  }
+
+  function buildEmptyPools() {
+    const groupCount = Number(tournamentMetaCache?.groupCount || 0);
+    const pools = {
+      unassigned: [],
+      groups: {},
+    };
+
+    for (let i = 1; i <= groupCount; i++) {
+      pools.groups[`Pool ${i}`] = [];
+    }
+
+    return pools;
   }
 
   function buildRandomPools(teams, groupCount) {
