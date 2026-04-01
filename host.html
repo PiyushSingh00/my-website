@@ -308,31 +308,24 @@
             <div class="field-group">
                 <label>Tournament type <span class="req">*</span></label>
                 <div class="wiz-type-cards">
-                <button type="button" class="wiz-type-card active" data-type="single">
+                  <button type="button" class="wiz-type-card active" data-type="single">
                     <span class="wiz-type-icon">🎾</span>
-                    <span class="wiz-type-name">Single event</span>
-                    <span class="wiz-type-desc">One event per match</span>
-                </button>
-                <button type="button" class="wiz-type-card" data-type="team">
+                    <span class="wiz-type-name">Individual event</span>
+                  </button>
+                  <button type="button" class="wiz-type-card" data-type="team">
                     <span class="wiz-type-icon">🏆</span>
                     <span class="wiz-type-name">Team event</span>
-                    <span class="wiz-type-desc">Multiple events per match</span>
-                </button>
+                  </button>
                 </div>
             </div>
 
             <div id="wiz-event-count-wrap" class="field-group hidden">
-                <label>Number of events per match <span class="req">*</span></label>
+                <label>Number of categories <span class="req">*</span></label>
                 <div class="wiz-counter-row">
                 <button type="button" class="counter-btn" id="wiz-event-dec">−</button>
                 <span class="wiz-counter-val" id="w-event-count-display">1</span>
                 <button type="button" class="counter-btn" id="wiz-event-inc">+</button>
                 </div>
-            </div>
-
-            <div id="wiz-event-names-wrap" class="hidden">
-                <p class="wiz-sublabel">Name each event</p>
-                <div id="wiz-event-name-fields"></div>
             </div>
 
             <div class="field-group" style="margin-top: 20px;">
@@ -356,7 +349,7 @@
             <div class="wiz-step" data-step="2">
             <p class="eyebrow">Step 3 of 6</p>
             <h2 class="wiz-step-title">Configure events</h2>
-            <p class="wiz-step-sub">Set rules for each event. All fields are optional.</p>
+            <p class="wiz-step-sub">Set rules for each category. All fields are optional.</p>
 
             <div id="wiz-event-config"></div>
 

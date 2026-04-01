@@ -189,33 +189,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     wiz.courtNames = wiz.courtNames.slice(0, wiz.courtCount);
   }
 
-  function renderEventNameFields() {
-    const wrap = document.getElementById("wiz-event-name-fields");
-    if (!wrap) return;
-
-    wrap.innerHTML = "";
-    for (let i = 0; i < wiz.eventCount; i++) {
-      const div = document.createElement("div");
-      div.className = "field-group wiz-event-name-row";
-      div.innerHTML = `
-        <label>Event ${i + 1}</label>
-        <input
-          type="text"
-          class="wiz-event-name-inp"
-          data-idx="${i}"
-          placeholder="e.g. Men's Singles"
-          value="${wiz.eventNames[i] || ""}"
-        />
-      `;
-      wrap.appendChild(div);
-    }
-
-    wrap.querySelectorAll(".wiz-event-name-inp").forEach((inp) => {
-      inp.addEventListener("input", () => {
-        wiz.eventNames[Number(inp.dataset.idx)] = inp.value;
-      });
-    });
-  }
 
   function renderEventConfig() {
     const wrap = document.getElementById("wiz-event-config");
@@ -223,10 +196,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     wrap.innerHTML = "";
 
-    const events =
-      wiz.tournamentType === "single"
-        ? [{ name: wiz.name || "Event 1" }]
-        : wiz.eventNames.map((n, i) => ({ name: n || `Event ${i + 1}` }));
+    const events = Array.from({ length: wiz.eventCount || 1 }, (_, i) => ({
+      name: `Category ${i + 1}`,
+    }));
 
     while (wiz.eventConfigs.length < events.length) {
       wiz.eventConfigs.push({
@@ -418,13 +390,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
 
-      if (wiz.tournamentType === "team") {
-        const anyEmpty = wiz.eventNames.some((name) => !name.trim());
-        if (anyEmpty) {
-          alert("Please name all events.");
-          return false;
-        }
+      if (wiz.eventCount < 1) {
+        alert("Please enter number of categories.");
+        return false;
       }
+
     }
 
     if (n === 2) {
@@ -494,10 +464,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const body = document.getElementById("wiz-review-body");
     if (!body) return;
 
-    const events =
-      wiz.tournamentType === "single"
-        ? [{ name: "Single event", cfg: wiz.eventConfigs[0] || {} }]
-        : wiz.eventNames.map((n, i) => ({ name: n || `Event ${i + 1}`, cfg: wiz.eventConfigs[i] || {} }));
+    const events = Array.from({ length: wiz.eventCount || 1 }, (_, i) => ({
+      name: `Category ${i + 1}`,
+      cfg: wiz.eventConfigs[i] || {},
+    }));
 
     const courtList =
       wiz.courtNames.filter(Boolean).join(", ") ||
@@ -541,7 +511,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
 
       <div class="wiz-review-section">
-        <div class="wiz-review-row"><span class="wiz-review-key">Tournament type</span><span class="wiz-review-val">${wiz.tournamentType === "team" ? "Team event" : "Single event"}</span></div>
+        <div class="wiz-review-row"><span class="wiz-review-key">Tournament type</span><span class="wiz-review-val">${wiz.tournamentType === "team" ? "Team event" : "Individual event"}</span></div>
         <div class="wiz-review-row"><span class="wiz-review-key">Format</span><span class="wiz-review-val">${
           wiz.stageFormat === "knockout"
             ? "Knockout"
@@ -652,8 +622,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       c.classList.toggle("active", c.dataset.type === "single");
     });
 
-    document.getElementById("wiz-event-count-wrap").classList.add("hidden");
-    document.getElementById("wiz-event-names-wrap").classList.add("hidden");
+    document.getElementById("wiz-event-count-wrap").classList.remove("hidden");
 
     document.getElementById("w-payment-no").classList.add("active");
     document.getElementById("w-payment-yes").classList.remove("active");
@@ -670,7 +639,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       wizSaveNowBtn.textContent = "💾 Save now";
     }
 
-    renderEventNameFields();
     renderEventConfig();
     syncCourtCount();
     renderCourtNameFields();
@@ -689,14 +657,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       c.classList.toggle("active", c.dataset.type === wiz.tournamentType);
     });
 
-    const isTeam = wiz.tournamentType === "team";
-    document.getElementById("wiz-event-count-wrap")?.classList.toggle("hidden", !isTeam);
-    document.getElementById("wiz-event-names-wrap")?.classList.toggle("hidden", !isTeam);
+    document.getElementById("wiz-event-count-wrap")?.classList.remove("hidden");
     document.getElementById("w-event-count-display").textContent = String(wiz.eventCount || 1);
-
-    if (isTeam) {
-      renderEventNameFields();
-    }
 
     const stageFormat = document.getElementById("w-stage-format");
     if (stageFormat) stageFormat.value = wiz.stageFormat || "";
@@ -764,7 +726,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       teamSize: cfg.teamSize || "1",
       exactTeamSize: cfg.teamSize === "4" && cfg.exactTeamSize ? Number(cfg.exactTeamSize) : null,
       playingLevel: cfg.playingLevel || "",
-      eventName: wiz.tournamentType === "single" ? "" : (wiz.eventNames[i] || cfg.eventName || ""),
+      eventName: `Category ${i + 1}`,
     }));
 
     const payload = {
@@ -778,7 +740,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       tournamentType: wiz.tournamentType,
       eventCount: wiz.eventCount,
-      eventNames: wiz.eventNames,
+      eventNames: Array.from({ length: wiz.eventCount || 1 }, (_, i) => `Category ${i + 1}`),
       eventConfigs: categories,
 
       stageFormat: wiz.stageFormat,
@@ -1333,14 +1295,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const tCats = Array.isArray(t.categories) ? t.categories : [];
 
-    if (wiz.tournamentType === "team") {
-      const eventNames = tCats.map((c) => c.eventName || "").filter(Boolean);
-      wiz.eventNames = eventNames.length ? eventNames : [""];
-      wiz.eventCount = wiz.eventNames.length;
-    } else {
-      wiz.eventNames = [];
-      wiz.eventCount = 1;
-    }
+    wiz.eventCount = tCats.length || 1;
+    wiz.eventNames = Array.from({ length: wiz.eventCount }, (_, i) => `Category ${i + 1}`);
 
     wiz.eventConfigs = tCats.length
       ? tCats.map((c) => ({
@@ -1420,14 +1376,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const tCats = Array.isArray(t.categories) ? t.categories : [];
 
-    if (wiz.tournamentType === "team") {
-      const eventNames = tCats.map((c) => c.eventName || "").filter(Boolean);
-      wiz.eventNames = eventNames.length ? eventNames : [""];
-      wiz.eventCount = wiz.eventNames.length;
-    } else {
-      wiz.eventNames = [];
-      wiz.eventCount = 1;
-    }
+    wiz.eventCount = tCats.length || 1;
+    wiz.eventNames = Array.from({ length: wiz.eventCount }, (_, i) => `Category ${i + 1}`);
 
     wiz.eventConfigs = tCats.length
       ? tCats.map((c) => ({
@@ -1691,30 +1641,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   document.querySelectorAll(".wiz-type-card").forEach((card) => {
-    card.addEventListener("click", () => {
-      if (viewOnlyMode) return;
+  card.addEventListener("click", () => {
+    if (viewOnlyMode) return;
 
-      document.querySelectorAll(".wiz-type-card").forEach((c) => c.classList.remove("active"));
+    document.querySelectorAll(".wiz-type-card").forEach((c) => c.classList.remove("active"));
       card.classList.add("active");
 
       wiz.tournamentType = card.dataset.type;
-      const isTeam = wiz.tournamentType === "team";
 
-      document.getElementById("wiz-event-count-wrap")?.classList.toggle("hidden", !isTeam);
-      document.getElementById("wiz-event-names-wrap")?.classList.toggle("hidden", !isTeam);
+      document.getElementById("wiz-event-count-wrap")?.classList.remove("hidden");
 
-      if (isTeam) {
+      if (!wiz.eventCount || wiz.eventCount < 1) {
         wiz.eventCount = 1;
-        document.getElementById("w-event-count-display").textContent = "1";
-        wiz.eventNames = [wiz.eventNames[0] || ""];
-        renderEventNameFields();
-      } else {
-        wiz.eventCount = 1;
-        document.getElementById("w-event-count-display").textContent = "1";
-        wiz.eventNames = [];
       }
 
+      document.getElementById("w-event-count-display").textContent = String(wiz.eventCount);
+
+      while (wiz.eventConfigs.length < wiz.eventCount) {
+        wiz.eventConfigs.push({
+          categoryId: "",
+          gender: "",
+          ageGroup: "",
+          playingLevel: "",
+          teamSize: "1",
+          eventName: "",
+        });
+      }
+      wiz.eventConfigs = wiz.eventConfigs.slice(0, wiz.eventCount);
+
       toggleTeamPlayerLimitsSection();
+      renderEventConfig();
     });
   });
 
@@ -1723,8 +1679,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (wiz.eventCount > 1) {
       wiz.eventCount--;
       document.getElementById("w-event-count-display").textContent = String(wiz.eventCount);
-      wiz.eventNames = wiz.eventNames.slice(0, wiz.eventCount);
-      renderEventNameFields();
+      wiz.eventConfigs = wiz.eventConfigs.slice(0, wiz.eventCount);
+      renderEventConfig();
     }
   });
 
@@ -1733,8 +1689,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (wiz.eventCount < 10) {
       wiz.eventCount++;
       document.getElementById("w-event-count-display").textContent = String(wiz.eventCount);
-      while (wiz.eventNames.length < wiz.eventCount) wiz.eventNames.push("");
-      renderEventNameFields();
+      while (wiz.eventConfigs.length < wiz.eventCount) {
+        wiz.eventConfigs.push({
+          categoryId: "",
+          gender: "",
+          ageGroup: "",
+          playingLevel: "",
+          teamSize: "1",
+          eventName: "",
+        });
+      }
+      renderEventConfig();
     }
   });
 
