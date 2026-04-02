@@ -1248,30 +1248,7 @@ function wireTopbar(user) {
   });
 }
 
-async function openTournamentFromQueryIfPresent() {
-  const params = new URLSearchParams(window.location.search);
-  const tournamentId = params.get("tournamentId");
-  if (!tournamentId) return;
 
-  try {
-    const data = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}`);
-    if (!data) return;
-
-    selectedTournament = {
-      ...(data.data || data),
-      tournamentId,
-    };
-
-    if ((!selectedTournament.categories || selectedTournament.categories.length === 0) && tournamentId) {
-      const fresh = await hydrateTournamentMeta(tournamentId);
-      if (fresh?.categories) selectedTournament.categories = fresh.categories;
-    }
-
-    openCodeModal(selectedTournament);
-  } catch (err) {
-    console.warn("Could not open tournament from shared link", err);
-  }
-}
 
 async function switchToHost() {
   await fetch("/api/user/mode", {
