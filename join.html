@@ -5,7 +5,6 @@
     <title>ScheduleIt – Join tournament</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Fonts (optional, to match main page) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,12 +12,10 @@
       rel="stylesheet"
     />
 
-    <!-- NOTE: styles/ path -->
     <link rel="stylesheet" href="styles/join.css" />
   </head>
   <body>
     <div class="app-shell">
-      <!-- Top bar -->
       <header class="topbar">
         <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
@@ -28,13 +25,8 @@
               A
             </button>
 
-
             <div class="user-menu-dropdown" id="user-menu-dropdown">
-              <button
-                type="button"
-                class="dropdown-item"
-                id="dropdown-signout"
-              >
+              <button type="button" class="dropdown-item" id="dropdown-signout">
                 Sign out
               </button>
             </div>
@@ -51,240 +43,324 @@
         </div>
       </header>
 
-        <!-- Main content -->
-    <main class="join-main">
-      <section class="join-intro">
-        <h1>Join a tournament</h1>
-        <p class="helper-text">
-          Browse tournaments across sports and join using the code shared by your host.
-        </p>
-      </section>
+      <main class="join-main">
+        <div class="join-shell">
+          <aside class="join-sidebar" id="join-sidebar">
+            <div class="join-sidebar-head">
+              <h2>Player panel</h2>
+              <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle-btn" aria-label="Toggle sidebar">
+                ☰
+              </button>
+            </div>
 
-      <section class="tournament-browser">
-        <!-- Tabs -->
-         <section id="team-invite-section" class="team-invite-section hidden">
-          <div class="browser-header">
-            <div>
-              <h2>Team join requests</h2>
+            <nav class="join-nav" aria-label="Join navigation">
+              <button class="join-nav-btn is-active" type="button" data-tab="dashboard" title="Dashboard">
+                <span class="join-nav-icon">🏠</span>
+                <span class="join-nav-text">Dashboard</span>
+              </button>
+
+              <button class="join-nav-btn" type="button" data-tab="notifications" title="Notifications">
+                <span class="join-nav-icon">🔔</span>
+                <span class="join-nav-text">Notifications</span>
+                <span class="join-nav-badge hidden" id="sidebar-notification-badge">0</span>
+              </button>
+
+              <button class="join-nav-btn" type="button" data-tab="all" title="All tournaments">
+                <span class="join-nav-icon">🌍</span>
+                <span class="join-nav-text">All tournaments</span>
+              </button>
+
+              <button class="join-nav-btn" type="button" data-tab="mine" title="My tournaments">
+                <span class="join-nav-icon">🏆</span>
+                <span class="join-nav-text">My tournaments</span>
+              </button>
+            </nav>
+          </aside>
+
+          <section class="join-content">
+            <section class="join-intro">
+              <h1>Join a tournament</h1>
               <p class="helper-text">
-                Accept or reject requests sent by captains.
+                Browse tournaments, manage invites, and track your activity.
               </p>
-            </div>
-          </div>
+            </section>
 
-          <div id="team-invite-list" class="team-invite-list"></div>
-        </section>
-        
-        <div class="join-tabs">
-            <button class="join-tab is-active" data-tab="all" type="button">
-            All tournaments
-            </button>
-            <button class="join-tab" data-tab="mine" type="button">
-            My tournaments
-            </button>
+            <section class="content-card">
+              <!-- DASHBOARD -->
+              <div class="tab-panel is-active" data-panel="dashboard">
+                <div class="browser-header">
+                  <div>
+                    <h2>Dashboard</h2>
+                    <p class="helper-text">
+                      Your upcoming tournaments and player stats.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="dashboard-stack">
+                  <div class="dashboard-card">
+                    <div class="dashboard-card-head">
+                      <div>
+                        <p class="eyebrow">Upcoming</p>
+                        <h3 class="dashboard-section-title">Registered tournaments</h3>
+                      </div>
+                    </div>
+
+                    <div id="dashboard-upcoming-list" class="dashboard-upcoming-list">
+                      <div class="dashboard-empty-card">No upcoming tournaments yet.</div>
+                    </div>
+                  </div>
+
+                  <div class="dashboard-card">
+                    <div class="dashboard-card-head">
+                      <div>
+                        <p class="eyebrow">Performance</p>
+                        <h3 class="dashboard-section-title">Stats</h3>
+                      </div>
+                    </div>
+
+                    <div class="stats-grid">
+                      <div class="stat-card">
+                        <div class="stat-top">
+                          <p class="stat-label">Total tournaments played</p>
+                          <select class="stat-filter" data-stat-filter="tournaments">
+                            <option value="all">All time</option>
+                          </select>
+                        </div>
+                        <h4 class="stat-value" id="stat-total-tournaments-played">0</h4>
+                      </div>
+
+                      <div class="stat-card">
+                        <div class="stat-top">
+                          <p class="stat-label">Total titles won</p>
+                          <select class="stat-filter" data-stat-filter="titles">
+                            <option value="all">All time</option>
+                          </select>
+                        </div>
+                        <h4 class="stat-value" id="stat-total-titles-won">0</h4>
+                      </div>
+
+                      <div class="stat-card">
+                        <div class="stat-top">
+                          <p class="stat-label">Total matches played</p>
+                          <select class="stat-filter" data-stat-filter="matches">
+                            <option value="all">All time</option>
+                          </select>
+                        </div>
+                        <h4 class="stat-value" id="stat-total-matches-played">0</h4>
+                      </div>
+
+                      <div class="stat-card">
+                        <div class="stat-top">
+                          <p class="stat-label">Win %</p>
+                          <select class="stat-filter" data-stat-filter="winpct">
+                            <option value="all">All time</option>
+                          </select>
+                        </div>
+                        <h4 class="stat-value" id="stat-win-percent">0%</h4>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- NOTIFICATIONS -->
+              <div class="tab-panel" data-panel="notifications">
+                <div class="browser-header">
+                  <div>
+                    <h2>Notifications</h2>
+                    <p class="helper-text">
+                      Team invites and status updates will appear here.
+                    </p>
+                  </div>
+                </div>
+
+                <div id="notification-list" class="notification-list"></div>
+
+                <p class="helper-text" id="notification-empty-state" style="display:none;">
+                  No notifications yet.
+                </p>
+              </div>
+
+              <!-- ALL TOURNAMENTS -->
+              <div class="tab-panel" data-panel="all">
+                <div class="browser-header">
+                  <div>
+                    <h2>Available tournaments</h2>
+                    <p class="helper-text">
+                      Showing tournaments created by all hosts.
+                    </p>
+                  </div>
+
+                  <div class="filters">
+                    <div class="filter-group">
+                      <label for="sport-filter">Filter by sport</label>
+                      <select id="sport-filter">
+                        <option value="all">All sports</option>
+                      </select>
+                    </div>
+
+                    <div class="filter-group">
+                      <label for="tournament-status-filter">Filter by status</label>
+                      <select id="tournament-status-filter">
+                        <option value="all">All tournaments</option>
+                        <option value="upcoming">Upcoming</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+
+                    <div class="filter-group">
+                      <label for="tournament-search">Search tournament</label>
+                      <input
+                        id="tournament-search"
+                        type="text"
+                        placeholder="Search by tournament name"
+                        autocomplete="off"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div id="tournament-list" class="tournament-list"></div>
+
+                <p class="helper-text" id="empty-state" style="display: none;">
+                  No tournaments found yet. Ask a host to create one from the Host page.
+                </p>
+              </div>
+
+              <!-- MY TOURNAMENTS -->
+              <div class="tab-panel" data-panel="mine">
+                <div class="browser-header">
+                  <div>
+                    <h2>My tournaments</h2>
+                    <p class="helper-text">
+                      Tournaments you have registered for using this account.
+                    </p>
+                  </div>
+
+                  <div class="filters">
+                    <div class="filter-group">
+                      <label for="my-sport-filter">Filter by sport</label>
+                      <select id="my-sport-filter">
+                        <option value="all">All sports</option>
+                      </select>
+                    </div>
+
+                    <div class="filter-group">
+                      <label for="my-tournament-status-filter">Filter by status</label>
+                      <select id="my-tournament-status-filter">
+                        <option value="all">All tournaments</option>
+                        <option value="upcoming">Upcoming</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+
+                    <div class="filter-group">
+                      <label for="my-tournament-search">Search tournament</label>
+                      <input
+                        id="my-tournament-search"
+                        type="text"
+                        placeholder="Search by tournament name"
+                        autocomplete="off"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div id="my-tournament-list" class="tournament-list"></div>
+
+                <p class="helper-text" id="my-empty-state" style="display: none;">
+                  You haven’t joined any tournaments yet. Use “All tournaments” to register.
+                </p>
+              </div>
+            </section>
+          </section>
         </div>
-
-        <!-- ALL TOURNAMENTS PANEL (existing list & filter moved inside) -->
-        <div class="tab-panel is-active" data-panel="all">
-            <div class="browser-header">
-            <div>
-              <h2>Available tournaments</h2>
-              <p class="helper-text">
-                Showing tournaments created by all hosts.
-              </p>
-            </div>
-
-            <div class="filters">
-              <div class="filter-group">
-                <label for="sport-filter">Filter by sport</label>
-                <select id="sport-filter">
-                  <option value="all">All sports</option>
-                </select>
-              </div>
-
-              <div class="filter-group">
-                <label for="tournament-status-filter">Filter by status</label>
-                <select id="tournament-status-filter">
-                  <option value="all">All tournaments</option>
-                  <option value="upcoming">Upcoming</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
-
-              <div class="filter-group">
-                <label for="tournament-search">Search tournament</label>
-                <input
-                  id="tournament-search"
-                  type="text"
-                  placeholder="Search by tournament name"
-                  autocomplete="off"
-                />
-              </div>
-            </div>
-          </div>
-
-            <div id="tournament-list" class="tournament-list">
-            <!-- Tournament cards will be injected here by JS -->
-            </div>
-
-            <p class="helper-text" id="empty-state" style="display: none;">
-            No tournaments found yet. Ask a host to create one from the Host page.
-            </p>
-        </div>
-
-        <!-- MY TOURNAMENTS PANEL -->
-        <div class="tab-panel" data-panel="mine">
-          <div class="browser-header">
-            <div>
-              <h2>My tournaments</h2>
-              <p class="helper-text">
-                Tournaments you have registered for using this account.
-              </p>
-            </div>
-
-            <div class="filters">
-              <div class="filter-group">
-                <label for="my-sport-filter">Filter by sport</label>
-                <select id="my-sport-filter">
-                  <option value="all">All sports</option>
-                </select>
-              </div>
-
-              <div class="filter-group">
-                <label for="my-tournament-status-filter">Filter by status</label>
-                <select id="my-tournament-status-filter">
-                  <option value="all">All tournaments</option>
-                  <option value="upcoming">Upcoming</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
-
-              <div class="filter-group">
-                <label for="my-tournament-search">Search tournament</label>
-                <input
-                  id="my-tournament-search"
-                  type="text"
-                  placeholder="Search by tournament name"
-                  autocomplete="off"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div id="my-tournament-list" class="tournament-list"></div>
-
-          <p class="helper-text" id="my-empty-state" style="display: none;">
-            You haven’t joined any tournaments yet. Use “All tournaments” tab to register.
-          </p>
-        </div>
-        </section>
-
-    </main>
-
-
+      </main>
     </div>
 
     <!-- Tournament code modal -->
     <div class="modal-overlay hidden" id="code-modal" aria-hidden="true">
-        <div class="modal">
-            <button class="modal-close" type="button" data-close-modal>&times;</button>
+      <div class="modal">
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
 
-            <h2 id="code-modal-title">Enter tournament code</h2>
-            <p class="helper-text" id="code-modal-subtitle">
-            Ask your host for the unique tournament code and enter it below.
-            </p>
+        <h2 id="code-modal-title">Enter tournament code</h2>
+        <p class="helper-text" id="code-modal-subtitle">
+          Ask your host for the unique tournament code and enter it below.
+        </p>
 
-            <form id="code-form">
-            <div class="field-group">
-                <label for="player-category">Category</label>
-                <select id="player-category" name="playerCategory" required>
-                  <option value="">Select category</option>
-                </select>
-                <label for="code-input">Tournament code</label>
-                <input
-                type="text"
-                id="code-input"
-                name="code"
-                placeholder="e.g. ABCD-1234"
-                required
-                />
-            </div>
+        <form id="code-form">
+          <div class="field-group">
+            <label for="player-category">Category</label>
+            <select id="player-category" name="playerCategory" required>
+              <option value="">Select category</option>
+            </select>
 
-            <p class="error-text" id="code-error" style="display: none;">
-                Incorrect code. Please try again.
-            </p>
+            <label for="code-input">Tournament code</label>
+            <input
+              type="text"
+              id="code-input"
+              name="code"
+              placeholder="e.g. ABCD-1234"
+              required
+            />
+          </div>
 
-            <button type="submit" class="btn-primary full-width">
-                Continue
-            </button>
-            </form>
-        </div>
+          <p class="error-text" id="code-error" style="display: none;">
+            Incorrect code. Please try again.
+          </p>
+
+          <button type="submit" class="btn-primary full-width">
+            Continue
+          </button>
+        </form>
+      </div>
     </div>
 
     <!-- Player registration modal -->
     <div class="modal-overlay hidden" id="player-modal" aria-hidden="true">
-        <div class="modal">
-            <button class="modal-close" type="button" data-close-modal>&times;</button>
+      <div class="modal">
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
 
-            <h2 id="player-modal-title">Player details</h2>
-            <p class="helper-text">
-            Enter your details to complete the registration.
-            </p>
+        <h2 id="player-modal-title">Player details</h2>
+        <p class="helper-text">
+          Enter your details to complete the registration.
+        </p>
 
-            <form id="player-form">
-            <div class="field-group">
-                <label for="player-name">Name of player</label>
-                <input
-                id="player-name"
-                name="playerName"
-                type="text"
-                required
-                />
-            </div>
+        <form id="player-form">
+          <div class="field-group">
+            <label for="player-name">Name of player</label>
+            <input id="player-name" name="playerName" type="text" required />
+          </div>
 
-            <div class="field-group">
-                <label for="player-age">Age</label>
-                <input
-                id="player-age"
-                name="playerAge"
-                type="number"
-                min="1"
-                max="120"
-                required
-                />
-            </div>
+          <div class="field-group">
+            <label for="player-age">Age</label>
+            <input id="player-age" name="playerAge" type="number" min="1" max="120" required />
+          </div>
 
-            <div class="field-group">
-                <label for="player-gender">Gender</label>
-                <select id="player-gender" name="playerGender" required>
-                <option value="">Select</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-                <option value="Prefer not to say">Prefer not to say</option>
-                </select>
-            </div>
+          <div class="field-group">
+            <label for="player-gender">Gender</label>
+            <select id="player-gender" name="playerGender" required>
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
 
-            <div class="field-group">
-                <label for="player-phone">Phone number</label>
-                <input
-                id="player-phone"
-                name="playerPhone"
-                type="tel"
-                required
-                />
-            </div>
+          <div class="field-group">
+            <label for="player-phone">Phone number</label>
+            <input id="player-phone" name="playerPhone" type="tel" required />
+          </div>
 
-            <button type="submit" class="btn-primary full-width">
-                Submit registration
-            </button>
-            </form>
-        </div>
+          <button type="submit" class="btn-primary full-width">
+            Submit registration
+          </button>
+        </form>
+      </div>
     </div>
 
-
-    <!-- NOTE: scripts/ path -->
     <script type="module" src="scripts/join.js"></script>
-
   </body>
 </html>
