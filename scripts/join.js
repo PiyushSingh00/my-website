@@ -408,6 +408,27 @@ async function hydrateTournamentMeta(tournamentId) {
   return null;
 }
 
+async function openTournamentFromQueryIfPresent() {
+  const params = new URLSearchParams(window.location.search);
+  const tournamentId = params.get("tournamentId");
+  if (!tournamentId) return;
+
+  try {
+    const meta = await hydrateTournamentMeta(tournamentId);
+    if (!meta) return;
+
+    const normalizedTournament = {
+      ...meta,
+      tournamentId: meta.tournamentId || meta.id || tournamentId,
+    };
+
+    selectedTournament = normalizedTournament;
+    openCodeModal(normalizedTournament);
+  } catch (err) {
+    console.warn("Could not open tournament from shared link", err);
+  }
+}
+
 function openPlayerModal(t, user) {
   const form = document.getElementById("player-form");
   form?.reset();
@@ -1298,8 +1319,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadAllTournaments();
   await loadMyTournaments();
-  await renderTeamInvites(user);
   await openTournamentFromQueryIfPresent();
+  await renderTeamInvites(user);
   renderNotifications(user);
   renderDashboard();
   setActiveTab("dashboard");
