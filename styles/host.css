@@ -2431,3 +2431,25 @@ input, select, textarea {
     grid-template-columns: 72px minmax(0, 1fr);
   }
 }
+.pill-toggle-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pill-toggle-row .btn-dark {
+  background: rgba(5, 10, 22, 0.98);
+  color: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.pill-toggle-row .btn-dark.active {
+  background: rgba(77, 208, 225, 0.18);
+  color: #ffffff;
+  border: 1px solid rgba(77, 208, 225, 0.7);
+  box-shadow: 0 0 0 1px rgba(77, 208, 225, 0.18);
+}
+
+.pill-toggle-row .btn-dark:hover {
+  color: #ffffff;
+}

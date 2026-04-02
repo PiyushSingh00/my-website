@@ -674,8 +674,7 @@ document.getElementById("w-public-no")?.classList.remove("active");
     document.getElementById("w-date-end").value = wiz.dateEnd || "";
     document.getElementById("w-venue").value = wiz.venue || "";
     document.getElementById("w-details").value = wiz.details || "";
-    document.getElementById("w-public-yes")?.classList.toggle("active", !!wiz.isPublic);
-document.getElementById("w-public-no")?.classList.toggle("active", !wiz.isPublic);
+
 
     document.querySelectorAll(".wiz-type-card").forEach((c) => {
       c.classList.toggle("active", c.dataset.type === wiz.tournamentType);
@@ -712,6 +711,8 @@ document.getElementById("w-public-no")?.classList.toggle("active", !wiz.isPublic
 
     document.getElementById("w-payment-yes")?.classList.toggle("active", !!wiz.requirePayment);
     document.getElementById("w-payment-no")?.classList.toggle("active", !wiz.requirePayment);
+    document.getElementById("w-public-yes")?.classList.toggle("active", !!wiz.isPublic);
+    document.getElementById("w-public-no")?.classList.toggle("active", !wiz.isPublic);
     document.getElementById("wiz-amount-wrap")?.classList.toggle("hidden", !wiz.requirePayment);
     document.getElementById("w-amount").value = wiz.amount || "";
   }
