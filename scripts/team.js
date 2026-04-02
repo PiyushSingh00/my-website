@@ -180,6 +180,74 @@ document.addEventListener("DOMContentLoaded", async () => {
     return allPlayers.filter((p) => normalizeStatus(p) === "accepted");
   }
 
+  function getCaptainDisplayName() {
+    return currentCaptainSubmission?.captainName || user.name || user.username || "Captain";
+  }
+
+  function getCaptainIdentity() {
+    return {
+      username: user.username || "",
+      name: user.name || user.username || "",
+    };
+  }
+
+  function getTournamentCaptainState() {
+    try {
+      const raw = localStorage.getItem(`scheduleit_captains_${tournamentId}`);
+      const parsed = JSON.parse(raw || "null");
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function getOtherCaptainNamesForTournament() {
+    const captainState = getTournamentCaptainState();
+    const confirmed = Array.isArray(captainState?.confirmedCaptains) ? captainState.confirmedCaptains : [];
+
+    return confirmed
+      .map((c) => normalizeIdentity(c?.playerName))
+      .filter(Boolean)
+      .filter((name) => {
+        const meByName = normalizeIdentity(user?.name);
+        const meByUsername = normalizeIdentity(user?.username);
+        return name !== meByName && name !== meByUsername;
+      });
+  }
+
+  function isCaptainPlayerRecord(player) {
+    const captain = getCaptainIdentity();
+
+    return (
+      (player?.username && identitiesMatch(player.username, captain.username)) ||
+      (player?.playerName && identitiesMatch(player.playerName, captain.name)) ||
+      (player?.name && identitiesMatch(player.name, captain.name))
+    );
+  }
+
+  function isOtherCaptainPlayerRecord(player) {
+    const otherCaptainNames = getOtherCaptainNamesForTournament();
+    const playerName =
+      normalizeIdentity(player?.playerName) ||
+      normalizeIdentity(player?.name) ||
+      normalizeIdentity(player?.username);
+
+    return otherCaptainNames.includes(playerName);
+  }
+
+  function getSelectablePlayersForTeam(categoryId) {
+    const pool =
+      tournamentMeta?.tournamentType === "team"
+        ? getAcceptedPlayers()
+        : getPlayersForCategory(categoryId);
+
+    return pool.filter((player) => {
+      if (isCaptainPlayerRecord(player)) return false;
+      if (isOtherCaptainPlayerRecord(player)) return false;
+      return true;
+    });
+  }
+
   function getCurrentCategory() {
     const categories = normalizeCategories(tournamentMeta?.categories);
 
@@ -270,11 +338,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       requiredCountEl.textContent = `${currentRule.min} - ${currentRule.max}`;
     }
 
-    selectedCountEl.textContent = String(getSelectedValues().length);
+    const otherSelected = getSelectedValues().length;
+    const totalSelected = currentUserIsCaptain ? otherSelected + 1 : otherSelected;
+    selectedCountEl.textContent = String(totalSelected);
   }
 
   function makePlayerOptions(categoryId, selectedValue = "") {
-    const categoryPlayers = getPlayersForCategory(categoryId);
+    const categoryPlayers = getSelectablePlayersForTeam(categoryId);
     const selectedValues = new Set(getSelectedValues());
 
     return categoryPlayers
@@ -287,7 +357,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           </option>
         `;
       })
-      .join("");
+        .join("");
   }
 
   function renderPlayerRows(savedValues = []) {
@@ -304,17 +374,35 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    const count =
-      savedValues.length ||
-      (currentRule.mode === "exact" ? currentRule.exact : currentRule.min);
+    const captainRow = document.createElement("div");
+    captainRow.className = "team-player-row captain-locked-row";
+    captainRow.innerHTML = `
+      <div class="player-slot-label">Player 1</div>
 
-    for (let i = 0; i < count; i++) {
+      <div class="field-group" style="margin-bottom:0;">
+        <label>Captain</label>
+        <input type="text" value="${escapeHtml(getCaptainDisplayName())}" disabled />
+      </div>
+
+      <button type="button" class="row-remove-btn" disabled>Locked</button>
+    `;
+    teamRowsWrap.appendChild(captainRow);
+
+    const totalRequired =
+      currentRule.mode === "exact" ? currentRule.exact : currentRule.min;
+
+    const otherPlayersCount = Math.max(
+      savedValues.length,
+      Math.max(totalRequired - 1, 0)
+    );
+
+    for (let i = 0; i < otherPlayersCount; i++) {
       const selectedValue = savedValues[i] || "";
 
       const row = document.createElement("div");
       row.className = "team-player-row";
       row.innerHTML = `
-        <div class="player-slot-label">Player ${i + 1}</div>
+        <div class="player-slot-label">Player ${i + 2}</div>
 
         <div class="field-group" style="margin-bottom:0;">
           <label>Select player</label>
@@ -340,13 +428,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const rowValue = select?.value || "";
         const nextValues = currentValues.filter((v) => v !== rowValue);
 
-        if (currentRule.mode === "exact" && nextValues.length < currentRule.exact) {
-          alert(`This format requires exactly ${currentRule.exact} players.`);
-          return;
-        }
+        const minimumOthers =
+          currentRule.mode === "exact"
+            ? Math.max(currentRule.exact - 1, 0)
+            : Math.max(currentRule.min - 1, 0);
 
-        if (currentRule.mode === "range" && nextValues.length < currentRule.min) {
-          alert(`Minimum ${currentRule.min} players are required.`);
+        if (nextValues.length < minimumOthers) {
+          alert(`Captain plus at least ${minimumOthers} other player(s) are required.`);
           return;
         }
 
@@ -813,9 +901,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const selectedValues = getSelectedValues();
+    const currentTotal = selectedValues.length + 1; // captain included
 
-    if (selectedValues.length >= currentRule.max) {
-      alert(`You can add maximum ${currentRule.max} players.`);
+    if (currentTotal >= currentRule.max) {
+      alert(`You can add maximum ${currentRule.max} players including captain.`);
       return;
     }
 
@@ -856,30 +945,46 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    const totalSelected = selectedValues.length + 1; // captain included
+
     if (currentRule.mode === "exact") {
-      if (selectedValues.length !== currentRule.exact) {
-        alert(`Please select exactly ${currentRule.exact} players.`);
+      if (totalSelected !== currentRule.exact) {
+        alert(`Please select exactly ${currentRule.exact} players including captain.`);
         return;
       }
     } else {
-      if (selectedValues.length < currentRule.min) {
-        alert(`Please select at least ${currentRule.min} players.`);
+      if (totalSelected < currentRule.min) {
+        alert(`Please select at least ${currentRule.min} players including captain.`);
         return;
       }
-      if (selectedValues.length > currentRule.max) {
-        alert(`Please select at most ${currentRule.max} players.`);
+      if (totalSelected > currentRule.max) {
+        alert(`Please select at most ${currentRule.max} players including captain.`);
         return;
       }
     }
 
-    const playerPool =
-      tournamentMeta?.tournamentType === "team"
-        ? getAcceptedPlayers()
-        : getPlayersForCategory(categoryId);
+    const playerPool = getSelectablePlayersForTeam(categoryId);
 
-    const selectedPlayers = selectedValues
+    const selectedOtherPlayers = selectedValues
       .map((id) => playerPool.find((p) => String(getPlayerId(p)) === String(id)))
       .filter(Boolean);
+
+    const captainPlayer = {
+      playerId: user.username || user.name || "captain",
+      playerName: user.name || user.username || "Captain",
+      username: user.username || "",
+      categoryId,
+    };
+
+    const selectedPlayers = [
+      captainPlayer,
+      ...selectedOtherPlayers.map((p) => ({
+        playerId: getPlayerId(p),
+        playerName: getPlayerName(p),
+        username: p.username || p.userName || "",
+        categoryId: getPlayerCategoryId(p),
+      })),
+    ];
 
     const captainName = user.name || user.username || "";
     const captainUsername = user.username || "";
@@ -895,12 +1000,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       createdBy: captainUsername || captainName,
       captainName,
       captainUsername,
-      players: selectedPlayers.map((p) => ({
-        playerId: getPlayerId(p),
-        playerName: getPlayerName(p),
-        username: p.username || p.userName || "",
-        categoryId: getPlayerCategoryId(p),
-      })),
+      players: selectedPlayers,
       savedAt: new Date().toISOString(),
     };
 
