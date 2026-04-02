@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── DOM refs ──────────────────────────────────────────────────────────────
   const titleEl        = document.getElementById("score-title");
   const subEl          = document.getElementById("score-sub");
+  const tieMetaEl      = document.getElementById("score-tie-meta");
   const backBtn        = document.getElementById("back-to-fixtures");
   const saveBtn        = document.getElementById("save-score");
   const configWrap     = document.getElementById("config-fields");
@@ -46,6 +47,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const roundIndex   = Number(params.get("round"));
   const matchIndex   = Number(params.get("match"));
   const scoreIndex   = Number(params.get("scoreIndex") ?? 0);
+  const tieId        = params.get("tieId");
+  const submatchNo   = params.get("submatchNo");
 
   if (!tournamentId || !categoryId || Number.isNaN(roundIndex) || Number.isNaN(matchIndex)) {
     if (titleEl) titleEl.textContent = "Missing required URL params";
@@ -128,6 +131,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (titleEl)    titleEl.textContent    = `${homeLabel} vs ${awayLabel}`;
   if (subEl)      subEl.textContent      = `${schema.sport || ""} • Category ${categoryId} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
+  if (tieMetaEl)  tieMetaEl.textContent  = tieId ? `Tie ${tieId}${submatchNo ? ` • Submatch ${submatchNo}` : ''}` : '';
   if (homeNameEl) homeNameEl.textContent = homeLabel;
   if (awayNameEl) awayNameEl.textContent = awayLabel;
 

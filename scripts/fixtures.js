@@ -955,3 +955,39 @@ if (allSet.size !== chosen.length) {
 });
   
 });
+
+
+// ---- Advanced league / tie renderer patch ----
+document.addEventListener("DOMContentLoaded", () => {
+  const groupsEl = document.getElementById('fixtures-groups');
+  if (!groupsEl) return;
+  window.renderAdvancedTieRounds = function renderAdvancedTieRounds(tieRounds = []) {
+    groupsEl.innerHTML = '';
+    tieRounds.forEach((roundObj, idx) => {
+      const wrap = document.createElement('section');
+      wrap.className = 'fixtures-group';
+      const ties = Array.isArray(roundObj.ties) ? roundObj.ties : [];
+      wrap.innerHTML = `<div class="fixtures-group-header"><div class="fixtures-group-header-left"><h3 class="fixtures-group-title">${roundObj.label || `Round ${idx + 1}`}</h3><span class="muted">${ties.length} ties</span></div></div>`;
+      const grid = document.createElement('div');
+      grid.className = 'tie-round-grid';
+      ties.forEach((tie) => {
+        const card = document.createElement('div');
+        card.className = 'tie-card';
+        const submatches = Array.isArray(tie.submatches) ? tie.submatches : [];
+        card.innerHTML = `<div class="tie-card-head"><strong>${tie.teamAName || tie.teamA || 'Team A'} vs ${tie.teamBName || tie.teamB || 'Team B'}</strong><span class="muted">${tie.lineupLocked ? 'Lineup locked' : 'Lineup pending'}</span></div>`;
+        const list = document.createElement('div');
+        list.className = 'tie-submatch-list';
+        submatches.forEach((match, i) => {
+          const row = document.createElement('div');
+          row.className = 'tie-submatch-row';
+          row.innerHTML = `<span>Submatch ${i + 1}</span><span class="muted">${match.label || match.categoryLabel || 'Pending players'}</span>`;
+          list.appendChild(row);
+        });
+        card.appendChild(list);
+        grid.appendChild(card);
+      });
+      wrap.appendChild(grid);
+      groupsEl.appendChild(wrap);
+    });
+  };
+});

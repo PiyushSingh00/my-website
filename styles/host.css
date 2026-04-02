@@ -2453,3 +2453,14 @@ input, select, textarea {
 .pill-toggle-row .btn-dark:hover {
   color: #ffffff;
 }
+
+/* Pickleball / advanced settings */
+.section-head-inline{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.switch-row{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;font-weight:600;}
+.wiz-subsection-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.wiz-subsection-card{padding:14px 16px;border-radius:18px;background:rgba(5,11,24,.55);border:1px solid rgba(255,255,255,.08);}
+.wiz-subsection-title{margin:0 0 12px;font-size:16px;}
+.compact-grid .field-group{margin-bottom:12px;}
+.wiz-key-value{display:grid;grid-template-columns:180px 1fr;gap:10px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.07);}
+.wiz-key-value:last-child{border-bottom:none;}
+@media (max-width: 900px){.wiz-subsection-grid{grid-template-columns:1fr;}.wiz-key-value{grid-template-columns:1fr;}}

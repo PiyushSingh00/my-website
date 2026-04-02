@@ -1353,3 +1353,5 @@ body.drawer-lock {
   .pk-rally-btns { grid-template-columns: 1fr; }
   .pk-big-score  { font-size: 52px; }
 }
+
+.score-title{font-size:18px;font-weight:700;color:var(--text,#e2e8f0);margin-bottom:4px;}

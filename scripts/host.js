@@ -62,6 +62,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       loss: "",
       draw: "",
     },
+    advancedSettings: {
+      enabled: false,
+      eventFormat: "",
+      roundRobinMatchCount: "",
+      fixedTeamCount: "",
+      qualifierCount: "",
+      tieSubmatchCount: "",
+      lineupSubmitMode: "captain_submit_host_lock",
+      lineupSequenceRule: "fixed_order",
+      leaderboardRankBasis: "total_match_points",
+      tiebreakOrder: "head_to_head_then_ties_won_then_decider",
+      enableDeciderTie: true,
+      benchParticipationRequired: false,
+      benchParticipationStage: "league_only",
+      participationEnforcement: "warn",
+      semifinalSeeding: "1v4_2v3",
+      autoGenerateSemis: true,
+    },
 
     courtCount: 1,
     courtNames: [],
@@ -152,6 +170,64 @@ document.addEventListener("DOMContentLoaded", async () => {
   function isPowerOfTwo(value) {
     const num = Number(value);
     return num > 0 && (num & (num - 1)) === 0;
+  }
+
+  function isAdvancedFormatSelected() {
+    return Boolean(wiz.advancedSettings?.enabled && wiz.advancedSettings?.eventFormat);
+  }
+
+  function syncAdvancedSettingsVisibility() {
+    const enabled = document.getElementById("w-enable-advanced-settings")?.checked;
+    document.getElementById("wiz-advanced-settings-body")?.classList.toggle("hidden", !enabled);
+    if (wiz.advancedSettings) wiz.advancedSettings.enabled = Boolean(enabled);
+  }
+
+  function readAdvancedSettingsFromDom() {
+    if (!wiz.advancedSettings) return;
+    wiz.advancedSettings.enabled = Boolean(document.getElementById("w-enable-advanced-settings")?.checked);
+    wiz.advancedSettings.eventFormat = document.getElementById("w-advanced-event-format")?.value || "";
+    wiz.advancedSettings.roundRobinMatchCount = document.getElementById("w-round-robin-match-count")?.value || "";
+    wiz.advancedSettings.fixedTeamCount = document.getElementById("w-fixed-team-count")?.value || "";
+    wiz.advancedSettings.qualifierCount = document.getElementById("w-qualifier-count")?.value || "";
+    wiz.advancedSettings.tieSubmatchCount = document.getElementById("w-tie-submatch-count")?.value || "";
+    wiz.advancedSettings.lineupSubmitMode = document.getElementById("w-lineup-submit-mode")?.value || "captain_submit_host_lock";
+    wiz.advancedSettings.lineupSequenceRule = document.getElementById("w-lineup-sequence-rule")?.value || "fixed_order";
+    wiz.advancedSettings.leaderboardRankBasis = document.getElementById("w-leaderboard-rank-basis")?.value || "total_match_points";
+    wiz.advancedSettings.tiebreakOrder = document.getElementById("w-tiebreak-order")?.value || "head_to_head_then_ties_won_then_decider";
+    wiz.advancedSettings.enableDeciderTie = (document.getElementById("w-enable-decider-tie")?.value || "true") === "true";
+    wiz.advancedSettings.benchParticipationRequired = (document.getElementById("w-bench-participation-required")?.value || "false") === "true";
+    wiz.advancedSettings.benchParticipationStage = document.getElementById("w-bench-participation-stage")?.value || "league_only";
+    wiz.advancedSettings.participationEnforcement = document.getElementById("w-participation-enforcement")?.value || "warn";
+    wiz.advancedSettings.semifinalSeeding = document.getElementById("w-semifinal-seeding")?.value || "1v4_2v3";
+    wiz.advancedSettings.autoGenerateSemis = (document.getElementById("w-auto-generate-semis")?.value || "true") === "true";
+  }
+
+  function writeAdvancedSettingsToDom() {
+    if (!wiz.advancedSettings) return;
+    const a = wiz.advancedSettings;
+    const setVal = (id, value) => {
+      const node = document.getElementById(id);
+      if (!node) return;
+      if (node.type === 'checkbox') node.checked = Boolean(value);
+      else node.value = value ?? '';
+    };
+    setVal('w-enable-advanced-settings', a.enabled);
+    setVal('w-advanced-event-format', a.eventFormat);
+    setVal('w-round-robin-match-count', a.roundRobinMatchCount);
+    setVal('w-fixed-team-count', a.fixedTeamCount);
+    setVal('w-qualifier-count', a.qualifierCount);
+    setVal('w-tie-submatch-count', a.tieSubmatchCount);
+    setVal('w-lineup-submit-mode', a.lineupSubmitMode);
+    setVal('w-lineup-sequence-rule', a.lineupSequenceRule);
+    setVal('w-leaderboard-rank-basis', a.leaderboardRankBasis);
+    setVal('w-tiebreak-order', a.tiebreakOrder);
+    setVal('w-enable-decider-tie', String(Boolean(a.enableDeciderTie)));
+    setVal('w-bench-participation-required', String(Boolean(a.benchParticipationRequired)));
+    setVal('w-bench-participation-stage', a.benchParticipationStage);
+    setVal('w-participation-enforcement', a.participationEnforcement);
+    setVal('w-semifinal-seeding', a.semifinalSeeding);
+    setVal('w-auto-generate-semis', String(Boolean(a.autoGenerateSemis)));
+    syncAdvancedSettingsVisibility();
   }
 
   function shouldShowLeaguePoints() {
@@ -406,6 +482,26 @@ function buildEventNameFromConfig(cfg = {}) {
         }
       }
 
+      readAdvancedSettingsFromDom();
+      if (wiz.advancedSettings?.enabled) {
+        if (!wiz.advancedSettings.eventFormat) {
+          alert("Please select an advanced event mode.");
+          return false;
+        }
+        if (!Number(wiz.advancedSettings.roundRobinMatchCount || 0)) {
+          alert("Please enter number of league rounds / matches.");
+          return false;
+        }
+        if (Number(wiz.advancedSettings.fixedTeamCount || 0) < 2) {
+          alert("Please enter a valid fixed number of teams.");
+          return false;
+        }
+        if (Number(wiz.advancedSettings.tieSubmatchCount || 0) < 1) {
+          alert("Please enter number of submatches per tie.");
+          return false;
+        }
+      }
+
       if (wiz.eventCount < 1) {
         alert("Please enter number of categories.");
         return false;
@@ -465,6 +561,7 @@ function buildEventNameFromConfig(cfg = {}) {
     if (n === 1) {
       wiz.stageFormat = document.getElementById("w-stage-format")?.value || "";
       wiz.groupCount = document.getElementById("w-group-count")?.value || "";
+      readAdvancedSettingsFromDom();
     }
 
     if (n === 2) {
@@ -499,6 +596,7 @@ function buildEventNameFromConfig(cfg = {}) {
     const courtList =
       wiz.courtNames.filter(Boolean).join(", ") ||
       Array.from({ length: wiz.courtCount }, (_, i) => `Court ${i + 1}`).join(", ");
+    const advanced = wiz.advancedSettings || {};
 
     const evRows = events
       .map((ev) => {
@@ -581,6 +679,18 @@ function buildEventNameFromConfig(cfg = {}) {
       <div class="wiz-review-section">
         <div class="wiz-review-row"><span class="wiz-review-key">Courts</span><span class="wiz-review-val">${courtList}</span></div>
         <div class="wiz-review-row"><span class="wiz-review-key">Payment</span><span class="wiz-review-val">${wiz.requirePayment ? "₹" + wiz.amount : "Free entry"}</span></div>
+      </div>
+      <div class="wiz-review-section">
+        <h3>Advanced event settings</h3>
+        <div class="wiz-key-value"><span>Enabled</span><strong>${advanced.enabled ? "Yes" : "No"}</strong></div>
+        <div class="wiz-key-value"><span>Mode</span><strong>${advanced.eventFormat || "—"}</strong></div>
+        <div class="wiz-key-value"><span>League rounds</span><strong>${advanced.roundRobinMatchCount || "—"}</strong></div>
+        <div class="wiz-key-value"><span>Fixed teams</span><strong>${advanced.fixedTeamCount || "—"}</strong></div>
+        <div class="wiz-key-value"><span>Qualifiers</span><strong>${advanced.qualifierCount || "—"}</strong></div>
+        <div class="wiz-key-value"><span>Submatches per tie</span><strong>${advanced.tieSubmatchCount || "—"}</strong></div>
+        <div class="wiz-key-value"><span>Lineup flow</span><strong>${advanced.lineupSubmitMode || "—"}</strong></div>
+        <div class="wiz-key-value"><span>Leaderboard rank basis</span><strong>${advanced.leaderboardRankBasis || "—"}</strong></div>
+        <div class="wiz-key-value"><span>Tie-break order</span><strong>${advanced.tiebreakOrder || "—"}</strong></div>
       </div>
     `;
   }
@@ -774,6 +884,32 @@ async function saveTournamentFromWizard() {
     tournamentType: wiz.tournamentType,
     stageFormat: wiz.stageFormat,
     groupCount: wiz.stageFormat === "group_knockout" ? Number(wiz.groupCount) : null,
+    advancedSettings: {
+      enabled: Boolean(wiz.advancedSettings?.enabled),
+      eventFormat: wiz.advancedSettings?.eventFormat || null,
+      roundRobinMatchCount: wiz.advancedSettings?.roundRobinMatchCount !== "" ? Number(wiz.advancedSettings.roundRobinMatchCount) : null,
+      fixedTeamCount: wiz.advancedSettings?.fixedTeamCount !== "" ? Number(wiz.advancedSettings.fixedTeamCount) : null,
+      qualifierCount: wiz.advancedSettings?.qualifierCount !== "" ? Number(wiz.advancedSettings.qualifierCount) : null,
+      tieStructure: {
+        submatchCount: wiz.advancedSettings?.tieSubmatchCount !== "" ? Number(wiz.advancedSettings.tieSubmatchCount) : null,
+        lineupSubmitMode: wiz.advancedSettings?.lineupSubmitMode || null,
+        lineupSequenceRule: wiz.advancedSettings?.lineupSequenceRule || null,
+      },
+      leaderboard: {
+        rankBasis: wiz.advancedSettings?.leaderboardRankBasis || null,
+        tiebreakOrder: wiz.advancedSettings?.tiebreakOrder || null,
+        enableDeciderTie: Boolean(wiz.advancedSettings?.enableDeciderTie),
+      },
+      participation: {
+        benchParticipationRequired: Boolean(wiz.advancedSettings?.benchParticipationRequired),
+        applyStage: wiz.advancedSettings?.benchParticipationStage || null,
+        enforcement: wiz.advancedSettings?.participationEnforcement || null,
+      },
+      playoffs: {
+        semifinalSeeding: wiz.advancedSettings?.semifinalSeeding || null,
+        autoGenerateSemis: Boolean(wiz.advancedSettings?.autoGenerateSemis),
+      },
+    },
 
     tournamentRules: {
       maxMatchesPerPlayer: wiz.tournamentRules.maxMatchesPerPlayer ? Number(wiz.tournamentRules.maxMatchesPerPlayer) : null,
@@ -2007,9 +2143,17 @@ wizSubmitBtn?.addEventListener("click", async () => {
     renderCalendar(allTournaments);
   });
 
+
+  // ---- Advanced settings wiring (frontend patch) ----
+  const advancedEnable = document.getElementById("w-enable-advanced-settings");
+  advancedEnable?.addEventListener("change", syncAdvancedSettingsVisibility);
+  ["w-advanced-event-format","w-round-robin-match-count","w-fixed-team-count","w-qualifier-count","w-tie-submatch-count","w-lineup-submit-mode","w-lineup-sequence-rule","w-leaderboard-rank-basis","w-tiebreak-order","w-enable-decider-tie","w-bench-participation-required","w-bench-participation-stage","w-participation-enforcement","w-semifinal-seeding","w-auto-generate-semis"].forEach((id)=>{ document.getElementById(id)?.addEventListener("change", readAdvancedSettingsFromDom); });
+  writeAdvancedSettingsToDom();
+
   await loadSports();
   renderCourtNameFields();
   await loadMyTournaments();
   switchHostView("dashboard");
   setWizardModeUI();
 });
+

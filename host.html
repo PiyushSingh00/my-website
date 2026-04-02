@@ -352,6 +352,147 @@
                 </select>
             </div>
 
+            
+            <div id="wiz-advanced-settings-wrap" class="wiz-section-card" style="margin-top:20px;">
+              <div class="section-head-inline">
+                <div>
+                  <h3 class="wiz-section-title">Advanced settings</h3>
+                  <p class="wiz-helper-text" style="margin-top:6px;">Use this for special event formats like SPL / numbered-team league + knockout.</p>
+                </div>
+                <label class="switch-row"><input type="checkbox" id="w-enable-advanced-settings" /> Enable</label>
+              </div>
+
+              <div id="wiz-advanced-settings-body" class="hidden">
+                <div class="wiz-cfg-grid">
+                  <div class="field-group">
+                    <label for="w-advanced-event-format">Advanced event mode</label>
+                    <select id="w-advanced-event-format">
+                      <option value="">None</option>
+                      <option value="number_draw_league_knockout">Number draw + league + knockout</option>
+                      <option value="spl_team_league">SPL team league</option>
+                    </select>
+                  </div>
+                  <div class="field-group">
+                    <label for="w-round-robin-match-count">No. of matches / rounds in league stage</label>
+                    <input type="number" id="w-round-robin-match-count" min="1" placeholder="e.g. 5" />
+                  </div>
+                  <div class="field-group">
+                    <label for="w-fixed-team-count">Fixed number of teams</label>
+                    <input type="number" id="w-fixed-team-count" min="2" placeholder="e.g. 8" />
+                  </div>
+                  <div class="field-group">
+                    <label for="w-qualifier-count">Teams qualifying to playoffs</label>
+                    <input type="number" id="w-qualifier-count" min="2" placeholder="e.g. 4" />
+                  </div>
+                </div>
+
+                <div class="wiz-subsection-grid" style="margin-top:18px;">
+                  <div class="wiz-subsection-card">
+                    <h4 class="wiz-subsection-title">Tie structure</h4>
+                    <div class="wiz-cfg-grid compact-grid">
+                      <div class="field-group">
+                        <label for="w-tie-submatch-count">Submatches per tie</label>
+                        <input type="number" id="w-tie-submatch-count" min="1" placeholder="e.g. 5" />
+                      </div>
+                      <div class="field-group">
+                        <label for="w-lineup-submit-mode">Lineup submission</label>
+                        <select id="w-lineup-submit-mode">
+                          <option value="none">No lineup-slip</option>
+                          <option value="captain_submit_host_lock">Captain submits, host locks</option>
+                          <option value="captain_submit_auto_lock">Captain submits, auto lock</option>
+                        </select>
+                      </div>
+                      <div class="field-group">
+                        <label for="w-lineup-sequence-rule">Playing sequence rule</label>
+                        <select id="w-lineup-sequence-rule">
+                          <option value="none">Not needed</option>
+                          <option value="fixed_order">Fixed order</option>
+                          <option value="host_defined">Host defined order</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="wiz-subsection-card">
+                    <h4 class="wiz-subsection-title">Leaderboard</h4>
+                    <div class="wiz-cfg-grid compact-grid">
+                      <div class="field-group">
+                        <label for="w-leaderboard-rank-basis">Rank primarily by</label>
+                        <select id="w-leaderboard-rank-basis">
+                          <option value="total_match_points">Total match points</option>
+                          <option value="ties_won">Ties won</option>
+                        </select>
+                      </div>
+                      <div class="field-group">
+                        <label for="w-tiebreak-order">Tie-break order</label>
+                        <select id="w-tiebreak-order">
+                          <option value="head_to_head_then_ties_won_then_decider">Head-to-head → ties won → decider tie</option>
+                          <option value="ties_won_then_head_to_head_then_decider">Ties won → head-to-head → decider tie</option>
+                        </select>
+                      </div>
+                      <div class="field-group">
+                        <label for="w-enable-decider-tie">Generate decider tie if unresolved</label>
+                        <select id="w-enable-decider-tie">
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="wiz-subsection-grid" style="margin-top:18px;">
+                  <div class="wiz-subsection-card">
+                    <h4 class="wiz-subsection-title">Participation rules</h4>
+                    <div class="wiz-cfg-grid compact-grid">
+                      <div class="field-group">
+                        <label for="w-bench-participation-required">Every roster player must appear at least once?</label>
+                        <select id="w-bench-participation-required">
+                          <option value="false">No</option>
+                          <option value="true">Yes</option>
+                        </select>
+                      </div>
+                      <div class="field-group">
+                        <label for="w-bench-participation-stage">Apply in stage</label>
+                        <select id="w-bench-participation-stage">
+                          <option value="league_only">League stage only</option>
+                          <option value="entire_tournament">Entire tournament</option>
+                        </select>
+                      </div>
+                      <div class="field-group">
+                        <label for="w-participation-enforcement">Enforcement</label>
+                        <select id="w-participation-enforcement">
+                          <option value="warn">Warn only</option>
+                          <option value="block_late_round_lineups">Block later lineups</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="wiz-subsection-card">
+                    <h4 class="wiz-subsection-title">Qualification rules</h4>
+                    <div class="wiz-cfg-grid compact-grid">
+                      <div class="field-group">
+                        <label for="w-semifinal-seeding">Semifinal seeding</label>
+                        <select id="w-semifinal-seeding">
+                          <option value="1v4_2v3">1st vs 4th, 2nd vs 3rd</option>
+                          <option value="1v2_3v4">1st vs 2nd, 3rd vs 4th</option>
+                        </select>
+                      </div>
+                      <div class="field-group">
+                        <label for="w-auto-generate-semis">Auto-generate semifinals</label>
+                        <select id="w-auto-generate-semis">
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
             <div id="wiz-group-count-wrap" class="field-group hidden">
                 <label for="w-group-count">How many groups? <span class="req">*</span></label>
                 <input type="number" id="w-group-count" min="2" step="1" placeholder="Enter 2, 4, 8, 16..." />

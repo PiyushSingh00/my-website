@@ -91,6 +91,9 @@
             <button type="button" class="team-tab" data-tab="create-team" id="create-team-tab-btn">
               Create team
             </button>
+            <button type="button" class="team-tab" data-tab="lineup-slip" id="lineup-slip-tab-btn">
+              Submit lineup
+            </button>
           </div>
 
           <!-- MY TEAM TAB -->
@@ -198,6 +201,32 @@
                 <button type="submit" class="btn-primary">Invite players</button>
               </div>
             </form>
+          </section>
+
+          <section class="team-tab-panel" data-panel="lineup-slip" id="lineup-slip-panel">
+            <div class="my-team-summary-card">
+              <div class="players-section-head">
+                <div>
+                  <h3>Lineup slip / playing sequence</h3>
+                  <p class="helper-text">Captain can submit lineup order for a tie. Host can later lock it.</p>
+                </div>
+              </div>
+              <div id="lineup-slip-empty" class="empty-state-card">
+                <h3>No tie selected yet</h3>
+                <p class="helper-text">This area is ready for captain lineup submission once backend returns pending ties.</p>
+              </div>
+              <form id="lineup-slip-form" class="hidden">
+                <div class="field-group">
+                  <label for="lineup-tie-select">Select tie</label>
+                  <select id="lineup-tie-select"></select>
+                </div>
+                <div id="lineup-submatch-list" class="lineup-submatch-list"></div>
+                <div class="actions-row">
+                  <button type="button" class="btn-secondary" id="lineup-save-draft-btn">Save draft</button>
+                  <button type="submit" class="btn-primary" id="lineup-submit-btn">Submit lineup</button>
+                </div>
+              </form>
+            </div>
           </section>
         </section>
       </main>

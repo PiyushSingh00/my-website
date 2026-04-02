@@ -146,6 +146,59 @@
           <div id="pools-grid" class="pools-grid"></div>
         </section>
 
+
+        <section id="team-numbering-section" class="captains-summary-section hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Advanced format</p>
+              <h2 class="section-title">Team number assignment</h2>
+              <p class="muted">Assign fixed team numbers for league matrix scheduling.</p>
+            </div>
+            <div class="pool-actions">
+              <button type="button" class="btn-dark" id="randomize-team-numbers-btn">Randomize numbers</button>
+              <button type="button" class="btn-primary" id="lock-team-numbers-btn">Lock mapping</button>
+            </div>
+          </div>
+          <div id="team-numbering-empty" class="empty-state compact-empty">
+            <div class="feature-icon">#️⃣</div>
+            <h3>No confirmed teams yet</h3>
+            <p class="muted">Confirm captains first to assign team numbers.</p>
+          </div>
+          <div id="team-numbering-list" class="captains-summary-list"></div>
+        </section>
+
+        <section id="lineup-review-section" class="captains-summary-section hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Tie workflow</p>
+              <h2 class="section-title">Lineup submissions</h2>
+              <p class="muted">Review and lock captain lineup slips before a tie starts.</p>
+            </div>
+          </div>
+          <div id="lineup-review-list" class="captains-summary-list"></div>
+        </section>
+
+        <section id="leaderboard-section" class="captains-summary-section hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Standings</p>
+              <h2 class="section-title">Leaderboard</h2>
+              <p class="muted">League table for advanced team formats.</p>
+            </div>
+          </div>
+          <div class="players-table-wrapper" style="display:block;max-height:none;">
+            <table class="players-table">
+              <thead>
+                <tr>
+                  <th>Rank</th><th>Team</th><th>Match points</th><th>Ties won</th><th>Played</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+
         <!-- EMBEDDED FIXTURES -->
         <section id="fixtures-embed" class="fixtures-embed hidden">
           <header class="fixtures-header">

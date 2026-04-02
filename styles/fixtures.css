@@ -503,3 +503,9 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.tie-round-grid{display:grid;gap:12px;margin-top:14px;}
+.tie-card{padding:14px 16px;border-radius:16px;background:rgba(6,12,26,.9);border:1px solid rgba(255,255,255,.08);display:grid;gap:10px;}
+.tie-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.tie-submatch-list{display:grid;gap:8px;}
+.tie-submatch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);}

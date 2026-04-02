@@ -975,3 +975,46 @@ await loadTeamRequests();
 wireTeamTabs();
 hydratePage();
 });
+
+// ---- Advanced lineup-slip frontend patch ----
+document.addEventListener("DOMContentLoaded", () => {
+  const tabBtn = document.getElementById("lineup-slip-tab-btn");
+  const panel = document.getElementById("lineup-slip-panel");
+  const form = document.getElementById("lineup-slip-form");
+  const empty = document.getElementById("lineup-slip-empty");
+  const tieSelect = document.getElementById("lineup-tie-select");
+  const list = document.getElementById("lineup-submatch-list");
+  if (!tabBtn || !panel) return;
+
+  function activateLineupTab() {
+    document.querySelectorAll('.team-tab').forEach((btn) => btn.classList.toggle('is-active', btn === tabBtn));
+    document.querySelectorAll('.team-tab-panel').forEach((p) => p.classList.toggle('is-active', p === panel));
+  }
+  tabBtn.addEventListener('click', activateLineupTab);
+
+  function sampleSlots() {
+    return [1,2,3,4,5].map((i) => ({ order:i, label:`Submatch ${i}` }));
+  }
+  function renderLineupBuilder() {
+    if (!list) return;
+    list.innerHTML = '';
+    sampleSlots().forEach((slot) => {
+      const card = document.createElement('div');
+      card.className = 'lineup-submatch-card';
+      card.innerHTML = `
+        <div class="lineup-submatch-head"><strong>${slot.label}</strong><span class="muted">Order ${slot.order}</span></div>
+        <div class="lineup-pair-grid">
+          <div class="field-group"><label>Player 1</label><select><option value="">Select player</option></select></div>
+          <div class="field-group"><label>Player 2</label><select><option value="">Select player</option></select></div>
+        </div>`;
+      list.appendChild(card);
+    });
+    empty?.classList.add('hidden');
+    form?.classList.remove('hidden');
+  }
+  tieSelect?.addEventListener('change', renderLineupBuilder);
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    alert('Frontend lineup-slip submitted. Wire this to backend tie/lineup APIs next.');
+  });
+});

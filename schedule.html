@@ -70,6 +70,9 @@
               <button type="button" class="schedule-view-tab" data-view="live">
                 View live score
               </button>
+              <button type="button" class="schedule-view-tab" data-view="standings">
+                Leaderboard
+              </button>
             </div>
 
             <!-- BRACKET VIEW -->
@@ -85,6 +88,15 @@
               </div>
 
               <div id="schedule-groups"></div>
+            </div>
+
+            <div id="schedule-standings-wrap" class="schedule-live-wrap" style="display:none;">
+              <div class="players-table-wrapper" style="display:block;max-height:none;">
+                <table class="players-table">
+                  <thead><tr><th>Rank</th><th>Team</th><th>Match points</th><th>Ties won</th><th>Played</th></tr></thead>
+                  <tbody id="schedule-standings-body"><tr><td colspan="5" class="muted">Leaderboard will appear here for advanced league events.</td></tr></tbody>
+                </table>
+              </div>
             </div>
 
             <!-- LIVE SCORE VIEW -->

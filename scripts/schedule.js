@@ -93,6 +93,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const contentWrap = document.getElementById("schedule-content-wrap");
   const bracketWrap = document.getElementById("schedule-bracket-wrap");
   const liveWrap = document.getElementById("schedule-live-wrap");
+  const standingsWrap = document.getElementById("schedule-standings-wrap");
+  const standingsBody = document.getElementById("schedule-standings-body");
 
   const categoryToggle = document.getElementById("schedule-category-toggle");
   const groupsEl = document.getElementById("schedule-groups");
@@ -607,5 +609,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     firstBtn?.classList.add("active");
     noneSelectedEl && (noneSelectedEl.style.display = "none");
     renderCategoryBracket(state.activeCategoryId);
+  }
+});
+
+// ---- Advanced standings view patch ----
+document.addEventListener("DOMContentLoaded", () => {
+  const standingsBody = document.getElementById('schedule-standings-body');
+  const standingsWrap = document.getElementById('schedule-standings-wrap');
+  const bracketWrap = document.getElementById('schedule-bracket-wrap');
+  const liveWrap = document.getElementById('schedule-live-wrap');
+  document.querySelectorAll('.schedule-view-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      if (standingsWrap) standingsWrap.style.display = view === 'standings' ? '' : 'none';
+      if (bracketWrap) bracketWrap.style.display = view === 'bracket' ? '' : 'none';
+      if (liveWrap) liveWrap.style.display = view === 'live' ? '' : 'none';
+      document.querySelectorAll('.schedule-view-tab').forEach((b) => b.classList.toggle('active', b === btn));
+    });
+  });
+  window.renderAdvancedStandings = function(rows = []) {
+    if (!standingsBody) return;
+    standingsBody.innerHTML = rows.length ? '' : '<tr><td colspan="5" class="muted">No standings available yet.</td></tr>';
+    rows.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${idx + 1}</td><td>${row.teamName || row.team || '-'}</td><td>${row.matchPoints ?? 0}</td><td>${row.tiesWon ?? 0}</td><td>${row.played ?? 0}</td>`;
+      standingsBody.appendChild(tr);
+    });
   }
 });
