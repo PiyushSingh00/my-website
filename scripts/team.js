@@ -39,7 +39,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const teamTabs = document.querySelectorAll(".team-tab");
   const teamPanels = document.querySelectorAll(".team-tab-panel");
   const createTeamTabBtn = document.getElementById("create-team-tab-btn");
-  const createTeamPanel = document.getElementById("create-team-panel");
+  const lineupTabBtn = document.getElementById("lineup-tab-btn");
 
   const teamForm = document.getElementById("team-form");
   const categoryWrap = document.getElementById("team-category-wrap");
@@ -67,6 +67,69 @@ document.addEventListener("DOMContentLoaded", async () => {
   const myTeamEmptyStateEl = document.getElementById("my-team-empty-state");
   const myTeamEmptyTextEl = document.getElementById("my-team-empty-text");
 
+  // ---------------------------------------------------------------------------
+  // TOPBAR
+  // ---------------------------------------------------------------------------
+  if (trigger) {
+    const label = String(user?.username || user?.name || user?.email || "U").trim();
+    trigger.textContent = (label[0] || "U").toUpperCase();
+  }
+
+  trigger?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    dropdown?.classList.toggle("is-open");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dropdown || !trigger) return;
+    if (!dropdown.contains(e.target) && !trigger.contains(e.target)) {
+      dropdown.classList.remove("is-open");
+    }
+  });
+
+  document.getElementById("dropdown-signout")?.addEventListener("click", () => {
+    dropdown?.classList.remove("is-open");
+    logout();
+  });
+
+  playerBtn?.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
+  playerBtn?.addEventListener("click", async () => {
+    try {
+      await fetch("/api/user/mode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+        body: JSON.stringify({ mode: "player" }),
+      });
+    } catch {}
+    window.location.href = "join.html";
+  });
+
+  hostBtn?.addEventListener("click", async () => {
+    try {
+      await fetch("/api/user/mode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+        body: JSON.stringify({ mode: "host" }),
+      });
+    } catch {}
+    window.location.href = "host.html";
+  });
+
+  backBtn?.addEventListener("click", () => {
+    window.location.href = "join.html";
+  });
+
+  // ---------------------------------------------------------------------------
+  // HELPERS
+  // ---------------------------------------------------------------------------
   function normalizeIdentity(value) {
     return String(value || "").trim().toLowerCase();
   }
@@ -158,13 +221,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function apiGet(url) {
     return apiJson(url, { method: "GET" });
   }
+
   async function apiPost(url, body) {
-  return apiJson(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body ?? {}),
-  });
-}
+    return apiJson(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
 
   function categoryLabel(c) {
     const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
@@ -198,7 +262,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   }
 
-
+  function getTournamentCaptainState() {
+    return tournamentMeta?.captainState || tournamentMeta?.captains || {};
+  }
 
   function getOtherCaptainNamesForTournament() {
     const captainState = getTournamentCaptainState();
@@ -288,152 +354,119 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
     }
 
-    if (tournamentMeta.tournamentType === "team") {
-      const min = Number(tournamentMeta?.tournamentRules?.minPlayersPerTeam || 1);
-      const max = Number(tournamentMeta?.tournamentRules?.maxPlayersPerTeam || min || 1);
+    const rules = tournamentMeta?.tournamentRules || {};
+    const minPlayersPerTeam = Number(rules.minPlayersPerTeam || 1);
+    const maxPlayersPerTeam = Number(rules.maxPlayersPerTeam || 1);
 
+    if (tournamentMeta?.tournamentType === "team") {
       return {
-        mode: "range",
-        min,
-        max,
-        exact: null,
-        text: `You must select minimum ${min} and maximum ${max} players.`,
+        mode: minPlayersPerTeam === maxPlayersPerTeam ? "exact" : "range",
+        min: minPlayersPerTeam,
+        max: maxPlayersPerTeam,
+        exact: minPlayersPerTeam,
+        text:
+          minPlayersPerTeam === maxPlayersPerTeam
+            ? `Select exactly ${minPlayersPerTeam} players including captain.`
+            : `Select ${minPlayersPerTeam} to ${maxPlayersPerTeam} players including captain.`,
       };
     }
 
-    if (!category) {
+    const teamSize = Number(category?.teamSize || 1);
+    const exactTeamSize = Number(category?.exactTeamSize || 0);
+
+    if (teamSize >= 4 && exactTeamSize >= 4) {
       return {
         mode: "exact",
-        min: 1,
-        max: 1,
-        exact: 1,
-        text: "Select a category to continue.",
+        min: exactTeamSize,
+        max: exactTeamSize,
+        exact: exactTeamSize,
+        text: `Select exactly ${exactTeamSize} players including captain.`,
       };
     }
-
-    const teamSize = Number(category.teamSize || 1);
-    const exactTeamSize =
-      teamSize >= 4
-        ? Number(category.exactTeamSize || teamSize || 4)
-        : teamSize;
 
     return {
       mode: "exact",
-      min: exactTeamSize,
-      max: exactTeamSize,
-      exact: exactTeamSize,
-      text: `You must select exactly ${exactTeamSize} player${exactTeamSize > 1 ? "s" : ""} for this format.`,
+      min: teamSize,
+      max: teamSize,
+      exact: teamSize,
+      text: `Select exactly ${teamSize} players including captain.`,
     };
   }
 
   function updateRuleUi() {
-    ruleTextEl.textContent = currentRule.text;
+    if (!ruleTextEl || !ruleValueEl || !selectedCountEl || !requiredCountEl) return;
+
+    ruleTextEl.textContent = currentRule.text || "Choose players to continue.";
 
     if (currentRule.mode === "exact") {
       ruleValueEl.textContent = `Exactly ${currentRule.exact}`;
       requiredCountEl.textContent = String(currentRule.exact);
     } else {
       ruleValueEl.textContent = `${currentRule.min} to ${currentRule.max}`;
-      requiredCountEl.textContent = `${currentRule.min} - ${currentRule.max}`;
+      requiredCountEl.textContent = `${currentRule.min}-${currentRule.max}`;
     }
 
-    const otherSelected = getSelectedValues().length;
-    const totalSelected = currentUserIsCaptain ? otherSelected + 1 : otherSelected;
-    selectedCountEl.textContent = String(totalSelected);
+    const selected = getSelectedValues().length + 1; // include captain
+    selectedCountEl.textContent = String(selected);
   }
 
-  function makePlayerOptions(categoryId, selectedValue = "") {
-    const categoryPlayers = getSelectablePlayersForTeam(categoryId);
-    const selectedValues = new Set(getSelectedValues());
+  function makePlayerOptions(categoryId, currentValue = "") {
+    const players = getSelectablePlayersForTeam(categoryId);
+    const selected = new Set(getSelectedValues());
 
-    return categoryPlayers
-      .map((player) => {
-        const value = String(getPlayerId(player));
-        const disabled = selectedValues.has(value) && value !== selectedValue;
-        return `
-          <option value="${escapeHtml(value)}" ${value === selectedValue ? "selected" : ""} ${disabled ? "disabled" : ""}>
-            ${escapeHtml(getPlayerName(player))}
-          </option>
-        `;
+    return players
+      .filter((p) => {
+        const id = String(getPlayerId(p));
+        return !selected.has(id) || id === String(currentValue);
       })
-        .join("");
+      .map((p) => {
+        const id = String(getPlayerId(p));
+        return `<option value="${escapeHtml(id)}">${escapeHtml(getPlayerName(p))}</option>`;
+      })
+      .join("");
   }
 
-  function renderPlayerRows(savedValues = []) {
-    const category = getCurrentCategory();
-    const categoryId =
-      tournamentMeta?.tournamentType === "team"
-        ? "__team_event__"
-        : (category ? String(category.categoryId || category.id) : "");
-
+  function renderPlayerRows(values = []) {
     teamRowsWrap.innerHTML = "";
 
-    if (!categoryId) {
-      updateRuleUi();
-      return;
+    let categoryId = "";
+
+    if (tournamentMeta?.tournamentType === "team") {
+      categoryId = "__team_event__";
+    } else {
+      const category = getCurrentCategory();
+      categoryId = category ? String(category.categoryId || category.id) : "";
     }
 
-    const captainRow = document.createElement("div");
-    captainRow.className = "team-player-row captain-locked-row";
-    captainRow.innerHTML = `
-      <div class="player-slot-label">Player 1</div>
-
-      <div class="field-group" style="margin-bottom:0;">
-        <label>Captain</label>
-        <input type="text" value="${escapeHtml(getCaptainDisplayName())}" disabled />
-      </div>
-
-      <button type="button" class="row-remove-btn" disabled>Locked</button>
-    `;
-    teamRowsWrap.appendChild(captainRow);
-
-    const totalRequired =
-      currentRule.mode === "exact" ? currentRule.exact : currentRule.min;
-
-    const otherPlayersCount = Math.max(
-      savedValues.length,
-      Math.max(totalRequired - 1, 0)
-    );
-
-    for (let i = 0; i < otherPlayersCount; i++) {
-      const selectedValue = savedValues[i] || "";
-
+    values.forEach((value, idx) => {
       const row = document.createElement("div");
       row.className = "team-player-row";
-      row.innerHTML = `
-        <div class="player-slot-label">Player ${i + 2}</div>
 
-        <div class="field-group" style="margin-bottom:0;">
-          <label>Select player</label>
-          <select class="team-player-select" data-row-index="${i}">
+      row.innerHTML = `
+        <div class="player-slot-label">Player ${idx + 2}</div>
+        <div class="player-slot">
+          <select class="team-player-select">
             <option value="">Select player</option>
-            ${makePlayerOptions(categoryId, selectedValue)}
+            ${makePlayerOptions(categoryId, value)}
           </select>
         </div>
-
-        <button type="button" class="row-remove-btn">Remove</button>
+        <button type="button" class="row-remove-btn" aria-label="Remove player">✕</button>
       `;
 
       const select = row.querySelector(".team-player-select");
-      if (select) select.value = selectedValue;
+      const removeBtn = row.querySelector(".row-remove-btn");
 
-      select?.addEventListener("change", () => {
+      select.value = value || "";
+
+      select.addEventListener("change", () => {
         refreshAllPlayerDropdowns();
-        updateRuleUi();
       });
 
-      row.querySelector(".row-remove-btn")?.addEventListener("click", () => {
-        const currentValues = getSelectedValues();
-        const rowValue = select?.value || "";
-        const nextValues = currentValues.filter((v) => v !== rowValue);
+      removeBtn.addEventListener("click", () => {
+        const nextValues = getSelectedValues().filter((_, i) => i !== idx);
 
-        const minimumOthers =
-          currentRule.mode === "exact"
-            ? Math.max(currentRule.exact - 1, 0)
-            : Math.max(currentRule.min - 1, 0);
-
-        if (nextValues.length < minimumOthers) {
-          alert(`Captain plus at least ${minimumOthers} other player(s) are required.`);
+        if (currentRule.mode === "range" && nextValues.length + 1 < currentRule.min) {
+          alert(`Minimum ${currentRule.min} players are required.`);
           return;
         }
 
@@ -442,7 +475,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
 
       teamRowsWrap.appendChild(row);
-    }
+    });
 
     refreshAllPlayerDropdowns();
     updateRuleUi();
@@ -468,7 +501,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       select.value = current;
     });
 
-    selectedCountEl.textContent = String(getSelectedValues().length);
+    selectedCountEl.textContent = String(getSelectedValues().length + 1);
   }
 
   function populateCategoryDropdown() {
@@ -496,7 +529,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     localStorage.setItem(draftKey, JSON.stringify(payload));
-    if (showMessage) alert("Team draft saved.");
+    if (showMessage) alert("Team draft saved in browser.");
   }
 
   function loadDraft() {
@@ -506,213 +539,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       return JSON.parse(raw);
     } catch {
       return null;
-    }
-  }
-
-let captainStateCache = null;
-let teamRequestsCache = [];
-
-async function loadCaptainState() {
-  const resp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`);
-  captainStateCache = resp.ok ? (resp.data || { selectedCaptainIds: [], confirmedCaptains: [] }) : { selectedCaptainIds: [], confirmedCaptains: [] };
-}
-
-async function loadTeamRequests() {
-  const resp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`);
-  teamRequestsCache = resp.ok && Array.isArray(resp.data) ? resp.data : [];
-}
-
-function getTournamentCaptainState() {
-  return captainStateCache || { selectedCaptainIds: [], confirmedCaptains: [] };
-}
-
-function findCaptainSubmissionForCurrentUser() {
-  return teamRequestsCache.find((req) => {
-    const captainUserMatch =
-      (req?.captainUsername && identitiesMatch(req.captainUsername, user?.username)) ||
-      (req?.captainName && identitiesMatch(req.captainName, user?.name)) ||
-      (req?.captainName && identitiesMatch(req.captainName, user?.username));
-    return captainUserMatch;
-  }) || null;
-}
-
-function findAcceptedInviteForCurrentUser() {
-  return teamRequestsCache.find((req) => {
-    const invitedPlayers = Array.isArray(req.invitedPlayers) ? req.invitedPlayers : [];
-    return invitedPlayers.some((p) => {
-      const sameUser =
-        (p?.username && identitiesMatch(p.username, user?.username)) ||
-        (p?.playerName && identitiesMatch(p.playerName, user?.name)) ||
-        (p?.playerName && identitiesMatch(p.playerName, user?.username));
-
-      return sameUser && p.inviteStatus === "accepted";
-    });
-  }) || null;
-}
-
-function findSubmissionByInvite(invite) {
-  return invite || null;
-}
-
-function getInviteStatusForPlayer(player, captainSubmission) {
-  const invitedPlayers = Array.isArray(captainSubmission?.invitedPlayers) ? captainSubmission.invitedPlayers : [];
-
-  const match = invitedPlayers.find((p) => {
-    return (
-      String(p.playerId || "") === String(player.playerId || "") ||
-      identitiesMatch(p.playerName, player.playerName) ||
-      identitiesMatch(p.username, player.username)
-    );
-  });
-
-  if (!match) return "other";
-  return match.inviteStatus === "accepted" ? "accepted" : "pending";
-}
-
-  function setActiveTeamTab(tabName) {
-    teamTabs.forEach((btn) => {
-      btn.classList.toggle("is-active", btn.dataset.tab === tabName);
-    });
-
-    teamPanels.forEach((panel) => {
-      panel.classList.toggle("is-active", panel.dataset.panel === tabName);
-    });
-  }
-
-  function wireTeamTabs() {
-    teamTabs.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (btn.classList.contains("hidden")) return;
-        setActiveTeamTab(btn.dataset.tab);
-      });
-    });
-  }
-
-  function renderMyTeamTab() {
-    currentCaptainSubmission = findCaptainSubmissionForCurrentUser();
-    currentAcceptedInvite = findAcceptedInviteForCurrentUser();
-    currentUserIsCaptain = !!currentCaptainSubmission;
-
-    myTeamPlayerListEl.innerHTML = "";
-    myTeamEmptyStateEl.classList.add("hidden");
-
-    if (currentUserIsCaptain) {
-      const submission = currentCaptainSubmission;
-      const captainLabel = submission.captainName || user.name || user.username || "Captain";
-      const teamName = submission.teamName || "Untitled team";
-
-      myTeamNameEl.textContent = teamName;
-      myTeamCaptainEl.textContent = captainLabel;
-      myTeamRoleEl.textContent = "Captain";
-      myTeamCategoryEl.textContent = submission.categoryLabel || "—";
-
-      const players = Array.isArray(submission.invitedPlayers) ? submission.invitedPlayers : [];
-      
-      const captainRow = document.createElement("div");
-      captainRow.className = "my-team-player-card";
-      captainRow.innerHTML = `
-        <div class="my-team-player-left">
-          <div class="my-team-player-name">${escapeHtml(captainLabel)}</div>
-          <div class="my-team-player-sub">You</div>
-        </div>
-        <span class="member-status-pill member-status-pill--captain">Captain</span>
-      `;
-      myTeamPlayerListEl.appendChild(captainRow);
-
-      players.forEach((player) => {
-        const status = getInviteStatusForPlayer(player, submission);
-        if (status === "other") return;
-
-        const card = document.createElement("div");
-        card.className = "my-team-player-card";
-        card.innerHTML = `
-          <div class="my-team-player-left">
-            <div class="my-team-player-name">${escapeHtml(player.playerName || "Player")}</div>
-            <div class="my-team-player-sub">${escapeHtml(player.username || "")}</div>
-          </div>
-          <span class="member-status-pill ${status === "accepted" ? "member-status-pill--accepted" : "member-status-pill--pending"}">
-            ${status === "accepted" ? "Accepted" : "Request sent"}
-          </span>
-        `;
-        myTeamPlayerListEl.appendChild(card);
-      });
-
-      createTeamTabBtn.classList.remove("hidden");
-      createTeamPanel.classList.remove("hidden");
-      pageTitleEl.textContent = "My team";
-      pageSubtitleEl.textContent = "View your team or manage invites if you are the captain.";
-      return;
-    }
-
-    if (currentAcceptedInvite) {
-      const invite = currentAcceptedInvite;
-      const linkedSubmission = findSubmissionByInvite(invite);
-      const teamName = invite.teamName || linkedSubmission?.teamName || "Untitled team";
-      const captainName = invite.captainName || linkedSubmission?.captainName || "Captain";
-
-      myTeamNameEl.textContent = teamName;
-      myTeamCaptainEl.textContent = captainName;
-      myTeamRoleEl.textContent = "Player";
-      myTeamCategoryEl.textContent = invite.categoryLabel || linkedSubmission?.categoryLabel || "—";
-
-      const captainRow = document.createElement("div");
-      captainRow.className = "my-team-player-card";
-      captainRow.innerHTML = `
-        <div class="my-team-player-left">
-          <div class="my-team-player-name">${escapeHtml(captainName)}</div>
-          <div class="my-team-player-sub">Captain</div>
-        </div>
-        <span class="member-status-pill member-status-pill--captain">Captain</span>
-      `;
-      myTeamPlayerListEl.appendChild(captainRow);
-
-      const sourcePlayers = Array.isArray(linkedSubmission?.invitedPlayers) ? linkedSubmission.invitedPlayers : [];
-
-      sourcePlayers.forEach((player) => {
-        const isCurrent =
-          (player?.username && identitiesMatch(player.username, user.username)) ||
-          (player?.playerName && identitiesMatch(player.playerName, user.name)) ||
-          (player?.playerName && identitiesMatch(player.playerName, user.username));
-
-        const status = isCurrent
-  ? "accepted"
-  : (player.inviteStatus === "accepted" ? "accepted" : "pending");
-
-        const card = document.createElement("div");
-        card.className = "my-team-player-card";
-        card.innerHTML = `
-          <div class="my-team-player-left">
-            <div class="my-team-player-name">${escapeHtml(player.playerName || "Player")}</div>
-            <div class="my-team-player-sub">${isCurrent ? "You" : escapeHtml(player.username || "")}</div>
-          </div>
-          <span class="member-status-pill ${status === "accepted" ? "member-status-pill--accepted" : "member-status-pill--pending"}">
-            ${status === "accepted" ? "Accepted" : "Request sent"}
-          </span>
-        `;
-        myTeamPlayerListEl.appendChild(card);
-      });
-
-      createTeamTabBtn.classList.add("hidden");
-      createTeamPanel.classList.add("hidden");
-      pageTitleEl.textContent = "My team";
-      pageSubtitleEl.textContent = "View your accepted team.";
-      return;
-    }
-
-    myTeamNameEl.textContent = "—";
-    myTeamCaptainEl.textContent = "—";
-    myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
-    myTeamCategoryEl.textContent = "—";
-    myTeamEmptyStateEl.classList.remove("hidden");
-
-    if (currentUserIsCaptain) {
-      myTeamEmptyTextEl.textContent = "No team created yet. Use Create team to invite players.";
-      createTeamTabBtn.classList.remove("hidden");
-      createTeamPanel.classList.remove("hidden");
-    } else {
-      myTeamEmptyTextEl.textContent = "You have not accepted any team invite for this tournament yet.";
-      createTeamTabBtn.classList.add("hidden");
-      createTeamPanel.classList.add("hidden");
     }
   }
 
@@ -748,7 +574,64 @@ function getInviteStatusForPlayer(player, captainSubmission) {
       : resp.data?.players || resp.data?.items || [];
   }
 
-  function hydrateCreateTab() {
+  async function loadTeamRequestsForTournament() {
+    const candidates = [
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
+    ];
+
+    for (const url of candidates) {
+      const resp = await apiGet(url);
+      if (!resp.ok) continue;
+
+      if (Array.isArray(resp.data)) return resp.data;
+      if (Array.isArray(resp.data?.items)) return resp.data.items;
+      if (Array.isArray(resp.data?.requests)) return resp.data.requests;
+      if (Array.isArray(resp.data?.data)) return resp.data.data;
+    }
+
+    return [];
+  }
+
+  async function loadCaptainStateForTournament() {
+    const resp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`);
+    if (!resp.ok) return null;
+    return resp.data || null;
+  }
+
+  async function hydrateSubmissionState() {
+    const requests = await loadTeamRequestsForTournament();
+    const captainState = await loadCaptainStateForTournament();
+
+    if (captainState) {
+      tournamentMeta.captainState = captainState;
+    }
+
+    const myCaptainRequest = requests.find((req) => isSameCaptain(req, user));
+    if (myCaptainRequest) {
+      currentUserIsCaptain = true;
+      currentCaptainSubmission = myCaptainRequest;
+    } else {
+      currentUserIsCaptain = false;
+      currentCaptainSubmission = null;
+    }
+
+    const acceptedInvite = requests.find((req) => {
+      const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+      return invited.some((invite) => {
+        const sameUser = isSameUserByInviteFields(invite, user);
+        return sameUser && invite.inviteStatus === "accepted";
+      });
+    });
+
+    currentAcceptedInvite = acceptedInvite || null;
+  }
+
+  function hydratePage() {
+    tournamentNameEl.textContent = tournamentMeta?.tournamentName || "-";
+    tournamentSportEl.textContent = tournamentMeta?.sportName || "-";
+    tournamentDatesEl.textContent = tournamentMeta?.tournamentDates || "-";
+
     const draft = loadDraft();
     if (draft?.teamName) teamNameInput.value = draft.teamName;
 
@@ -770,73 +653,105 @@ function getInviteStatusForPlayer(player, captainSubmission) {
       renderPlayerRows(Array.isArray(draft.playerIds) ? draft.playerIds : []);
     } else {
       teamRowsWrap.innerHTML = "";
+      updateRuleUi();
     }
-  }
 
-  function hydratePage() {
-    tournamentNameEl.textContent = tournamentMeta?.tournamentName || "-";
-    tournamentSportEl.textContent = tournamentMeta?.sportName || "-";
-    tournamentDatesEl.textContent = tournamentMeta?.tournamentDates || "-";
-
-    hydrateCreateTab();
-    renderMyTeamTab();
-    setActiveTeamTab("my-team");
-  }
-
-  if (trigger) {
-    const label = (user?.name || user?.username || user?.email || "U").trim();
-    trigger.textContent = label.charAt(0).toUpperCase();
-  }
-
-  trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
-
-  document.addEventListener("click", (e) => {
-    if (!dropdown || !trigger) return;
-    if (!dropdown.contains(e.target) && !trigger.contains(e.target)) {
-      dropdown.classList.remove("is-open");
+    if (currentUserIsCaptain) {
+      pageTitleEl.textContent = "Create / Manage team";
+      pageSubtitleEl.textContent = "Invite players to your team and manage pending team requests.";
+      createTeamTabBtn?.classList.remove("hidden");
+      lineupTabBtn?.classList.remove("hidden");
+    } else if (currentAcceptedInvite) {
+      pageTitleEl.textContent = "My team";
+      pageSubtitleEl.textContent = "View the team you are part of for this tournament.";
+      createTeamTabBtn?.classList.add("hidden");
+      lineupTabBtn?.classList.add("hidden");
+    } else {
+      pageTitleEl.textContent = "My team";
+      pageSubtitleEl.textContent = "View your team or manage invites if you are the captain.";
+      createTeamTabBtn?.classList.add("hidden");
+      lineupTabBtn?.classList.add("hidden");
     }
-  });
 
-  document.getElementById("dropdown-signout")?.addEventListener("click", () => {
-    dropdown?.classList.remove("is-open");
-    logout();
-  });
+    renderMyTeamPanel();
+  }
 
-  playerBtn?.classList.add("is-active");
-  hostBtn?.classList.remove("is-active");
+  function renderMyTeamPanel() {
+    myTeamPlayerListEl.innerHTML = "";
 
-  playerBtn?.addEventListener("click", async () => {
-    try {
-      await fetch("/api/user/mode", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + localStorage.getItem("token"),
-        },
-        body: JSON.stringify({ mode: "player" }),
+    const activeTeam = currentCaptainSubmission || currentAcceptedInvite;
+
+    if (!activeTeam) {
+      myTeamNameEl.textContent = "-";
+      myTeamCaptainEl.textContent = "-";
+      myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
+      myTeamCategoryEl.textContent = "-";
+      myTeamEmptyStateEl.classList.remove("hidden");
+      myTeamEmptyTextEl.textContent = currentUserIsCaptain
+        ? "You have not submitted a team for this tournament yet."
+        : "You are not part of any accepted team for this tournament yet.";
+      return;
+    }
+
+    myTeamEmptyStateEl.classList.add("hidden");
+
+    myTeamNameEl.textContent = activeTeam.teamName || "-";
+    myTeamCaptainEl.textContent = activeTeam.captainName || "-";
+    myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
+    myTeamCategoryEl.textContent = activeTeam.categoryLabel || "-";
+
+    const invitedPlayers = Array.isArray(activeTeam.invitedPlayers) ? activeTeam.invitedPlayers : [];
+
+    if (!invitedPlayers.length) {
+      myTeamPlayerListEl.innerHTML = `
+        <div class="empty-state-card">
+          <h3>No invited players yet</h3>
+          <p class="helper-text">Once players are invited, they will appear here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    invitedPlayers.forEach((player) => {
+      const card = document.createElement("div");
+      card.className = "my-team-player-card";
+
+      const status = player?.inviteStatus || "pending";
+      const statusClass =
+        status === "accepted"
+          ? "status-pill status-pill--accepted"
+          : status === "rejected"
+            ? "status-pill status-pill--rejected"
+            : "status-pill status-pill--pending";
+
+      card.innerHTML = `
+        <div class="my-team-player-left">
+          <div class="my-team-player-name">${escapeHtml(player.playerName || player.name || "Player")}</div>
+          <div class="my-team-player-meta">${escapeHtml(player.phone || player.playerPhone || "")}</div>
+        </div>
+        <div class="${statusClass}">${escapeHtml(status)}</div>
+      `;
+      myTeamPlayerListEl.appendChild(card);
+    });
+  }
+
+  function wireTeamTabs() {
+    teamTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const target = tab.dataset.tab;
+        if (!target) return;
+
+        teamTabs.forEach((btn) => btn.classList.toggle("is-active", btn === tab));
+        teamPanels.forEach((panel) => {
+          panel.classList.toggle("is-active", panel.dataset.panel === target);
+        });
       });
-    } catch {}
-    window.location.href = "join.html";
-  });
+    });
+  }
 
-  hostBtn?.addEventListener("click", async () => {
-    try {
-      await fetch("/api/user/mode", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + localStorage.getItem("token"),
-        },
-        body: JSON.stringify({ mode: "host" }),
-      });
-    } catch {}
-    window.location.href = "host.html";
-  });
-
-  backBtn?.addEventListener("click", () => {
-    window.location.href = "join.html";
-  });
-
+  // ---------------------------------------------------------------------------
+  // CATEGORY / ROW EVENTS
+  // ---------------------------------------------------------------------------
   wireTeamTabs();
 
   categorySelect?.addEventListener("change", () => {
@@ -878,143 +793,121 @@ function getInviteStatusForPlayer(player, captainSubmission) {
     saveDraft(true);
   });
 
- teamForm?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  let categoryId = "";
-  let category = null;
-
-  if (tournamentMeta?.tournamentType === "team") {
-    categoryId = "";
-  } else {
-    category = getCurrentCategory();
-    categoryId = category ? String(category.categoryId || category.id) : "";
-    if (!categoryId) {
-      alert("Please select a category.");
-      return;
-    }
-  }
-
-  const selectedValues = getSelectedValues();
-
-  if (new Set(selectedValues).size !== selectedValues.length) {
-    alert("Same player cannot be selected twice.");
-    return;
-  }
-
-  if (currentRule.mode === "exact") {
-    if (selectedValues.length !== currentRule.exact - 1) {
-      alert(`Please select exactly ${currentRule.exact - 1} other players. Captain is already included.`);
-      return;
-    }
-  } else {
-    const totalWithCaptain = selectedValues.length + 1;
-    if (totalWithCaptain < currentRule.min) {
-      alert(`Please select at least ${currentRule.min - 1} other players.`);
-      return;
-    }
-    if (totalWithCaptain > currentRule.max) {
-      alert(`Please select at most ${currentRule.max - 1} other players.`);
-      return;
-    }
-  }
-
-  const playerPool =
-    tournamentMeta?.tournamentType === "team"
-      ? getAcceptedPlayers()
-      : getPlayersForCategory(categoryId);
-
-  const selectedPlayers = selectedValues
-    .map((id) => playerPool.find((p) => String(getPlayerId(p)) === String(id)))
-    .filter(Boolean);
-
-  const captainName = user.name || user.username || "";
-  const captainUsername = user.username || "";
-
-  const payload = {
-    teamName: teamNameInput.value.trim() || captainName || "Unnamed team",
-    categoryId,
-    categoryLabel: category ? categoryLabel(category) : "Team event",
-    captainName,
-    captainUsername,
-    captainPlayerId: user.userId || user.id || user.username,
-    invitedPlayers: selectedPlayers.map((p) => ({
-      playerId: getPlayerId(p),
-      playerName: getPlayerName(p),
-      username: p.username || "",
-      phone: p.phone || "",
-      inviteStatus: "pending",
-    })),
-  };
-
-  const result = await apiPost(
-    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
-    payload
-  );
-
-  if (!result.ok) {
-    alert(result.data?.message || "Could not send invites.");
-    return;
-  }
-
-  saveDraft(false);
-  alert("Team invites sent successfully.");
-  window.location.href = "join.html";
-});
-tournamentMeta = await loadTournamentMeta();
-if (!tournamentMeta) {
-  alert("Tournament not found.");
-  window.location.href = "join.html";
-  return;
-}
-
-allPlayers = await loadPlayers();
-await loadCaptainState();
-await loadTeamRequests();
-
-wireTeamTabs();
-hydratePage();
-});
-
-// ---- Advanced lineup-slip frontend patch ----
-document.addEventListener("DOMContentLoaded", () => {
-  const tabBtn = document.getElementById("lineup-slip-tab-btn");
-  const panel = document.getElementById("lineup-slip-panel");
-  const form = document.getElementById("lineup-slip-form");
-  const empty = document.getElementById("lineup-slip-empty");
-  const tieSelect = document.getElementById("lineup-tie-select");
-  const list = document.getElementById("lineup-submatch-list");
-  if (!tabBtn || !panel) return;
-
-  function activateLineupTab() {
-    document.querySelectorAll('.team-tab').forEach((btn) => btn.classList.toggle('is-active', btn === tabBtn));
-    document.querySelectorAll('.team-tab-panel').forEach((p) => p.classList.toggle('is-active', p === panel));
-  }
-  tabBtn.addEventListener('click', activateLineupTab);
-
-  function sampleSlots() {
-    return [1,2,3,4,5].map((i) => ({ order:i, label:`Submatch ${i}` }));
-  }
-  function renderLineupBuilder() {
-    if (!list) return;
-    list.innerHTML = '';
-    sampleSlots().forEach((slot) => {
-      const card = document.createElement('div');
-      card.className = 'lineup-submatch-card';
-      card.innerHTML = `
-        <div class="lineup-submatch-head"><strong>${slot.label}</strong><span class="muted">Order ${slot.order}</span></div>
-        <div class="lineup-pair-grid">
-          <div class="field-group"><label>Player 1</label><select><option value="">Select player</option></select></div>
-          <div class="field-group"><label>Player 2</label><select><option value="">Select player</option></select></div>
-        </div>`;
-      list.appendChild(card);
-    });
-    empty?.classList.add('hidden');
-    form?.classList.remove('hidden');
-  }
-  tieSelect?.addEventListener('change', renderLineupBuilder);
-  form?.addEventListener('submit', (e) => {
+  // ---------------------------------------------------------------------------
+  // SUBMIT TEAM
+  // ---------------------------------------------------------------------------
+  teamForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    alert('Frontend lineup-slip submitted. Wire this to backend tie/lineup APIs next.');
+
+    if (!currentUserIsCaptain) {
+      alert("Only captains can create or edit a team.");
+      return;
+    }
+
+    let categoryId = "";
+    let category = null;
+
+    if (tournamentMeta?.tournamentType === "team") {
+      categoryId = "";
+    } else {
+      category = getCurrentCategory();
+      categoryId = category ? String(category.categoryId || category.id) : "";
+      if (!categoryId) {
+        alert("Please select a category.");
+        return;
+      }
+    }
+
+    const selectedValues = getSelectedValues();
+
+    if (new Set(selectedValues).size !== selectedValues.length) {
+      alert("Same player cannot be selected twice.");
+      return;
+    }
+
+    if (currentRule.mode === "exact") {
+      if (selectedValues.length !== currentRule.exact - 1) {
+        alert(`Please select exactly ${currentRule.exact - 1} other players. Captain is already included.`);
+        return;
+      }
+    } else {
+      const totalWithCaptain = selectedValues.length + 1;
+      if (totalWithCaptain < currentRule.min) {
+        alert(`Please select at least ${currentRule.min - 1} other players.`);
+        return;
+      }
+      if (totalWithCaptain > currentRule.max) {
+        alert(`Please select at most ${currentRule.max - 1} other players.`);
+        return;
+      }
+    }
+
+    const playerPool =
+      tournamentMeta?.tournamentType === "team"
+        ? getAcceptedPlayers()
+        : getPlayersForCategory(categoryId);
+
+    const selectedPlayers = selectedValues
+      .map((id) => playerPool.find((p) => String(getPlayerId(p)) === String(id)))
+      .filter(Boolean);
+
+    const captainName = user.name || user.username || "";
+    const captainUsername = user.username || "";
+
+    const invitedPlayers = selectedPlayers.map((player) => ({
+      playerId: String(getPlayerId(player)),
+      playerName: getPlayerName(player),
+      username: player.username || "",
+      phone: player.phone || player.playerPhone || "",
+      inviteStatus: "pending",
+    }));
+
+    const payload = {
+      tournamentId,
+      teamName: teamNameInput.value.trim() || "My Team",
+      categoryId,
+      categoryLabel:
+        tournamentMeta?.tournamentType === "team"
+          ? "Team event"
+          : (category ? categoryLabel(category) : ""),
+      captainName,
+      captainUsername,
+      createdBy: captainUsername || captainName,
+      invitedPlayers,
+      tournamentName: tournamentMeta?.tournamentName || "",
+    };
+
+    const candidates = [
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
+    ];
+
+    for (const url of candidates) {
+      const result = await apiPost(url, payload);
+      if (result.ok) {
+        saveDraft(false);
+        localStorage.removeItem(draftKey);
+        alert("Team request created successfully.");
+        await hydrateSubmissionState();
+        hydratePage();
+        return;
+      }
+    }
+
+    alert("Could not create team request. Please verify backend route.");
   });
+
+  // ---------------------------------------------------------------------------
+  // INITIAL LOAD
+  // ---------------------------------------------------------------------------
+  tournamentMeta = await loadTournamentMeta();
+  if (!tournamentMeta) {
+    alert("Could not load tournament.");
+    window.location.href = "join.html";
+    return;
+  }
+
+  allPlayers = await loadPlayers();
+  await hydrateSubmissionState();
+  hydratePage();
 });
