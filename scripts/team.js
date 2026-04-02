@@ -23,6 +23,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     text: "Select players.",
   };
 
+  let currentUserIsCaptain = false;
+  let currentAcceptedInvite = null;
+  let currentCaptainSubmission = null;
+
   const draftKey = `scheduleit_team_draft_${tournamentId}_${user.username || user.name || "user"}`;
 
   const trigger = document.getElementById("team-user-menu-trigger");
@@ -31,6 +35,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const hostBtn = document.getElementById("mode-host-btn");
 
   const backBtn = document.getElementById("team-back-btn");
+
+  const teamTabs = document.querySelectorAll(".team-tab");
+  const teamPanels = document.querySelectorAll(".team-tab-panel");
+  const createTeamTabBtn = document.getElementById("create-team-tab-btn");
+  const createTeamPanel = document.getElementById("create-team-panel");
+
   const teamForm = document.getElementById("team-form");
   const categoryWrap = document.getElementById("team-category-wrap");
   const categorySelect = document.getElementById("team-category-select");
@@ -43,64 +53,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tournamentSportEl = document.getElementById("team-tournament-sport");
   const tournamentDatesEl = document.getElementById("team-tournament-dates");
   const pageTitleEl = document.getElementById("team-page-title");
+  const pageSubtitleEl = document.getElementById("team-page-subtitle");
   const ruleTextEl = document.getElementById("team-rule-text");
   const ruleValueEl = document.getElementById("team-size-rule");
   const selectedCountEl = document.getElementById("selected-count");
   const requiredCountEl = document.getElementById("required-count");
 
-  if (trigger) {
-    const label = (user?.name || user?.username || user?.email || "U").trim();
-    trigger.textContent = label.charAt(0).toUpperCase();
+  const myTeamNameEl = document.getElementById("my-team-name");
+  const myTeamCaptainEl = document.getElementById("my-team-captain");
+  const myTeamRoleEl = document.getElementById("my-team-role");
+  const myTeamCategoryEl = document.getElementById("my-team-category");
+  const myTeamPlayerListEl = document.getElementById("my-team-player-list");
+  const myTeamEmptyStateEl = document.getElementById("my-team-empty-state");
+  const myTeamEmptyTextEl = document.getElementById("my-team-empty-text");
+
+  function normalizeIdentity(value) {
+    return String(value || "").trim().toLowerCase();
   }
-
-  trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
-
-  document.addEventListener("click", (e) => {
-    if (!dropdown || !trigger) return;
-    if (!dropdown.contains(e.target) && !trigger.contains(e.target)) {
-      dropdown.classList.remove("is-open");
-    }
-  });
-
-  document.getElementById("dropdown-signout")?.addEventListener("click", () => {
-    dropdown?.classList.remove("is-open");
-    logout();
-  });
-
-  playerBtn?.classList.add("is-active");
-  hostBtn?.classList.remove("is-active");
-
-  playerBtn?.addEventListener("click", async () => {
-    try {
-      await fetch("/api/user/mode", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + localStorage.getItem("token"),
-        },
-        body: JSON.stringify({ mode: "player" }),
-      });
-    } catch {}
-    window.location.href = "join.html";
-  });
-
-  hostBtn?.addEventListener("click", async () => {
-    try {
-      await fetch("/api/user/mode", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + localStorage.getItem("token"),
-        },
-        body: JSON.stringify({ mode: "host" }),
-      });
-    } catch {}
-    window.location.href = "host.html";
-  });
-
-  backBtn?.addEventListener("click", () => {
-    window.location.href = "join.html";
-  });
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -109,6 +78,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function identitiesMatch(a, b) {
+    return normalizeIdentity(a) && normalizeIdentity(a) === normalizeIdentity(b);
+  }
+
+  function isSameUserByInviteFields(invite, currentUser) {
+    return (
+      (invite?.inviteeUsername && identitiesMatch(invite.inviteeUsername, currentUser?.username)) ||
+      (invite?.inviteeName && identitiesMatch(invite.inviteeName, currentUser?.name)) ||
+      (invite?.inviteeName && identitiesMatch(invite.inviteeName, currentUser?.username))
+    );
+  }
+
+  function isSameCaptain(submission, currentUser) {
+    return (
+      (submission?.captainUsername && identitiesMatch(submission.captainUsername, currentUser?.username)) ||
+      (submission?.captainName && identitiesMatch(submission.captainName, currentUser?.name)) ||
+      (submission?.createdBy && identitiesMatch(submission.createdBy, currentUser?.username)) ||
+      (submission?.createdBy && identitiesMatch(submission.createdBy, currentUser?.name))
+    );
   }
 
   function normalizeCategories(cats) {
@@ -432,6 +422,250 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function getAllInvitesForTournament() {
+    try {
+      const raw = localStorage.getItem(`scheduleit_team_invites_${tournamentId}`);
+      const parsed = JSON.parse(raw || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function getAllTeamSubmissionsForTournament() {
+    const submissions = [];
+    const prefix = `scheduleit_team_submission_${tournamentId}_`;
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) || "null");
+        if (parsed && typeof parsed === "object") submissions.push(parsed);
+      } catch {}
+    }
+
+    return submissions;
+  }
+
+  function findCaptainSubmissionForCurrentUser() {
+    const submissions = getAllTeamSubmissionsForTournament();
+    return submissions.find((submission) => isSameCaptain(submission, user)) || null;
+  }
+
+  function findAcceptedInviteForCurrentUser() {
+    const invites = getAllInvitesForTournament();
+    return invites.find((invite) => invite.status === "accepted" && isSameUserByInviteFields(invite, user)) || null;
+  }
+
+  function findSubmissionByInvite(invite) {
+    if (!invite) return null;
+    const submissions = getAllTeamSubmissionsForTournament();
+
+    return (
+      submissions.find((submission) => {
+        const captainMatch =
+          (invite.captainUsername && identitiesMatch(submission.captainUsername || submission.createdBy, invite.captainUsername)) ||
+          (invite.captainName && identitiesMatch(submission.captainName || submission.createdBy, invite.captainName));
+
+        const teamMatch = invite.teamName
+          ? identitiesMatch(submission.teamName, invite.teamName)
+          : true;
+
+        return captainMatch && teamMatch;
+      }) || null
+    );
+  }
+
+  function getInviteStatusForPlayer(player, captainSubmission) {
+    const invites = getAllInvitesForTournament();
+
+    const relevant = invites.find((invite) => {
+      const sameCaptain =
+        (captainSubmission?.captainUsername && identitiesMatch(invite.captainUsername, captainSubmission.captainUsername)) ||
+        (captainSubmission?.captainName && identitiesMatch(invite.captainName, captainSubmission.captainName)) ||
+        (captainSubmission?.createdBy && identitiesMatch(invite.captainUsername || invite.captainName, captainSubmission.createdBy));
+
+      const samePlayer =
+        (player?.playerId && String(invite.inviteePlayerId) === String(player.playerId)) ||
+        identitiesMatch(invite.inviteeName, player?.playerName) ||
+        identitiesMatch(invite.inviteeUsername, player?.username);
+
+      return sameCaptain && samePlayer;
+    });
+
+    if (!relevant) return "accepted";
+    if (relevant.status === "accepted") return "accepted";
+    if (relevant.status === "pending") return "pending";
+    return "other";
+  }
+
+  function setActiveTeamTab(tabName) {
+    teamTabs.forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.tab === tabName);
+    });
+
+    teamPanels.forEach((panel) => {
+      panel.classList.toggle("is-active", panel.dataset.panel === tabName);
+    });
+  }
+
+  function wireTeamTabs() {
+    teamTabs.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.classList.contains("hidden")) return;
+        setActiveTeamTab(btn.dataset.tab);
+      });
+    });
+  }
+
+  function renderMyTeamTab() {
+    const invites = getAllInvitesForTournament();
+    currentCaptainSubmission = findCaptainSubmissionForCurrentUser();
+    currentAcceptedInvite = findAcceptedInviteForCurrentUser();
+    currentUserIsCaptain = !!currentCaptainSubmission;
+
+    myTeamPlayerListEl.innerHTML = "";
+    myTeamEmptyStateEl.classList.add("hidden");
+
+    if (currentUserIsCaptain) {
+      const submission = currentCaptainSubmission;
+      const captainLabel = submission.captainName || user.name || user.username || "Captain";
+      const teamName = submission.teamName || "Untitled team";
+
+      myTeamNameEl.textContent = teamName;
+      myTeamCaptainEl.textContent = captainLabel;
+      myTeamRoleEl.textContent = "Captain";
+      myTeamCategoryEl.textContent = submission.categoryLabel || "—";
+
+      const players = Array.isArray(submission.players) ? submission.players : [];
+
+      const captainRow = document.createElement("div");
+      captainRow.className = "my-team-player-card";
+      captainRow.innerHTML = `
+        <div class="my-team-player-left">
+          <div class="my-team-player-name">${escapeHtml(captainLabel)}</div>
+          <div class="my-team-player-sub">You</div>
+        </div>
+        <span class="member-status-pill member-status-pill--captain">Captain</span>
+      `;
+      myTeamPlayerListEl.appendChild(captainRow);
+
+      players.forEach((player) => {
+        const status = getInviteStatusForPlayer(player, submission);
+        if (status === "other") return;
+
+        const card = document.createElement("div");
+        card.className = "my-team-player-card";
+        card.innerHTML = `
+          <div class="my-team-player-left">
+            <div class="my-team-player-name">${escapeHtml(player.playerName || "Player")}</div>
+            <div class="my-team-player-sub">${escapeHtml(player.username || "")}</div>
+          </div>
+          <span class="member-status-pill ${status === "accepted" ? "member-status-pill--accepted" : "member-status-pill--pending"}">
+            ${status === "accepted" ? "Accepted" : "Request sent"}
+          </span>
+        `;
+        myTeamPlayerListEl.appendChild(card);
+      });
+
+      createTeamTabBtn.classList.remove("hidden");
+      createTeamPanel.classList.remove("hidden");
+      pageTitleEl.textContent = "My team";
+      pageSubtitleEl.textContent = "View your team or manage invites if you are the captain.";
+      return;
+    }
+
+    if (currentAcceptedInvite) {
+      const invite = currentAcceptedInvite;
+      const linkedSubmission = findSubmissionByInvite(invite);
+      const teamName = invite.teamName || linkedSubmission?.teamName || "Untitled team";
+      const captainName = invite.captainName || linkedSubmission?.captainName || "Captain";
+
+      myTeamNameEl.textContent = teamName;
+      myTeamCaptainEl.textContent = captainName;
+      myTeamRoleEl.textContent = "Player";
+      myTeamCategoryEl.textContent = invite.categoryLabel || linkedSubmission?.categoryLabel || "—";
+
+      const captainRow = document.createElement("div");
+      captainRow.className = "my-team-player-card";
+      captainRow.innerHTML = `
+        <div class="my-team-player-left">
+          <div class="my-team-player-name">${escapeHtml(captainName)}</div>
+          <div class="my-team-player-sub">Captain</div>
+        </div>
+        <span class="member-status-pill member-status-pill--captain">Captain</span>
+      `;
+      myTeamPlayerListEl.appendChild(captainRow);
+
+      const sourcePlayers = Array.isArray(linkedSubmission?.players) && linkedSubmission.players.length
+        ? linkedSubmission.players
+        : Array.isArray(invite.allPlayers) ? invite.allPlayers : [];
+
+      sourcePlayers.forEach((player) => {
+        const isCurrent =
+          (player?.username && identitiesMatch(player.username, user.username)) ||
+          (player?.playerName && identitiesMatch(player.playerName, user.name)) ||
+          (player?.playerName && identitiesMatch(player.playerName, user.username));
+
+        const status = isCurrent
+          ? "accepted"
+          : (() => {
+              const matchingInvite = invites.find((row) => {
+                const sameCaptain =
+                  (invite.captainUsername && identitiesMatch(row.captainUsername, invite.captainUsername)) ||
+                  (invite.captainName && identitiesMatch(row.captainName, invite.captainName));
+
+                const samePlayer =
+                  (player?.playerId && String(row.inviteePlayerId) === String(player.playerId)) ||
+                  identitiesMatch(row.inviteeName, player?.playerName) ||
+                  identitiesMatch(row.inviteeUsername, player?.username);
+
+                return sameCaptain && samePlayer;
+              });
+
+              return matchingInvite?.status === "accepted" ? "accepted" : "pending";
+            })();
+
+        const card = document.createElement("div");
+        card.className = "my-team-player-card";
+        card.innerHTML = `
+          <div class="my-team-player-left">
+            <div class="my-team-player-name">${escapeHtml(player.playerName || "Player")}</div>
+            <div class="my-team-player-sub">${isCurrent ? "You" : escapeHtml(player.username || "")}</div>
+          </div>
+          <span class="member-status-pill ${status === "accepted" ? "member-status-pill--accepted" : "member-status-pill--pending"}">
+            ${status === "accepted" ? "Accepted" : "Request sent"}
+          </span>
+        `;
+        myTeamPlayerListEl.appendChild(card);
+      });
+
+      createTeamTabBtn.classList.add("hidden");
+      createTeamPanel.classList.add("hidden");
+      pageTitleEl.textContent = "My team";
+      pageSubtitleEl.textContent = "View your accepted team.";
+      return;
+    }
+
+    myTeamNameEl.textContent = "—";
+    myTeamCaptainEl.textContent = "—";
+    myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
+    myTeamCategoryEl.textContent = "—";
+    myTeamEmptyStateEl.classList.remove("hidden");
+
+    if (currentUserIsCaptain) {
+      myTeamEmptyTextEl.textContent = "No team created yet. Use Create team to invite players.";
+      createTeamTabBtn.classList.remove("hidden");
+      createTeamPanel.classList.remove("hidden");
+    } else {
+      myTeamEmptyTextEl.textContent = "You have not accepted any team invite for this tournament yet.";
+      createTeamTabBtn.classList.add("hidden");
+      createTeamPanel.classList.add("hidden");
+    }
+  }
+
   async function loadTournamentMeta() {
     const hostResp = await apiGet("/api/host/tournaments");
     if (hostResp.ok && Array.isArray(hostResp.data)) {
@@ -464,12 +698,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       : resp.data?.players || resp.data?.items || [];
   }
 
-  function hydratePage() {
-    pageTitleEl.textContent = `Create team`;
-    tournamentNameEl.textContent = tournamentMeta?.tournamentName || "-";
-    tournamentSportEl.textContent = tournamentMeta?.sportName || "-";
-    tournamentDatesEl.textContent = tournamentMeta?.tournamentDates || "-";
-
+  function hydrateCreateTab() {
     const draft = loadDraft();
     if (draft?.teamName) teamNameInput.value = draft.teamName;
 
@@ -493,6 +722,72 @@ document.addEventListener("DOMContentLoaded", async () => {
       teamRowsWrap.innerHTML = "";
     }
   }
+
+  function hydratePage() {
+    tournamentNameEl.textContent = tournamentMeta?.tournamentName || "-";
+    tournamentSportEl.textContent = tournamentMeta?.sportName || "-";
+    tournamentDatesEl.textContent = tournamentMeta?.tournamentDates || "-";
+
+    hydrateCreateTab();
+    renderMyTeamTab();
+    setActiveTeamTab("my-team");
+  }
+
+  if (trigger) {
+    const label = (user?.name || user?.username || user?.email || "U").trim();
+    trigger.textContent = label.charAt(0).toUpperCase();
+  }
+
+  trigger?.addEventListener("click", () => dropdown?.classList.toggle("is-open"));
+
+  document.addEventListener("click", (e) => {
+    if (!dropdown || !trigger) return;
+    if (!dropdown.contains(e.target) && !trigger.contains(e.target)) {
+      dropdown.classList.remove("is-open");
+    }
+  });
+
+  document.getElementById("dropdown-signout")?.addEventListener("click", () => {
+    dropdown?.classList.remove("is-open");
+    logout();
+  });
+
+  playerBtn?.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
+  playerBtn?.addEventListener("click", async () => {
+    try {
+      await fetch("/api/user/mode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+        body: JSON.stringify({ mode: "player" }),
+      });
+    } catch {}
+    window.location.href = "join.html";
+  });
+
+  hostBtn?.addEventListener("click", async () => {
+    try {
+      await fetch("/api/user/mode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+        body: JSON.stringify({ mode: "host" }),
+      });
+    } catch {}
+    window.location.href = "host.html";
+  });
+
+  backBtn?.addEventListener("click", () => {
+    window.location.href = "join.html";
+  });
+
+  wireTeamTabs();
 
   categorySelect?.addEventListener("change", () => {
     if (tournamentMeta?.tournamentType === "team") return;
@@ -534,6 +829,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   teamForm?.addEventListener("submit", (e) => {
     e.preventDefault();
+
+    if (!currentUserIsCaptain) {
+      alert("Only captain can create or update a team.");
+      return;
+    }
 
     let categoryId = "";
     let category = null;
@@ -583,8 +883,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const captainName = user.name || user.username || "";
     const captainUsername = user.username || "";
-    const normalizedCaptainName = String(captainName).trim().toLowerCase();
-    const normalizedCaptainUsername = String(captainUsername).trim().toLowerCase();
+    const normalizedCaptainName = normalizeIdentity(captainName);
+    const normalizedCaptainUsername = normalizeIdentity(captainUsername);
 
     const payload = {
       tournamentId,
@@ -632,12 +932,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const newInvites = payload.players
       .filter((player) => {
-        const playerName = String(player.playerName || "").trim().toLowerCase();
-        const playerUsername = String(player.username || "").trim().toLowerCase();
+        const playerName = normalizeIdentity(player.playerName || "");
+        const playerUsername = normalizeIdentity(player.username || "");
 
         const isCaptainByName = playerName && playerName === normalizedCaptainName;
-        const isCaptainByUsername =
-          playerUsername && normalizedCaptainUsername && playerUsername === normalizedCaptainUsername;
+        const isCaptainByUsername = playerUsername && normalizedCaptainUsername && playerUsername === normalizedCaptainUsername;
 
         return !isCaptainByName && !isCaptainByUsername;
       })
@@ -672,8 +971,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     localStorage.setItem(invitesKey, JSON.stringify([...filteredExisting, ...newInvites]));
 
-    alert("Team invites sent in browser for now. Invited players can accept from Join page.");
-    window.location.href = "join.html";
+    alert("Team invites sent in browser for now.");
+    renderMyTeamTab();
+    setActiveTeamTab("my-team");
   });
 
   tournamentMeta = await loadTournamentMeta();

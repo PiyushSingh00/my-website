@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>ScheduleIt – Create team</title>
+    <title>ScheduleIt – My team</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -52,10 +52,10 @@
         <section class="team-card">
           <div class="team-head">
             <div>
-              <p class="eyebrow">Captain area</p>
-              <h1 id="team-page-title">Create team</h1>
+              <p class="eyebrow">Team area</p>
+              <h1 id="team-page-title">My team</h1>
               <p class="helper-text" id="team-page-subtitle">
-                Build your team from the players registered in this tournament.
+                View your team or manage invites if you are the captain.
               </p>
             </div>
 
@@ -84,62 +84,121 @@
             </div>
           </div>
 
-          <form id="team-form">
-            <div class="field-group">
-              <label for="team-name-input">Team name <span class="optional">(optional)</span></label>
-              <input
-                id="team-name-input"
-                type="text"
-                placeholder="Enter team name"
-              />
-            </div>
+          <div class="team-tabs" id="team-tabs">
+            <button type="button" class="team-tab is-active" data-tab="my-team">
+              My team
+            </button>
+            <button type="button" class="team-tab" data-tab="create-team" id="create-team-tab-btn">
+              Create team
+            </button>
+          </div>
 
-            <div class="field-group" id="team-category-wrap">
-              <label for="team-category-select">Category</label>
-              <select id="team-category-select">
-                <option value="">Select category</option>
-              </select>
-            </div>
+          <!-- MY TEAM TAB -->
+          <section class="team-tab-panel is-active" data-panel="my-team">
+            <div class="my-team-summary-card">
+              <div class="my-team-summary-grid">
+                <div class="summary-chip">
+                  <span class="summary-label">Team name</span>
+                  <span class="summary-value" id="my-team-name">-</span>
+                </div>
 
-            <div class="rules-box">
-              <h3>Selection rules</h3>
-              <p class="helper-text" id="team-rule-text">
-                Choose players to continue.
-              </p>
+                <div class="summary-chip">
+                  <span class="summary-label">Captain</span>
+                  <span class="summary-value" id="my-team-captain">-</span>
+                </div>
+
+                <div class="summary-chip">
+                  <span class="summary-label">Your role</span>
+                  <span class="summary-value" id="my-team-role">-</span>
+                </div>
+
+                <div class="summary-chip">
+                  <span class="summary-label">Category</span>
+                  <span class="summary-value" id="my-team-category">-</span>
+                </div>
+              </div>
             </div>
 
             <div class="players-section">
               <div class="players-section-head">
                 <div>
-                  <h3>Selected players</h3>
-                  <p class="helper-text">Choose players from the tournament registration list.</p>
+                  <h3>Team members</h3>
+                  <p class="helper-text">
+                    Players invited to this team and their current status.
+                  </p>
+                </div>
+              </div>
+
+              <div id="my-team-player-list" class="my-team-player-list"></div>
+
+              <div id="my-team-empty-state" class="empty-state-card hidden">
+                <h3>No team found yet</h3>
+                <p class="helper-text" id="my-team-empty-text">
+                  No team is available for this tournament yet.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- CREATE TEAM TAB -->
+          <section class="team-tab-panel" data-panel="create-team" id="create-team-panel">
+            <form id="team-form">
+              <div class="field-group">
+                <label for="team-name-input">Team name <span class="optional">(optional)</span></label>
+                <input
+                  id="team-name-input"
+                  type="text"
+                  placeholder="Enter team name"
+                />
+              </div>
+
+              <div class="field-group" id="team-category-wrap">
+                <label for="team-category-select">Category</label>
+                <select id="team-category-select">
+                  <option value="">Select category</option>
+                </select>
+              </div>
+
+              <div class="rules-box">
+                <h3>Selection rules</h3>
+                <p class="helper-text" id="team-rule-text">
+                  Choose players to continue.
+                </p>
+              </div>
+
+              <div class="players-section">
+                <div class="players-section-head">
+                  <div>
+                    <h3>Selected players</h3>
+                    <p class="helper-text">Choose players from the tournament registration list.</p>
+                  </div>
+
+                  <button type="button" class="btn-dark" id="add-player-row-btn">
+                    + Add player
+                  </button>
                 </div>
 
-                <button type="button" class="btn-dark" id="add-player-row-btn">
-                  + Add player
-                </button>
+                <div id="team-player-rows" class="team-player-rows"></div>
               </div>
 
-              <div id="team-player-rows" class="team-player-rows"></div>
-            </div>
+              <div class="team-summary">
+                <div class="summary-chip">
+                  <span class="summary-label">Players selected</span>
+                  <span class="summary-value" id="selected-count">0</span>
+                </div>
 
-            <div class="team-summary">
-              <div class="summary-chip">
-                <span class="summary-label">Players selected</span>
-                <span class="summary-value" id="selected-count">0</span>
+                <div class="summary-chip">
+                  <span class="summary-label">Required</span>
+                  <span class="summary-value" id="required-count">-</span>
+                </div>
               </div>
 
-              <div class="summary-chip">
-                <span class="summary-label">Required</span>
-                <span class="summary-value" id="required-count">-</span>
+              <div class="form-actions">
+                <button type="button" class="btn-dark" id="save-draft-btn">Save draft</button>
+                <button type="submit" class="btn-primary">Invite players</button>
               </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="button" class="btn-dark" id="save-draft-btn">Save draft</button>
-              <button type="submit" class="btn-primary">Invite players</button>
-            </div>
-          </form>
+            </form>
+          </section>
         </section>
       </main>
     </div>

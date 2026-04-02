@@ -174,7 +174,7 @@ body {
 }
 
 .team-card {
-  width: min(980px, 100%);
+  width: min(1080px, 100%);
   margin: 0 auto;
   border-radius: var(--radius-lg);
   background:
@@ -244,6 +244,117 @@ body {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
+}
+
+.team-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.team-tab {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.team-tab:hover {
+  transform: translateY(-1px);
+  background: rgba(77, 208, 225, 0.08);
+  color: var(--text);
+}
+
+.team-tab.is-active {
+  background: rgba(77, 208, 225, 0.16);
+  border-color: rgba(77, 208, 225, 0.55);
+  color: var(--text);
+}
+
+.team-tab-panel {
+  display: none;
+}
+
+.team-tab-panel.is-active {
+  display: block;
+}
+
+.my-team-summary-card {
+  margin-bottom: 18px;
+}
+
+.my-team-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.my-team-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.my-team-player-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(5, 11, 24, 0.72);
+}
+
+.my-team-player-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.my-team-player-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.my-team-player-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.member-status-pill {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.member-status-pill--captain {
+  background: rgba(77, 208, 225, 0.16);
+  color: #a5f3ff;
+}
+
+.member-status-pill--accepted {
+  background: rgba(66, 211, 146, 0.16);
+  color: #9ff4ca;
+}
+
+.member-status-pill--pending {
+  background: rgba(242, 95, 76, 0.16);
+  color: #ffb4a8;
+}
+
+.empty-state-card {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .field-group {
@@ -414,7 +525,8 @@ body {
 }
 
 @media (max-width: 900px) {
-  .team-meta-grid {
+  .team-meta-grid,
+  .my-team-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -422,7 +534,8 @@ body {
 @media (max-width: 700px) {
   .team-head,
   .players-section-head,
-  .form-actions {
+  .form-actions,
+  .my-team-player-card {
     flex-direction: column;
     align-items: stretch;
   }
@@ -435,11 +548,9 @@ body {
     padding-bottom: 0;
   }
 
-  .team-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .team-meta-grid {
+  .team-summary,
+  .team-meta-grid,
+  .my-team-summary-grid {
     grid-template-columns: 1fr;
   }
 }

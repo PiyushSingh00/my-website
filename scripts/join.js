@@ -574,6 +574,34 @@ function isUserCaptainForTournament(tournament, user) {
   });
 }
 
+function hasAcceptedTeamForTournament(tournament, user) {
+  const tournamentId = tournament?.tournamentId ?? tournament?.id;
+  if (!tournamentId || !user) return false;
+
+  try {
+    const raw = localStorage.getItem(`scheduleit_team_invites_${tournamentId}`);
+    const invites = JSON.parse(raw || "[]");
+    if (!Array.isArray(invites)) return false;
+
+    const myName = normalizeIdentity(user?.name);
+    const myUsername = normalizeIdentity(user?.username);
+
+    return invites.some((invite) => {
+      if (invite.status !== "accepted") return false;
+
+      const inviteName = normalizeIdentity(invite.inviteeName);
+      const inviteUsername = normalizeIdentity(invite.inviteeUsername);
+
+      const nameMatch = myName && inviteName && myName === inviteName;
+      const usernameMatch = myUsername && inviteUsername && myUsername === inviteUsername;
+
+      return nameMatch || usernameMatch;
+    });
+  } catch {
+    return false;
+  }
+}
+
 /* -------------------------
    MY TOURNAMENTS
 ------------------------- */
@@ -595,6 +623,9 @@ function renderMyTournaments(tournaments) {
     const tournamentId = t.tournamentId ?? t.id;
     const status = normalizeStatus(t.myPlayer || t);
     const isCaptain = isUserCaptainForTournament(t, window.__me);
+    const hasAcceptedTeam = hasAcceptedTeamForTournament(t, window.__me);
+    const showTeamButton = isCaptain || hasAcceptedTeam;
+    const teamButtonLabel = isCaptain ? "Create/View my team" : "View my team";
 
     const card = document.createElement("div");
     card.className = "tournament-card";
@@ -612,7 +643,7 @@ function renderMyTournaments(tournaments) {
         <span>${t.venue ?? ""}</span>
       </div>
       <div class="tournament-actions">
-        ${isCaptain ? `<button type="button" class="captain-btn create-team-btn">Create team</button>` : ""}
+        ${showTeamButton ? `<button type="button" class="captain-btn create-team-btn">${teamButtonLabel}</button>` : ""}
         <button type="button" class="leave-btn">Opt out</button>
       </div>
     `;
