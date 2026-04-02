@@ -96,6 +96,10 @@ function normalizeIdentity(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function identitiesMatch(a, b) {
+  return normalizeIdentity(a) && normalizeIdentity(a) === normalizeIdentity(b);
+}
+
 function parseTournamentEndDate(tournamentDates) {
   if (!tournamentDates) return null;
 
@@ -535,77 +539,20 @@ function wirePlayerForm(user) {
 /* -------------------------
    CAPTAIN CHECK
 ------------------------- */
-function getLocalCaptainState(tournamentId) {
-  try {
-    const raw = localStorage.getItem(`scheduleit_captains_${tournamentId}`);
-    if (!raw) return null;
 
-    const parsed = JSON.parse(raw);
-    return {
-      selectedCaptainIds: Array.isArray(parsed?.selectedCaptainIds) ? parsed.selectedCaptainIds : [],
-      confirmedCaptains: Array.isArray(parsed?.confirmedCaptains) ? parsed.confirmedCaptains : [],
-      pools: parsed?.pools || null,
-    };
-  } catch {
-    return null;
-  }
-}
 
 function normalizeName(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function isUserCaptainForTournament(tournament, user) {
-  const tournamentId = tournament?.tournamentId ?? tournament?.id;
-  if (!tournamentId || !user) return false;
 
-  const captainState = getLocalCaptainState(tournamentId);
-  if (!captainState?.confirmedCaptains?.length) return false;
 
-  const userName = normalizeName(user.name);
-  const userUsername = normalizeName(user.username);
 
-  return captainState.confirmedCaptains.some((captain) => {
-    const captainName = normalizeName(captain.playerName);
-    return (
-      (userName && captainName === userName) ||
-      (userUsername && captainName === userUsername)
-    );
-  });
-}
-
-function hasAcceptedTeamForTournament(tournament, user) {
-  const tournamentId = tournament?.tournamentId ?? tournament?.id;
-  if (!tournamentId || !user) return false;
-
-  try {
-    const raw = localStorage.getItem(`scheduleit_team_invites_${tournamentId}`);
-    const invites = JSON.parse(raw || "[]");
-    if (!Array.isArray(invites)) return false;
-
-    const myName = normalizeIdentity(user?.name);
-    const myUsername = normalizeIdentity(user?.username);
-
-    return invites.some((invite) => {
-      if (invite.status !== "accepted") return false;
-
-      const inviteName = normalizeIdentity(invite.inviteeName);
-      const inviteUsername = normalizeIdentity(invite.inviteeUsername);
-
-      const nameMatch = myName && inviteName && myName === inviteName;
-      const usernameMatch = myUsername && inviteUsername && myUsername === inviteUsername;
-
-      return nameMatch || usernameMatch;
-    });
-  } catch {
-    return false;
-  }
-}
 
 /* -------------------------
    MY TOURNAMENTS
 ------------------------- */
-function renderMyTournaments(tournaments) {
+async function renderMyTournaments(tournaments) {
   const list = document.getElementById("my-tournament-list");
   const empty = document.getElementById("my-empty-state");
   if (!list || !empty) return;
@@ -619,12 +566,12 @@ function renderMyTournaments(tournaments) {
 
   empty.style.display = "none";
 
-  tournaments.forEach((t) => {
+  for (const t of tournaments) {
     const tournamentId = t.tournamentId ?? t.id;
     const status = normalizeStatus(t.myPlayer || t);
-    const isCaptain = isUserCaptainForTournament(t, window.__me);
-    const hasAcceptedTeam = hasAcceptedTeamForTournament(t, window.__me);
-    const showTeamButton = isCaptain || hasAcceptedTeam;
+    const isCaptain = await isUserCaptainForTournament(t, window.__me);
+    const acceptedTeam = await hasAcceptedTeamForTournament(t, window.__me);
+    const showTeamButton = isCaptain || acceptedTeam;
     const teamButtonLabel = isCaptain ? "Create/View my team" : "View my team";
 
     const card = document.createElement("div");
@@ -656,8 +603,7 @@ function renderMyTournaments(tournaments) {
       window.location.href = `schedule.html?tournamentId=${tournamentId}`;
     });
 
-    const leaveBtn = card.querySelector(".leave-btn");
-    leaveBtn?.addEventListener("click", async (e) => {
+    card.querySelector(".leave-btn")?.addEventListener("click", async (e) => {
       e.stopPropagation();
       const ok = confirm("Leave this tournament?");
       if (!ok) return;
@@ -669,14 +615,13 @@ function renderMyTournaments(tournaments) {
       await loadMyTournaments();
     });
 
-    const createTeamBtn = card.querySelector(".create-team-btn");
-    createTeamBtn?.addEventListener("click", (e) => {
+    card.querySelector(".create-team-btn")?.addEventListener("click", (e) => {
       e.stopPropagation();
       window.location.href = `team.html?tournamentId=${tournamentId}`;
     });
 
     list.appendChild(card);
-  });
+  }
 }
 
 function populateSportFilterFromMine(list) {
@@ -694,8 +639,8 @@ function populateSportFilterFromMine(list) {
   });
 }
 
-function renderFilteredMyTournaments() {
-  const bySport = currentMySportFilter === "all"
+async function renderFilteredMyTournaments() {
+    const bySport = currentMySportFilter === "all"
     ? myTournaments
     : myTournaments.filter((t) => t.sportName === currentMySportFilter);
 
@@ -708,7 +653,7 @@ function renderFilteredMyTournaments() {
     ? byStatus.filter((t) => String(t.tournamentName || "").toLowerCase().includes(term))
     : byStatus;
 
-  renderMyTournaments(byName);
+  await renderMyTournaments(byName);
 }
 
 function wireMySportFilter() {
@@ -746,229 +691,330 @@ async function loadMyTournaments() {
     const raw = await apiGet("/api/player/tournaments");
     myTournaments = normalizeTournamentList(raw);
     populateSportFilterFromMine(myTournaments);
-    renderFilteredMyTournaments();
-    renderDashboard();
-    renderNotifications(window.__me);
+    await renderFilteredMyTournaments();
+renderDashboard();
+await renderNotifications(window.__me);
   } catch (err) {
     console.error("Failed to load player tournaments", err);
     myTournaments = [];
     populateSportFilterFromMine(myTournaments);
-    renderFilteredMyTournaments();
-    renderDashboard();
-    renderNotifications(window.__me);
+    await renderFilteredMyTournaments();
+renderDashboard();
+await renderNotifications(window.__me);
   }
 }
 
 /* -------------------------
    NOTIFICATIONS
 ------------------------- */
-function getInviteStorageKey(tournamentId) {
-  return `scheduleit_team_invites_${tournamentId}`;
-}
 
-function getNotificationHistoryKey(user) {
-  return `scheduleit_notification_history_${user?.username || user?.name || "user"}`;
-}
-
-function getAllInviteRecordsForMyTournaments() {
-  const tournamentIds = myTournaments.map((t) => t.tournamentId ?? t.id).filter(Boolean);
-  let allInvites = [];
-
-  tournamentIds.forEach((tid) => {
-    try {
-      const raw = localStorage.getItem(getInviteStorageKey(tid));
-      const parsed = JSON.parse(raw || "[]");
-      if (Array.isArray(parsed)) allInvites.push(...parsed);
-    } catch {}
-  });
-
-  return allInvites;
-}
-
-function getPendingInvitesForUser(user) {
-  const myName = normalizeIdentity(user?.name);
-  const myUsername = normalizeIdentity(user?.username);
-
-  return getAllInviteRecordsForMyTournaments().filter((invite) => {
-    if (invite.status !== "pending") return false;
-
-    const inviteName = normalizeIdentity(invite.inviteeName);
-    const inviteUsername = normalizeIdentity(invite.inviteeUsername);
-
-    const nameMatch = myName && inviteName && myName === inviteName;
-    const usernameMatch = myUsername && inviteUsername && myUsername === inviteUsername;
-
-    return nameMatch || usernameMatch;
-  });
-}
-
-function getStoredNotificationHistory(user) {
+async function loadCaptainStateForTournament(tournamentId) {
   try {
-    const raw = localStorage.getItem(getNotificationHistoryKey(user));
-    const parsed = JSON.parse(raw || "[]");
-    return Array.isArray(parsed) ? parsed : [];
+    return await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`);
+  } catch {
+    return null;
+  }
+}
+
+async function loadTeamRequestsForTournament(tournamentId) {
+  try {
+    return await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`);
   } catch {
     return [];
   }
 }
 
-function saveStoredNotificationHistory(user, items) {
-  localStorage.setItem(getNotificationHistoryKey(user), JSON.stringify(items));
+async function isUserCaptainForTournament(tournament, user) {
+  const tournamentId = tournament?.tournamentId ?? tournament?.id;
+  if (!tournamentId || !user) return false;
+
+  const captainState = await loadCaptainStateForTournament(tournamentId);
+  const confirmed = Array.isArray(captainState?.confirmedCaptains) ? captainState.confirmedCaptains : [];
+
+  return confirmed.some((captain) => {
+    return (
+      identitiesMatch(captain?.playerName, user?.name) ||
+      identitiesMatch(captain?.playerName, user?.username)
+    );
+  });
 }
 
-function addNotificationHistoryEntry(user, entry) {
-  const existing = getStoredNotificationHistory(user);
-  existing.unshift(entry);
-  saveStoredNotificationHistory(user, existing);
+async function hasAcceptedTeamForTournament(tournament, user) {
+  const tournamentId = tournament?.tournamentId ?? tournament?.id;
+  if (!tournamentId || !user) return false;
+
+  const requests = await loadTeamRequestsForTournament(tournamentId);
+  const arr = Array.isArray(requests) ? requests : [];
+
+  return arr.some((req) => {
+    const invitedPlayers = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+    return invitedPlayers.some((p) => {
+      const sameUser =
+        identitiesMatch(p?.username, user?.username) ||
+        identitiesMatch(p?.playerName, user?.name) ||
+        identitiesMatch(p?.playerName, user?.username);
+
+      return sameUser && p.inviteStatus === "accepted";
+    });
+  });
 }
 
-function saveUpdatedInvite(inviteToUpdate, nextStatus) {
-  const key = getInviteStorageKey(inviteToUpdate.tournamentId);
+async function renderTeamInvites(user) {
+  const section = document.getElementById("team-invite-section");
+  const list = document.getElementById("team-invite-list");
+  if (!section || !list) return;
 
-  let existing = [];
-  try {
-    existing = JSON.parse(localStorage.getItem(key) || "[]");
-    if (!Array.isArray(existing)) existing = [];
-  } catch {
-    existing = [];
+  list.innerHTML = "";
+
+  const tournamentIds = myTournaments.map((t) => t.tournamentId ?? t.id).filter(Boolean);
+  const cards = [];
+
+  for (const tournamentId of tournamentIds) {
+    const requests = await loadTeamRequestsForTournament(tournamentId);
+    const arr = Array.isArray(requests) ? requests : [];
+
+    arr.forEach((req) => {
+      const invitedPlayers = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+
+      invitedPlayers.forEach((p) => {
+        const sameUser =
+          identitiesMatch(p?.username, user?.username) ||
+          identitiesMatch(p?.playerName, user?.name) ||
+          identitiesMatch(p?.playerName, user?.username);
+
+        if (!sameUser || p.inviteStatus !== "pending") return;
+
+        cards.push({
+          tournamentId,
+          requestId: req.requestId,
+          playerId: p.playerId,
+          teamName: req.teamName,
+          captainName: req.captainName,
+          tournamentName: req.tournamentName,
+          categoryLabel: req.categoryLabel,
+        });
+      });
+    });
   }
 
-  const updated = existing.map((invite) => {
-    if (String(invite.requestId) === String(inviteToUpdate.requestId)) {
-      return {
-        ...invite,
-        status: nextStatus,
-        respondedAt: new Date().toISOString(),
-      };
-    }
-    return invite;
+  if (!cards.length) {
+    section.classList.add("hidden");
+    return;
+  }
+
+  section.classList.remove("hidden");
+
+  cards.forEach((invite) => {
+    const card = document.createElement("div");
+    card.className = "team-invite-card";
+    card.innerHTML = `
+      <div class="team-invite-head">
+        <div>
+          <h3>${invite.teamName || "Team request"}</h3>
+          <p class="helper-text">
+            ${invite.captainName || "Captain"} invited you to join team in
+            <strong>${invite.tournamentName || "Tournament"}</strong>
+          </p>
+          ${invite.categoryLabel ? `<p class="helper-text">Category: ${invite.categoryLabel}</p>` : ""}
+        </div>
+      </div>
+
+      <div class="team-invite-actions">
+        <button type="button" class="btn-primary accept-team-invite-btn">Accept</button>
+        <button type="button" class="btn-dark reject-team-invite-btn">Reject</button>
+      </div>
+    `;
+
+    card.querySelector(".accept-team-invite-btn")?.addEventListener("click", async () => {
+      const res = await fetch(
+        `/api/host/tournaments/${encodeURIComponent(invite.tournamentId)}/team-requests/${encodeURIComponent(invite.requestId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + localStorage.getItem("token"),
+          },
+          body: JSON.stringify({
+            playerId: invite.playerId,
+            status: "accepted",
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        alert("Could not accept invite.");
+        return;
+      }
+
+      await renderTeamInvites(user);
+      await loadMyTournaments();
+      alert("Team invite accepted.");
+    });
+
+    card.querySelector(".reject-team-invite-btn")?.addEventListener("click", async () => {
+      const res = await fetch(
+        `/api/host/tournaments/${encodeURIComponent(invite.tournamentId)}/team-requests/${encodeURIComponent(invite.requestId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + localStorage.getItem("token"),
+          },
+          body: JSON.stringify({
+            playerId: invite.playerId,
+            status: "rejected",
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        alert("Could not reject invite.");
+        return;
+      }
+
+      await renderTeamInvites(user);
+      alert("Team invite rejected.");
+    });
+
+    list.appendChild(card);
   });
-
-  localStorage.setItem(key, JSON.stringify(updated));
 }
 
-function buildAcceptedNotificationText(invite) {
-  const teamLabel = invite.teamName ? `'${invite.teamName}' team` : "the team";
-  return `You accepted the invite request to join ${teamLabel} of '${invite.captainName || "Captain"}' captain`;
-}
-
-function updateSidebarNotificationBadge(user) {
+function updateSidebarNotificationBadgeFromCount(count) {
   const badge = document.getElementById("sidebar-notification-badge");
   if (!badge) return;
 
-  const pendingCount = getPendingInvitesForUser(user).length;
-  if (!pendingCount) {
+  if (!count) {
     badge.classList.add("hidden");
     badge.textContent = "0";
     return;
   }
 
   badge.classList.remove("hidden");
-  badge.textContent = String(pendingCount);
+  badge.textContent = String(count);
 }
 
-function renderNotifications(user) {
+async function renderNotifications(user) {
   const list = document.getElementById("notification-list");
   const empty = document.getElementById("notification-empty-state");
   if (!list || !empty) return;
 
-  const pendingInvites = getPendingInvitesForUser(user);
-  const history = getStoredNotificationHistory(user);
-
   list.innerHTML = "";
 
+  const tournamentIds = myTournaments.map((t) => t.tournamentId ?? t.id).filter(Boolean);
   const cards = [];
 
-  pendingInvites.forEach((invite) => {
-    cards.push({ type: "pending", data: invite, ts: invite.createdAt || "" });
-  });
+  for (const tournamentId of tournamentIds) {
+    const requests = await loadTeamRequestsForTournament(tournamentId);
+    const arr = Array.isArray(requests) ? requests : [];
 
-  history.forEach((entry) => {
-    cards.push({ type: "history", data: entry, ts: entry.createdAt || entry.respondedAt || "" });
-  });
+    arr.forEach((req) => {
+      const invitedPlayers = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
 
-  cards.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+      invitedPlayers.forEach((p) => {
+        const sameUser =
+          identitiesMatch(p?.username, user?.username) ||
+          identitiesMatch(p?.playerName, user?.name) ||
+          identitiesMatch(p?.playerName, user?.username);
+
+        if (!sameUser || p.inviteStatus !== "pending") return;
+
+        cards.push({
+          tournamentId,
+          requestId: req.requestId,
+          playerId: p.playerId,
+          teamName: req.teamName,
+          captainName: req.captainName,
+          tournamentName: req.tournamentName,
+          categoryLabel: req.categoryLabel,
+          createdAt: req.createdAt || "",
+        });
+      });
+    });
+  }
+
+  cards.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   if (!cards.length) {
     empty.style.display = "block";
-    updateSidebarNotificationBadge(user);
+    updateSidebarNotificationBadgeFromCount(0);
     return;
   }
 
   empty.style.display = "none";
+  updateSidebarNotificationBadgeFromCount(cards.length);
 
-  cards.forEach((item) => {
-    if (item.type === "pending") {
-      const invite = item.data;
-      const card = document.createElement("div");
-      card.className = "notification-card";
-      card.innerHTML = `
-        <h3 class="notification-title">${invite.teamName || "Team join request"}</h3>
-        <p class="helper-text">
-          ${invite.captainName || "Captain"} invited you to join
-          <strong>${invite.tournamentName || "Tournament"}</strong>
-        </p>
-        ${
-          invite.categoryLabel
-            ? `<p class="helper-text">Category: ${invite.categoryLabel}</p>`
-            : ""
+  cards.forEach((invite) => {
+    const card = document.createElement("div");
+    card.className = "notification-card";
+    card.innerHTML = `
+      <h3 class="notification-title">${invite.teamName || "Team join request"}</h3>
+      <p class="helper-text">
+        ${invite.captainName || "Captain"} invited you to join
+        <strong>${invite.tournamentName || "Tournament"}</strong>
+      </p>
+      ${invite.categoryLabel ? `<p class="helper-text">Category: ${invite.categoryLabel}</p>` : ""}
+      <div class="notification-actions">
+        <button type="button" class="btn-primary accept-team-invite-btn">Accept</button>
+        <button type="button" class="btn-dark reject-team-invite-btn">Reject</button>
+      </div>
+    `;
+
+    card.querySelector(".accept-team-invite-btn")?.addEventListener("click", async () => {
+      const res = await fetch(
+        `/api/host/tournaments/${encodeURIComponent(invite.tournamentId)}/team-requests/${encodeURIComponent(invite.requestId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + localStorage.getItem("token"),
+          },
+          body: JSON.stringify({
+            playerId: invite.playerId,
+            status: "accepted",
+          }),
         }
-        <div class="notification-actions">
-          <button type="button" class="btn-primary accept-team-invite-btn">Accept</button>
-          <button type="button" class="btn-dark reject-team-invite-btn">Reject</button>
-        </div>
-      `;
+      );
 
-      card.querySelector(".accept-team-invite-btn")?.addEventListener("click", () => {
-        saveUpdatedInvite(invite, "accepted");
+      if (!res.ok) {
+        alert("Could not accept invite.");
+        return;
+      }
 
-        addNotificationHistoryEntry(user, {
-          type: "accepted_invite",
-          requestId: invite.requestId,
-          tournamentId: invite.tournamentId,
-          tournamentName: invite.tournamentName,
-          teamName: invite.teamName,
-          captainName: invite.captainName,
-          text: buildAcceptedNotificationText(invite),
-          createdAt: new Date().toISOString(),
-        });
+      await renderNotifications(user);
+      await renderTeamInvites(user);
+      await loadMyTournaments();
+      alert("Team invite accepted.");
+    });
 
-        renderNotifications(user);
-        updateSidebarNotificationBadge(user);
-      });
+    card.querySelector(".reject-team-invite-btn")?.addEventListener("click", async () => {
+      const res = await fetch(
+        `/api/host/tournaments/${encodeURIComponent(invite.tournamentId)}/team-requests/${encodeURIComponent(invite.requestId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + localStorage.getItem("token"),
+          },
+          body: JSON.stringify({
+            playerId: invite.playerId,
+            status: "rejected",
+          }),
+        }
+      );
 
-      card.querySelector(".reject-team-invite-btn")?.addEventListener("click", () => {
-        saveUpdatedInvite(invite, "rejected");
+      if (!res.ok) {
+        alert("Could not reject invite.");
+        return;
+      }
 
-        addNotificationHistoryEntry(user, {
-          type: "rejected_invite",
-          requestId: invite.requestId,
-          tournamentId: invite.tournamentId,
-          tournamentName: invite.tournamentName,
-          teamName: invite.teamName,
-          captainName: invite.captainName,
-          text: `You rejected the invite request to join '${invite.teamName || "team"}' of '${invite.captainName || "Captain"}' captain`,
-          createdAt: new Date().toISOString(),
-        });
+      await renderNotifications(user);
+      await renderTeamInvites(user);
+      alert("Team invite rejected.");
+    });
 
-        renderNotifications(user);
-        updateSidebarNotificationBadge(user);
-      });
-
-      list.appendChild(card);
-    } else {
-      const entry = item.data;
-      const card = document.createElement("div");
-      card.className = "notification-card accepted-notification";
-      card.innerHTML = `
-        <h3 class="notification-title">Update</h3>
-        <p class="helper-text">${entry.text}</p>
-      `;
-      list.appendChild(card);
-    }
+    list.appendChild(card);
   });
-
-  updateSidebarNotificationBadge(user);
 }
 
 /* -------------------------
@@ -1227,6 +1273,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadAllTournaments();
   await loadMyTournaments();
+  await renderTeamInvites(user);
   renderNotifications(user);
   renderDashboard();
   setActiveTab("dashboard");

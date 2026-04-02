@@ -67,6 +67,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     courtNames: [],
     requirePayment: false,
     amount: "",
+    isPublic: true,
   };
 
   const wizBackBtn = document.getElementById("wiz-back-btn");
@@ -189,7 +190,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     wiz.courtNames = wiz.courtNames.slice(0, wiz.courtCount);
   }
 
+function buildEventNameFromConfig(cfg = {}) {
+  const age = String(cfg.ageGroup || "").trim();
+  const gender = String(cfg.gender || "").trim();
 
+  const teamSize = Number(cfg.teamSize || 1);
+  const exact = Number(cfg.exactTeamSize || 0);
+
+  let formatText = "";
+  if (teamSize === 1) formatText = "Singles";
+  else if (teamSize === 2) formatText = "Doubles";
+  else if (teamSize === 3) formatText = "Triples";
+  else if (teamSize >= 4) formatText = exact ? `Team ${exact}` : "Team";
+
+  return [age, gender, formatText].filter(Boolean).join(" • ");
+}
   function renderEventConfig() {
     const wrap = document.getElementById("wiz-event-config");
     if (!wrap) return;
@@ -215,12 +230,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     events.forEach((ev, i) => {
       const cfg = wiz.eventConfigs[i];
+      cfg.eventName = buildEventNameFromConfig(cfg);
       const showExactTeamSizeField = cfg.teamSize === "4";
 
       const card = document.createElement("div");
       card.className = "wiz-event-cfg-card";
       card.innerHTML = `
-        <div class="wiz-event-cfg-title">${ev.name}</div>
+        <div class="wiz-event-cfg-title">${cfg.eventName || ev.name}</div>
         <div class="wiz-cfg-grid">
           <div class="field-group">
             <label>Gender</label>
@@ -436,6 +452,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       wiz.dateEnd = document.getElementById("w-date-end")?.value || "";
       wiz.venue = document.getElementById("w-venue")?.value.trim() || "";
       wiz.details = document.getElementById("w-details")?.value.trim() || "";
+      wiz.isPublic = Boolean(wiz.isPublic);
     }
 
     if (n === 1) {
@@ -464,10 +481,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const body = document.getElementById("wiz-review-body");
     if (!body) return;
 
-    const events = Array.from({ length: wiz.eventCount || 1 }, (_, i) => ({
-      name: `Category ${i + 1}`,
-      cfg: wiz.eventConfigs[i] || {},
-    }));
+    const events = Array.from({ length: wiz.eventCount || 1 }, (_, i) => {
+      const cfg = wiz.eventConfigs[i] || {};
+      return {
+        name: buildEventNameFromConfig(cfg) || `Category ${i + 1}`,
+        cfg,
+      };
+    });
 
     const courtList =
       wiz.courtNames.filter(Boolean).join(", ") ||
@@ -588,6 +608,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       courtNames: [],
       requirePayment: false,
       amount: "",
+      isPublic: true,
     });
 
     editingTournamentId = null;
@@ -600,7 +621,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("w-date-end").value = "";
     document.getElementById("w-venue").value = "";
     document.getElementById("w-details").value = "";
-
+    document.getElementById("w-public-yes")?.classList.add("active");
+document.getElementById("w-public-no")?.classList.remove("active");
     document.getElementById("w-event-count-display").textContent = "1";
     document.getElementById("w-stage-format").value = "";
     document.getElementById("w-group-count").value = "";
@@ -652,6 +674,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("w-date-end").value = wiz.dateEnd || "";
     document.getElementById("w-venue").value = wiz.venue || "";
     document.getElementById("w-details").value = wiz.details || "";
+    document.getElementById("w-public-yes")?.classList.toggle("active", !!wiz.isPublic);
+document.getElementById("w-public-no")?.classList.toggle("active", !wiz.isPublic);
 
     document.querySelectorAll(".wiz-type-card").forEach((c) => {
       c.classList.toggle("active", c.dataset.type === wiz.tournamentType);
@@ -709,110 +733,82 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.body.appendChild(overlay);
     setTimeout(() => overlay.remove(), 1000);
   }
+async function saveTournamentFromWizard() {
+  collectStep(0);
+  collectStep(1);
+  collectStep(2);
+  collectStep(4);
 
-  async function submitTournament() {
-    collectStep(currentStep);
-
-    const code = document.getElementById("access-code")?.value;
-    if (!code) {
-      alert("Please generate an access code first.");
-      return;
-    }
-
-    categories = wiz.eventConfigs.map((cfg, i) => ({
-      categoryId: cfg.categoryId || ("CAT-" + Math.random().toString(36).slice(2, 8).toUpperCase()),
-      ageGroup: cfg.ageGroup || "",
-      gender: cfg.gender || "",
-      teamSize: cfg.teamSize || "1",
-      exactTeamSize: cfg.teamSize === "4" && cfg.exactTeamSize ? Number(cfg.exactTeamSize) : null,
-      playingLevel: cfg.playingLevel || "",
-      eventName: `Category ${i + 1}`,
-    }));
-
-    const payload = {
-      tournamentName: wiz.name,
-      sportName: wiz.sport,
-      tournamentDates: wiz.dateStart + (wiz.dateEnd ? " to " + wiz.dateEnd : ""),
-      accessCode: code,
-      playerDetails: wiz.details,
-      venue: wiz.venue,
-      categories,
-
-      tournamentType: wiz.tournamentType,
-      eventCount: wiz.eventCount,
-      eventNames: Array.from({ length: wiz.eventCount || 1 }, (_, i) => `Category ${i + 1}`),
-      eventConfigs: categories,
-
-      stageFormat: wiz.stageFormat,
-      groupCount: wiz.stageFormat === "group_knockout" ? Number(wiz.groupCount) : null,
-
-      tournamentRules: {
-        maxMatchesPerPlayer: wiz.tournamentRules.maxMatchesPerPlayer ? Number(wiz.tournamentRules.maxMatchesPerPlayer) : null,
-        bestOfSets: wiz.tournamentRules.bestOfSets ? Number(wiz.tournamentRules.bestOfSets) : null,
-        pointsPerSet: wiz.tournamentRules.pointsPerSet ? Number(wiz.tournamentRules.pointsPerSet) : null,
-        minPlayersPerTeam: wiz.tournamentType === "team" && wiz.tournamentRules.minPlayersPerTeam ? Number(wiz.tournamentRules.minPlayersPerTeam) : null,
-        maxPlayersPerTeam: wiz.tournamentType === "team" && wiz.tournamentRules.maxPlayersPerTeam ? Number(wiz.tournamentRules.maxPlayersPerTeam) : null,
-      },
-
-      leaguePoints: shouldShowLeaguePoints()
-        ? {
-            win: wiz.leaguePoints.win !== "" ? Number(wiz.leaguePoints.win) : null,
-            loss: wiz.leaguePoints.loss !== "" ? Number(wiz.leaguePoints.loss) : null,
-            draw: wiz.leaguePoints.draw !== "" ? Number(wiz.leaguePoints.draw) : null,
-          }
-        : null,
-
-      courtCount: wiz.courtCount,
-      courtNames: wiz.courtNames,
-      requirePayment: wiz.requirePayment,
-      entryFee: wiz.requirePayment ? Number(wiz.amount) : 0,
-    };
-
-    const isEditMode = !!editingTournamentId;
-
-    if (wizSubmitBtn) {
-      wizSubmitBtn.disabled = true;
-      wizSubmitBtn.textContent = "Saving…";
-    }
-    if (wizSaveNowBtn) {
-      wizSaveNowBtn.disabled = true;
-      wizSaveNowBtn.textContent = "Saving…";
-    }
-
-    try {
-      const res = await fetch(
-        isEditMode ? `/api/host/tournaments/${editingTournamentId}` : "/api/host/tournaments",
-        {
-          method: isEditMode ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + localStorage.getItem("token"),
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!res.ok) {
-        throw new Error(isEditMode ? "Failed to update tournament" : "Failed to save tournament");
-      }
-
-      showCreatedToast(isEditMode ? "Tournament updated successfully" : "Tournament created successfully");
-      resetWizardStateAndUI();
-      showStep(0);
-      await loadMyTournaments();
-      switchHostView("my");
-    } catch (err) {
-      alert(err.message || "Something went wrong");
-      if (wizSubmitBtn) {
-        wizSubmitBtn.disabled = false;
-        wizSubmitBtn.textContent = isEditMode ? "💾 Save changes" : "🚀 Create tournament";
-      }
-      if (wizSaveNowBtn) {
-        wizSaveNowBtn.disabled = false;
-        wizSaveNowBtn.textContent = "💾 Save now";
-      }
-    }
+  const code = accessCodeInput?.value?.trim() || generateAccessCode();
+  if (accessCodeInput && !accessCodeInput.value.trim()) {
+    accessCodeInput.value = code;
   }
+
+  const categoriesPayload = (wiz.eventConfigs || []).map((cfg, index) => ({
+    categoryId: cfg.categoryId || `CAT-${index + 1}`,
+    eventName: buildEventNameFromConfig(cfg),
+    gender: cfg.gender || "",
+    ageGroup: cfg.ageGroup || "",
+    playingLevel: cfg.playingLevel || "",
+    teamSize: Number(cfg.teamSize || 1),
+    exactTeamSize: cfg.teamSize === "4" ? Number(cfg.exactTeamSize || 0) : null,
+  }));
+
+  const payload = {
+    tournamentName: wiz.name,
+    sportName: wiz.sport,
+    tournamentDates: wiz.dateStart + (wiz.dateEnd ? " to " + wiz.dateEnd : ""),
+    accessCode: code,
+    playerDetails: wiz.details,
+    venue: wiz.venue,
+    categories: categoriesPayload,
+
+    tournamentType: wiz.tournamentType,
+    stageFormat: wiz.stageFormat,
+    groupCount: wiz.stageFormat === "group_knockout" ? Number(wiz.groupCount) : null,
+
+    tournamentRules: {
+      maxMatchesPerPlayer: wiz.tournamentRules.maxMatchesPerPlayer ? Number(wiz.tournamentRules.maxMatchesPerPlayer) : null,
+      bestOfSets: wiz.tournamentRules.bestOfSets ? Number(wiz.tournamentRules.bestOfSets) : null,
+      pointsPerSet: wiz.tournamentRules.pointsPerSet ? Number(wiz.tournamentRules.pointsPerSet) : null,
+      minPlayersPerTeam: wiz.tournamentRules.minPlayersPerTeam ? Number(wiz.tournamentRules.minPlayersPerTeam) : null,
+      maxPlayersPerTeam: wiz.tournamentRules.maxPlayersPerTeam ? Number(wiz.tournamentRules.maxPlayersPerTeam) : null,
+    },
+
+    leaguePoints: shouldShowLeaguePoints() ? {
+      win: wiz.leaguePoints.win !== "" ? Number(wiz.leaguePoints.win) : null,
+      loss: wiz.leaguePoints.loss !== "" ? Number(wiz.leaguePoints.loss) : null,
+      draw: wiz.leaguePoints.draw !== "" ? Number(wiz.leaguePoints.draw) : null,
+    } : null,
+
+    courtCount: wiz.courtCount,
+    courtNames: wiz.courtNames,
+    requirePayment: wiz.requirePayment,
+    entryFee: wiz.requirePayment ? Number(wiz.amount || 0) : 0,
+    isPublic: Boolean(wiz.isPublic),
+  };
+
+  const isEditMode = !!editingTournamentId;
+
+  const res = await fetch(
+    isEditMode ? `/api/host/tournaments/${editingTournamentId}` : "/api/host/tournaments",
+    {
+      method: isEditMode ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + localStorage.getItem("token"),
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(isEditMode ? "Failed to update tournament" : "Failed to save tournament");
+  }
+
+  return await res.json();
+}
+
 
   function parseTournamentDateRange(dateStr = "") {
     if (!dateStr) return { start: null, end: null };
@@ -1221,6 +1217,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+async function shareTournamentCode(t) {
+  const joinLink = `${window.location.origin}/join.html?tournamentId=${encodeURIComponent(t.tournamentId)}`;
+  const text = `${t.tournamentName}\nCode: ${t.accessCode}\nJoin link: ${joinLink}`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: t.tournamentName,
+        text,
+        url: joinLink,
+      });
+      return;
+    } catch {}
+  }
+
+  await navigator.clipboard.writeText(text);
+  alert("Tournament code and join link copied.");
+}
+
+async function toggleRegistrationsForTournament(tournamentId, registrationsOpen) {
+  const res = await fetch(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/registrations-open`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token"),
+    },
+    body: JSON.stringify({ registrationsOpen }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to update registration status");
+  }
+
+  return await res.json();
+}
+
   function switchHostView(view) {
     const modeCards = document.querySelectorAll(".host-mode-card");
     const dashboardView = document.getElementById("dashboard-view");
@@ -1292,6 +1324,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     wiz.courtNames = Array.isArray(t.courtNames) ? [...t.courtNames] : [];
     wiz.requirePayment = !!t.requirePayment;
     wiz.amount = t.entryFee != null ? String(t.entryFee) : "";
+    wiz.isPublic = Boolean(t.isPublic);
 
     const tCats = Array.isArray(t.categories) ? t.categories : [];
 
@@ -1370,9 +1403,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     wiz.courtCount = Number(t.courtCount || 1);
-    wiz.courtNames = Array.isArray(t.courtNames) ? [...t.courtNames] : [];
-    wiz.requirePayment = !!t.requirePayment;
-    wiz.amount = t.entryFee != null ? String(t.entryFee) : "";
+wiz.courtNames = Array.isArray(t.courtNames) ? [...t.courtNames] : [];
+wiz.requirePayment = !!t.requirePayment;
+wiz.amount = t.entryFee != null ? String(t.entryFee) : "";
+wiz.isPublic = Boolean(t.isPublic);
 
     const tCats = Array.isArray(t.categories) ? t.categories : [];
 
@@ -1405,124 +1439,141 @@ document.addEventListener("DOMContentLoaded", async () => {
     showStep(0);
   }
 
-  function renderMyTournaments(tournaments) {
-    const container = document.getElementById("my-tournaments-list");
-    if (!container) return;
+function renderMyTournaments(tournaments) {
+  const container = document.getElementById("my-tournaments-list");
+  if (!container) return;
 
-    container.innerHTML = "";
+  container.innerHTML = "";
 
-    if (!tournaments.length) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="feature-icon">📋</div>
-          <h3>No tournaments found</h3>
-        </div>
-      `;
-      return;
-    }
+  if (!tournaments.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="feature-icon">📋</div>
+        <h3>No tournaments found</h3>
+      </div>
+    `;
+    return;
+  }
 
-    tournaments.forEach((t) => {
-      const tCats = (t.categories || [])
-        .map((c) => {
-          const size = Number(c.teamSize);
+  tournaments.forEach((t) => {
+    const tCats = (t.categories || [])
+      .map((c) => {
+        if (c?.eventName) return c.eventName;
 
-          let type = "";
-          if (size === 1) type = "Singles";
-          else if (size === 2) type = "Doubles";
-          else if (size === 3) type = "Triples";
-          else if (size >= 4) type = c.exactTeamSize ? `${c.exactTeamSize}-a-side` : "Team";
+        const size = Number(c.teamSize);
+        let type = "";
+        if (size === 1) type = "Singles";
+        else if (size === 2) type = "Doubles";
+        else if (size === 3) type = "Triples";
+        else if (size >= 4) type = c.exactTeamSize ? `${c.exactTeamSize}-a-side` : "Team";
 
-          const genderLabel =
-            c.gender === "Male"
-              ? "Men's"
-              : c.gender === "Female"
-                ? "Women's"
-                : c.gender;
+        return [c.ageGroup, c.gender, type].filter(Boolean).join(" • ");
+      })
+      .join(", ");
 
-          return `${c.ageGroup} ${genderLabel}${type ? " " + type : ""}`;
-        })
-        .join(", ");
+    const card = document.createElement("div");
+    card.className = "tournament-card";
 
-      const card = document.createElement("div");
-      card.className = "tournament-card";
+    card.innerHTML = `
+      <div class="tournament-head">
+        <h3>${t.tournamentName}</h3>
+        <button type="button" class="code-chip share-code-btn">${t.accessCode || "No code"}</button>
+      </div>
 
-      card.innerHTML = `
-        <div class="tournament-head">
-          <h3>${t.tournamentName}</h3>
-          <span class="code-chip">${t.accessCode}</span>
-        </div>
+      <p class="muted sport-date">${t.sportName} • ${t.tournamentDates}</p>
+      <p class="muted">📍 ${t.venue || "-"}</p>
 
-        <p class="muted sport-date">${t.sportName} • ${t.tournamentDates}</p>
-        <p class="muted">📍 ${t.venue}</p>
+      ${tCats ? `<p class="muted"><strong>Categories:</strong> ${tCats}</p>` : ""}
 
-        ${tCats ? `<p class="muted"><strong>Categories:</strong> ${tCats}</p>` : ""}
+      ${(() => {
+        const details =
+          typeof t.playerDetails === "string"
+            ? t.playerDetails
+            : Array.isArray(t.playerDetails)
+              ? t.playerDetails.join(", ")
+              : (t.playerDetails ?? "");
 
-        ${(() => {
-          const details =
-            typeof t.playerDetails === "string"
-              ? t.playerDetails
-              : Array.isArray(t.playerDetails)
-                ? t.playerDetails.join(", ")
-                : (t.playerDetails ?? "");
+        const detailsStr = String(details || "").trim();
+        return detailsStr
+          ? `
+            <p class="muted details-label">Details:</p>
+            <p class="muted details-text">${detailsStr}</p>
+          `
+          : "";
+      })()}
 
-          const detailsStr = String(details);
+      <div class="tournament-meta">
+        <span>Status: <strong>${t.registrationsOpen === false ? "Closed" : "Open"}</strong></span>
+        <span>Visibility: <strong>${t.isPublic ? "Public" : "Private"}</strong></span>
+      </div>
 
-          return detailsStr.trim() !== ""
-            ? `
-              <p class="muted details-label">Details:</p>
-              <p class="muted details-text">${detailsStr}</p>
-            `
-            : "";
-        })()}
+      <div class="tournament-meta tournament-actions">
+        <button type="button" class="view-btn" data-id="${t.tournamentId}">View</button>
+        <button type="button" class="edit-btn" data-id="${t.tournamentId}">Edit</button>
+        <button type="button" class="toggle-registration-btn btn-dark" data-id="${t.tournamentId}">
+          ${t.registrationsOpen === false ? "Start" : "Stop"}
+        </button>
+        <button type="button" class="delete-btn" data-id="${t.tournamentId}">Delete</button>
+      </div>
+    `;
 
-        <div class="tournament-meta">
-          <span>Status: <strong>${t.registrationsOpen ? "Open" : "Closed"}</strong></span>
-        </div>
+    card.addEventListener("click", () => {
+      window.location.href = `players.html?tournamentId=${t.tournamentId}`;
+    });
 
-        <div class="tournament-meta tournament-actions">
-          <button type="button" class="view-btn" data-id="${t.tournamentId}">View</button>
-          <button type="button" class="edit-btn" data-id="${t.tournamentId}">Edit</button>
-          <button type="button" class="delete-btn" data-id="${t.tournamentId}">Delete</button>
-        </div>
-      `;
+    card.querySelector(".share-code-btn")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await shareTournamentCode(t);
+      } catch {
+        alert("Could not copy/share tournament details.");
+      }
+    });
 
-      card.addEventListener("click", () => {
-        window.location.href = `players.html?tournamentId=${t.tournamentId}`;
-      });
+    card.querySelector(".view-btn")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openTournamentForView(t);
+    });
 
-      card.querySelector(".view-btn")?.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openTournamentForView(t);
-      });
+    card.querySelector(".edit-btn")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openTournamentForEdit(t);
+    });
 
-      card.querySelector(".edit-btn")?.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openTournamentForEdit(t);
-      });
+    card.querySelector(".toggle-registration-btn")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await toggleRegistrationsForTournament(t.tournamentId, t.registrationsOpen === false);
+        await loadMyTournaments();
+      } catch (err) {
+        alert(err.message || "Could not update registration state.");
+      }
+    });
 
-      card.querySelector(".delete-btn")?.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const ok = confirm("Delete this tournament? This cannot be undone.");
-        if (!ok) return;
+    card.querySelector(".delete-btn")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const ok = confirm("Delete this tournament? This cannot be undone.");
+      if (!ok) return;
 
-        const res = await fetch(`/api/host/tournaments/${t.tournamentId}`, {
+      try {
+        const res = await fetch(`/api/host/tournaments/${encodeURIComponent(t.tournamentId)}`, {
           method: "DELETE",
           headers: {
             Authorization: "Bearer " + localStorage.getItem("token"),
           },
         });
 
-        if (!res.ok) {
-          alert("Failed to delete tournament");
-          return;
-        }
+        if (!res.ok) throw new Error("Failed to delete tournament");
 
         await loadMyTournaments();
-      });
-
-      container.appendChild(card);
+      } catch (err) {
+        alert(err.message || "Could not delete tournament.");
+      }
     });
-  }
+
+    container.appendChild(card);
+  });
+}
 
   async function loadSports() {
     try {
@@ -1762,6 +1813,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("wiz-amount-wrap")?.classList.add("hidden");
   });
 
+  document.getElementById("w-public-yes")?.addEventListener("click", () => {
+  wiz.isPublic = true;
+  document.getElementById("w-public-yes")?.classList.add("active");
+  document.getElementById("w-public-no")?.classList.remove("active");
+});
+
+document.getElementById("w-public-no")?.addEventListener("click", () => {
+  wiz.isPublic = false;
+  document.getElementById("w-public-no")?.classList.add("active");
+  document.getElementById("w-public-yes")?.classList.remove("active");
+});
+
   document.getElementById("w-payment-yes")?.addEventListener("click", () => {
     if (viewOnlyMode) return;
     wiz.requirePayment = true;
@@ -1784,8 +1847,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     showStep(next);
   });
 
-  wizSubmitBtn?.addEventListener("click", submitTournament);
-  wizSaveNowBtn?.addEventListener("click", submitTournament);
+wizSaveNowBtn?.addEventListener("click", async () => {
+  try {
+    wizSaveNowBtn.disabled = true;
+    wizSaveNowBtn.textContent = "Saving...";
+    await saveTournamentFromWizard();
+    showCreatedToast("Tournament saved successfully");
+    await loadMyTournaments();
+  } catch (err) {
+    alert(err.message || "Something went wrong");
+  } finally {
+    if (wizSaveNowBtn) {
+      wizSaveNowBtn.disabled = false;
+      wizSaveNowBtn.textContent = "💾 Save now";
+    }
+  }
+});
+
+wizSubmitBtn?.addEventListener("click", async () => {
+  try {
+    wizSubmitBtn.disabled = true;
+    wizSubmitBtn.textContent = editingTournamentId ? "Saving..." : "Creating...";
+    await saveTournamentFromWizard();
+    showCreatedToast(editingTournamentId ? "Tournament updated successfully" : "Tournament created successfully");
+    resetWizardStateAndUI();
+    showStep(0);
+    await loadMyTournaments();
+    switchHostView("my");
+  } catch (err) {
+    alert(err.message || "Something went wrong");
+  } finally {
+    if (wizSubmitBtn) {
+      wizSubmitBtn.disabled = false;
+      wizSubmitBtn.textContent = editingTournamentId ? "💾 Save changes" : "🚀 Create tournament";
+    }
+  }
+});
 
   wizCancelEditBtn?.addEventListener("click", () => {
     resetWizardStateAndUI();

@@ -136,45 +136,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.target === confirmCaptainsModal) closeConfirmCaptainsModal();
   });
 
-  randomizePoolsBtn?.addEventListener("click", () => {
-    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
+  randomizePoolsBtn?.addEventListener("click", async () => {
+  if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
 
-    const teams = getConfirmedTeams();
-    if (!teams.length) {
-      alert("Please confirm captains first.");
-      return;
-    }
+  const teams = getConfirmedTeams();
+  if (!teams.length) {
+    alert("Please confirm captains first.");
+    return;
+  }
 
-    const groupCount = Number(tournamentMetaCache?.groupCount || 0);
-    if (!groupCount) {
-      alert("Number of pools not found.");
-      return;
-    }
+  const groupCount = Number(tournamentMetaCache?.groupCount || 0);
+  if (!groupCount) {
+    alert("Number of pools not found.");
+    return;
+  }
 
-    captainState.pools = buildRandomPools(teams, groupCount);
-    persistCaptainState();
+  captainState.pools = buildRandomPools(teams, groupCount);
+
+  try {
+    await savePoolsToDb();
     renderPools();
+  } catch (err) {
+    alert(err.message || "Could not save pools.");
+  }
+});
+
+resetPoolsBtn?.addEventListener("click", async () => {
+  if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
+
+  const teams = getConfirmedTeams();
+  if (!teams.length) {
+    alert("Please confirm captains first.");
+    return;
+  }
+
+  captainState.pools = buildEmptyPools();
+
+  teams.forEach((team) => {
+    captainState.pools.unassigned.push(team.teamKey);
   });
 
-  resetPoolsBtn?.addEventListener("click", () => {
-    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
-
-    const teams = getConfirmedTeams();
-    if (!teams.length) {
-      alert("Please confirm captains first.");
-      return;
-    }
-
-    captainState.pools = buildEmptyPools();
-
-    teams.forEach((team) => {
-      captainState.pools.unassigned.push(team.teamKey);
-    });
-
-    persistCaptainState();
+  try {
+    await savePoolsToDb();
     renderPools();
-  });
-
+  } catch (err) {
+    alert(err.message || "Could not save pools.");
+  }
+});
   function normalizeCategories(cats) {
     if (!cats) return [];
     if (Array.isArray(cats)) return cats;
@@ -321,6 +329,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  async function apiPut(url, body) {
+  return apiJson(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
   async function updateRegistrationStatus(player, nextStatus) {
     const playerId = getPlayerId(player);
     const body = JSON.stringify({ status: nextStatus });
@@ -366,7 +382,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   let tournamentCategories = [];
   let tournamentMetaCache = null;
 
-  const captainStorageKey = `scheduleit_captains_${tournamentId}`;
 
   let captainState = {
     selectedCaptainIds: [],
@@ -382,24 +397,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   }
 
-  function loadCaptainState() {
-    try {
-      const raw = localStorage.getItem(captainStorageKey);
-      if (!raw) return getDefaultCaptainState();
-      const parsed = JSON.parse(raw);
-      return {
-        selectedCaptainIds: Array.isArray(parsed?.selectedCaptainIds) ? parsed.selectedCaptainIds : [],
-        confirmedCaptains: Array.isArray(parsed?.confirmedCaptains) ? parsed.confirmedCaptains : [],
-        pools: parsed?.pools && typeof parsed.pools === "object" ? parsed.pools : null,
-      };
-    } catch {
-      return getDefaultCaptainState();
-    }
+async function loadCaptainStateFromDb() {
+  const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`);
+  if (r.ok && r.data) {
+    captainState.selectedCaptainIds = Array.isArray(r.data.selectedCaptainIds) ? r.data.selectedCaptainIds : [];
+    captainState.confirmedCaptains = Array.isArray(r.data.confirmedCaptains) ? r.data.confirmedCaptains : [];
+  } else {
+    captainState = getDefaultCaptainState();
   }
+}
 
-  function persistCaptainState() {
-    localStorage.setItem(captainStorageKey, JSON.stringify(captainState));
+async function saveCaptainStateToDb() {
+  const r = await apiPut(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`, {
+    selectedCaptainIds: captainState.selectedCaptainIds,
+    confirmedCaptains: captainState.confirmedCaptains,
+  });
+
+  if (!r.ok) {
+    throw new Error("Could not save captains");
   }
+}
+
+async function loadPoolsFromDb() {
+  const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/pools`);
+  captainState.pools = r.ok ? (r.data || null) : null;
+}
+
+async function savePoolsToDb() {
+  const r = await apiPut(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/pools`, {
+    pools: captainState.pools,
+  });
+
+  if (!r.ok) {
+    throw new Error("Could not save pools");
+  }
+}
+
 
   function getAcceptedPlayers() {
     return allPlayers.filter((p) => normalizeStatusPlayersPage(p) === "accepted");
@@ -459,29 +492,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  makeCaptainsSaveBtn?.addEventListener("click", () => {
-    const selected = Array.from(
-      makeCaptainsList.querySelectorAll('input[type="checkbox"]:checked')
-    ).map((el) => String(el.value));
+makeCaptainsSaveBtn?.addEventListener("click", async () => {
+  const selected = Array.from(
+    makeCaptainsList.querySelectorAll('input[type="checkbox"]:checked')
+  ).map((el) => String(el.value));
 
-    if (!selected.length) {
-      alert("Please select at least one captain.");
-      return;
-    }
+  if (!selected.length) {
+    alert("Please select at least one captain.");
+    return;
+  }
 
-    captainState.selectedCaptainIds = selected;
+  captainState.selectedCaptainIds = selected;
+  captainState.confirmedCaptains = captainState.confirmedCaptains.filter((item) =>
+    selected.includes(String(item.playerId))
+  );
+  captainState.pools = null;
 
-    captainState.confirmedCaptains = captainState.confirmedCaptains.filter((item) =>
-      selected.includes(String(item.playerId))
-    );
-
-    captainState.pools = null;
-    persistCaptainState();
+  try {
+    await saveCaptainStateToDb();
+    await savePoolsToDb();
     refreshCaptainButtons();
-
     closeMakeCaptainsModal();
     openConfirmCaptainsModal();
-  });
+  } catch (err) {
+    alert(err.message || "Could not save captains.");
+  }
+});
 
   function renderConfirmCaptainsForm() {
     confirmCaptainsList.innerHTML = "";
@@ -547,10 +583,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
         captainState.pools = null;
-        persistCaptainState();
-        refreshCaptainButtons();
-        renderConfirmCaptainsForm();
-        renderCaptainsSummary();
+        (async () => {
+  try {
+    await saveCaptainStateToDb();
+    await savePoolsToDb();
+    refreshCaptainButtons();
+    renderConfirmCaptainsForm();
+    renderCaptainsSummary();
+  } catch (err) {
+    alert(err.message || "Could not save captain removal.");
+  }
+})();
 
         if (!captainState.selectedCaptainIds.length) {
           closeConfirmCaptainsModal();
@@ -559,37 +602,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  confirmCaptainsForm?.addEventListener("submit", (e) => {
-    e.preventDefault();
+confirmCaptainsForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    if (!captainState.selectedCaptainIds.length) {
-      alert("Please select at least one captain.");
-      return;
-    }
+  if (!captainState.selectedCaptainIds.length) {
+    alert("Please select at least one captain.");
+    return;
+  }
 
-    const confirmed = captainState.selectedCaptainIds
-      .map((playerId) => {
-        const player = findPlayerById(playerId);
-        if (!player) return null;
+  const confirmed = captainState.selectedCaptainIds
+    .map((playerId) => {
+      const player = findPlayerById(playerId);
+      if (!player) return null;
 
-        const input = confirmCaptainsList.querySelector(
-          `.confirm-team-name-input[data-player-id="${CSS.escape(String(playerId))}"]`
-        );
+      const input = confirmCaptainsList.querySelector(
+        `.confirm-team-name-input[data-player-id="${CSS.escape(String(playerId))}"]`
+      );
 
-        const teamName = input?.value?.trim() || "";
+      const teamName = input?.value?.trim() || "";
 
-        return {
-          playerId: String(playerId),
-          playerName: getPlayerDisplayName(player),
-          categoryId: getPlayerCategoryId(player),
-          teamName,
-        };
-      })
-      .filter(Boolean);
+      return {
+        playerId: String(playerId),
+        playerName: getPlayerDisplayName(player),
+        categoryId: getPlayerCategoryId(player),
+        teamName,
+      };
+    })
+    .filter(Boolean);
 
-    captainState.confirmedCaptains = confirmed;
-    captainState.pools = null;
-    persistCaptainState();
+  captainState.confirmedCaptains = confirmed;
+  captainState.pools = null;
+
+  try {
+    await saveCaptainStateToDb();
+    await savePoolsToDb();
     refreshCaptainButtons();
     renderCaptainsSummary();
     closeConfirmCaptainsModal();
@@ -600,7 +646,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     ) {
       createPoolsBtn?.classList.remove("hidden");
     }
-  });
+  } catch (err) {
+    alert(err.message || "Could not save confirmed captains.");
+  }
+});
 
   function renderCaptainsSummary() {
     captainsSummaryList.innerHTML = "";
@@ -711,8 +760,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         captainState.pools.unassigned.push(team.teamKey);
       }
     });
-
-    persistCaptainState();
   }
 
   function openPoolsSection() {
@@ -811,29 +858,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  function moveTeamToZone(teamKey, zoneName) {
-    if (!captainState.pools) return;
+ async function moveTeamToZone(teamKey, zoneName) {
+  if (!captainState.pools) return;
 
-    captainState.pools.unassigned = (captainState.pools.unassigned || []).filter(
+  captainState.pools.unassigned = (captainState.pools.unassigned || []).filter(
+    (key) => key !== teamKey
+  );
+
+  Object.keys(captainState.pools.groups).forEach((poolName) => {
+    captainState.pools.groups[poolName] = captainState.pools.groups[poolName].filter(
       (key) => key !== teamKey
     );
+  });
 
-    Object.keys(captainState.pools.groups).forEach((poolName) => {
-      captainState.pools.groups[poolName] = captainState.pools.groups[poolName].filter(
-        (key) => key !== teamKey
-      );
-    });
-
-    if (zoneName === "unassigned") {
-      captainState.pools.unassigned.push(teamKey);
-    } else {
-      captainState.pools.groups[zoneName] = captainState.pools.groups[zoneName] || [];
-      captainState.pools.groups[zoneName].push(teamKey);
-    }
-
-    persistCaptainState();
-    renderPools();
+  if (zoneName === "unassigned") {
+    captainState.pools.unassigned.push(teamKey);
+  } else {
+    captainState.pools.groups[zoneName] = captainState.pools.groups[zoneName] || [];
+    captainState.pools.groups[zoneName].push(teamKey);
   }
+
+  try {
+    await savePoolsToDb();
+    renderPools();
+  } catch (err) {
+    alert(err.message || "Could not save pool movement.");
+  }
+}
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -960,16 +1011,18 @@ document.addEventListener("DOMContentLoaded", async () => {
             p.registrationStatus = nextStatus;
 
             if (nextStatus !== "accepted") {
-              const playerId = String(getPlayerId(p));
-              captainState.selectedCaptainIds = captainState.selectedCaptainIds.filter(
-                (id) => String(id) !== playerId
-              );
-              captainState.confirmedCaptains = captainState.confirmedCaptains.filter(
-                (item) => String(item.playerId) !== playerId
-              );
-              captainState.pools = null;
-              persistCaptainState();
-            }
+  const playerId = String(getPlayerId(p));
+  captainState.selectedCaptainIds = captainState.selectedCaptainIds.filter(
+    (id) => String(id) !== playerId
+  );
+  captainState.confirmedCaptains = captainState.confirmedCaptains.filter(
+    (item) => String(item.playerId) !== playerId
+  );
+  captainState.pools = null;
+
+  await saveCaptainStateToDb();
+  await savePoolsToDb();
+}
 
             renderPlayers();
             renderCaptainsSummary();
@@ -1030,50 +1083,41 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   addPlayerForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const name = document.getElementById("host-player-name")?.value?.trim();
-    const age = Number(document.getElementById("host-player-age")?.value);
-    const gender = document.getElementById("host-player-gender")?.value;
-    const phone = document.getElementById("host-player-phone")?.value?.trim();
-    const categoryId = document.getElementById("host-player-category")?.value;
+  const payload = {
+    playerName: document.getElementById("host-player-name")?.value?.trim(),
+    age: document.getElementById("host-player-age")?.value,
+    gender: document.getElementById("host-player-gender")?.value,
+    phone: document.getElementById("host-player-phone")?.value?.trim(),
+    categoryId: document.getElementById("host-player-category")?.value,
+  };
 
-    if (!name || !age || !gender || !phone || !categoryId) {
-      alert("Please fill all player details.");
-      return;
+  if (!payload.playerName || !payload.age || !payload.gender || !payload.phone || !payload.categoryId) {
+    alert("Please fill all player details.");
+    return;
+  }
+
+  const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/players`, payload);
+
+  if (!r.ok) {
+    alert(r.data?.message || "Could not add player.");
+    return;
+  }
+
+  await loadPlayers();
+  setActivePlayerTab(payload.categoryId);
+  renderPlayers();
+  closeAddPlayerModal();
+
+  if (fixturesUi.isOpen && !fixturesState.fixtures?.__locked) {
+    fixturesState.players = allPlayers;
+    rebuildAcceptedByCategory();
+    if (fixturesState.activeCategoryId) {
+      renderCategoryBracket(fixturesState.activeCategoryId);
     }
-
-    const newPlayer = {
-      playerId: "manual-" + Date.now(),
-      registrationId: "manual-" + Date.now(),
-      playerName: name,
-      name,
-      age,
-      gender,
-      phone,
-      playerPhone: phone,
-      categoryId,
-      category: categoryId,
-      status: "accepted",
-      registrationStatus: "accepted",
-      addedByHost: true
-    };
-
-    allPlayers.push(newPlayer);
-
-    setActivePlayerTab(categoryId);
-    renderPlayers();
-    closeAddPlayerModal();
-
-    if (fixturesUi.isOpen && !fixturesState.fixtures?.__locked) {
-      fixturesState.players = allPlayers;
-      rebuildAcceptedByCategory();
-
-      if (fixturesState.activeCategoryId) {
-        renderCategoryBracket(fixturesState.activeCategoryId);
-      }
-    }
-  });
+  }
+});
 
   async function loadPlayers() {
     const primary = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/players`);
@@ -1907,12 +1951,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     await openAndLoadFixtures(true);
   });
 
-  captainState = loadCaptainState();
-
-  await loadTournamentMeta();
-  wireTabs();
-  await loadPlayers();
-  renderCaptainsSummary();
-  refreshCaptainButtons();
-  refreshStageSpecificUi();
+await loadTournamentMeta();
+await loadCaptainStateFromDb();
+await loadPoolsFromDb();
+wireTabs();
+await loadPlayers();
+renderCaptainsSummary();
+refreshCaptainButtons();
+refreshStageSpecificUi();
 });

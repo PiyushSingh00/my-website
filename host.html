@@ -295,10 +295,24 @@
                   <input type="text" id="w-venue" placeholder="e.g. Andheri Sports Complex, Mumbai" />
                 </div>
                 <div class="field-group">
-                  <label for="w-details">Other details <span class="wiz-optional">(optional)</span></label>
-                  <textarea id="w-details" rows="3" placeholder="Share any special rules, timings, or notes for players."></textarea>
+                <label for="w-details">Other details <span class="wiz-optional">(optional)</span></label>
+                <textarea id="w-details" rows="3" placeholder="Share any special rules, timings, or notes for players."></textarea>
+              </div>
+
+              <div class="field-group">
+                <label>Visibility</label>
+                <div class="pill-toggle-row">
+                  <button type="button" class="btn-dark active" id="w-public-yes">Public</button>
+                  <button type="button" class="btn-dark" id="w-public-no">Private</button>
+                </div>
+                <p class="helper-text">
+                  Public tournaments can appear in Join mode. Private tournaments can be shared using direct link and code.
+                </p>
+              </div>
                 </div>
               </div>
+
+
 
               <!-- Step 2: Format -->
             <div class="wiz-step" data-step="1">
