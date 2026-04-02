@@ -66,7 +66,7 @@
             Make captains
           </button>
 
-                    <button class="btn-dark hidden" type="button" id="create-pools-btn">
+          <button class="btn-dark hidden" type="button" id="create-pools-btn">
             Create Pools
           </button>
 
@@ -116,6 +116,34 @@
           <div id="captains-summary-list" class="captains-summary-list"></div>
         </section>
 
+        <!-- TEAM NUMBER ASSIGNMENT -->
+        <section id="team-number-section" class="captains-summary-section hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Advanced setup</p>
+              <h2 class="section-title">Team number assignment</h2>
+            </div>
+
+            <div class="pool-actions">
+              <button type="button" class="btn-dark" id="randomize-team-numbers-btn">
+                Randomize team numbers
+              </button>
+              <button type="button" class="btn-dark" id="save-team-numbers-btn">
+                Save team numbers
+              </button>
+              <button type="button" class="btn-primary" id="lock-team-numbers-btn">
+                Lock mapping
+              </button>
+            </div>
+          </div>
+
+          <p class="helper-text">
+            Assign Team 1, Team 2, and so on for fixed-number league scheduling.
+          </p>
+
+          <div id="team-number-list" class="captains-summary-list"></div>
+        </section>
+
         <!-- POOLS -->
         <section id="pools-section" class="pools-section hidden">
           <div class="section-head">
@@ -146,63 +174,64 @@
           <div id="pools-grid" class="pools-grid"></div>
         </section>
 
-
-        <section id="team-numbering-section" class="captains-summary-section hidden">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">Advanced format</p>
-              <h2 class="section-title">Team number assignment</h2>
-              <p class="muted">Assign fixed team numbers for league matrix scheduling.</p>
-            </div>
-            <div class="pool-actions">
-              <button type="button" class="btn-dark" id="randomize-team-numbers-btn">Randomize numbers</button>
-              <button type="button" class="btn-primary" id="lock-team-numbers-btn">Lock mapping</button>
-            </div>
-          </div>
-          <div id="team-numbering-empty" class="empty-state compact-empty">
-            <div class="feature-icon">#️⃣</div>
-            <h3>No confirmed teams yet</h3>
-            <p class="muted">Confirm captains first to assign team numbers.</p>
-          </div>
-          <div id="team-numbering-list" class="captains-summary-list"></div>
-        </section>
-
+        <!-- LINEUP REVIEW -->
         <section id="lineup-review-section" class="captains-summary-section hidden">
           <div class="section-head">
             <div>
               <p class="eyebrow">Tie workflow</p>
-              <h2 class="section-title">Lineup submissions</h2>
-              <p class="muted">Review and lock captain lineup slips before a tie starts.</p>
+              <h2 class="section-title">Lineup review</h2>
             </div>
           </div>
-          <div id="lineup-review-list" class="captains-summary-list"></div>
+
+          <div id="lineup-review-list" class="captains-summary-list">
+            <div class="empty-state compact-empty">
+              <div class="feature-icon">📝</div>
+              <h3>No lineup submissions yet</h3>
+              <p class="muted">Captain lineup slips will appear here once submitted.</p>
+            </div>
+          </div>
         </section>
 
+        <!-- LEADERBOARD -->
         <section id="leaderboard-section" class="captains-summary-section hidden">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Standings</p>
+              <p class="eyebrow">League stage</p>
               <h2 class="section-title">Leaderboard</h2>
-              <p class="muted">League table for advanced team formats.</p>
             </div>
           </div>
-          <div class="players-table-wrapper" style="display:block;max-height:none;">
+
+          <div class="players-table-wrapper">
             <table class="players-table">
               <thead>
                 <tr>
-                  <th>Rank</th><th>Team</th><th>Match points</th><th>Ties won</th><th>Played</th><th>Status</th>
+                  <th>Rank</th>
+                  <th>Team</th>
+                  <th>Match points</th>
+                  <th>Ties won</th>
+                  <th>Head-to-head</th>
+                  <th>Qualified</th>
                 </tr>
               </thead>
-              <tbody id="leaderboard-table-body"></tbody>
+              <tbody id="leaderboard-table-body">
+                <tr>
+                  <td colspan="6" class="muted">No leaderboard data yet.</td>
+                </tr>
+              </tbody>
             </table>
           </div>
         </section>
 
-
         <!-- EMBEDDED FIXTURES -->
         <section id="fixtures-embed" class="fixtures-embed hidden">
           <header class="fixtures-header">
-            <p class="eyebrow">Knockout fixtures</p>
+            <p class="eyebrow">Tournament fixtures</p>
+            <h2 id="fixtures-tournament-name">Tournament name</h2>
+            <p class="helper-text players-meta">
+              <span id="fixtures-tournament-sport"></span>
+              <span id="fixtures-tournament-dates"></span>
+              <span>Code: <span id="fixtures-tournament-code"></span></span>
+            </p>
           </header>
 
           <div class="fixtures-toolbar">
@@ -222,8 +251,7 @@
           <div id="fixtures-toast" class="fixtures-toast" style="display:none;">✓ Done</div>
 
           <p class="helper-text">
-            Fixtures are auto-generated in random order for each category. BYE indicates a free pass
-            to the next round.
+            Fixtures are auto-generated in random order for each category. BYE indicates a free pass to the next round.
           </p>
 
           <div class="fixtures-toggle" id="fixtures-toggle"></div>
@@ -232,7 +260,7 @@
             <div class="feature-icon">🎯</div>
             <h3>Choose which fixtures to view</h3>
             <p class="muted">
-              Select a <strong>Category</strong> above to see the knockout bracket.
+              Select a <strong>Category</strong> above to see the tournament bracket.
             </p>
           </div>
 
@@ -329,16 +357,16 @@
 
         <div id="confirm-captains-empty" class="empty-state compact-empty hidden">
           <div class="feature-icon">🧢</div>
-          <h3>No captains selected</h3>
-          <p class="muted">Use “Make captains” first.</p>
+          <h3>No captains selected yet</h3>
+          <p class="muted">Choose captains first, then return here to confirm them.</p>
         </div>
 
         <form id="confirm-captains-form">
-          <div id="confirm-captains-list" class="confirm-captains-list"></div>
+          <div id="confirm-captains-list" class="captains-summary-list"></div>
 
           <div class="modal-footer">
             <button type="button" class="btn-dark" id="confirm-captains-cancel-btn">Cancel</button>
-            <button type="submit" class="btn-primary">Submit captains</button>
+            <button type="submit" class="btn-primary">Confirm captains</button>
           </div>
         </form>
       </div>
