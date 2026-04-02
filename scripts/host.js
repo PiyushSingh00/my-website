@@ -1218,22 +1218,61 @@ async function saveTournamentFromWizard() {
   }
 
 async function shareTournamentCode(t) {
-  const joinLink = `${window.location.origin}/join.html?tournamentId=${encodeURIComponent(t.tournamentId)}`;
-  const text = `${t.tournamentName}\nCode: ${t.accessCode}\nJoin link: ${joinLink}`;
+  const joinLink = `${window.location.origin}/join.html?tournamentId=${encodeURIComponent(tournament.tournamentId)}`;
+  const shareText = `${tournament.tournamentName}\nCode: ${tournament.accessCode}\nJoin link: ${joinLink}`;
 
+  // 1) Native share first
   if (navigator.share) {
     try {
       await navigator.share({
-        title: t.tournamentName,
-        text,
+        title: tournament.tournamentName,
+        text: shareText,
         url: joinLink,
       });
       return;
-    } catch {}
+    } catch (err) {
+      // user cancel or unsupported behavior -> fall through to copy
+      console.warn("navigator.share failed:", err);
+    }
   }
 
-  await navigator.clipboard.writeText(text);
-  alert("Tournament code and join link copied.");
+  // 2) Clipboard API next
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      alert("Tournament code and join link copied.");
+      return;
+    } catch (err) {
+      console.warn("navigator.clipboard.writeText failed:", err);
+    }
+  }
+
+  // 3) Final fallback for non-HTTPS / older browsers
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = shareText;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+
+    const success = document.execCommand("copy");
+    document.body.removeChild(textarea);
+
+    if (!success) {
+      throw new Error("execCommand copy failed");
+    }
+
+    alert("Tournament code and join link copied.");
+  } catch (err) {
+    console.error("Fallback copy failed:", err);
+    prompt("Copy tournament details manually:", shareText);
+  }
 }
 
 async function toggleRegistrationsForTournament(tournamentId, registrationsOpen) {
