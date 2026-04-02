@@ -414,25 +414,32 @@ function buildEventNameFromConfig(cfg = {}) {
     }
 
     if (n === 2) {
-      const missingExactTeamSize = wiz.eventConfigs.some(
-        (cfg) => cfg.teamSize === "4" && !String(cfg.exactTeamSize || "").trim()
-      );
+  const missingExactTeamSize = wiz.eventConfigs.some(
+    (cfg) => cfg.teamSize === "4" && !String(cfg.exactTeamSize || "").trim()
+  );
 
-      if (missingExactTeamSize) {
-        alert('Please enter the exact team size for every event where format is "Team (4+)".');
-        return false;
-      }
+  if (missingExactTeamSize) {
+    alert('Please enter the exact team size for every event where format is "Team (4+)".');
+    return false;
+  }
 
-      if (wiz.tournamentType === "team") {
-        const minVal = Number(wiz.tournamentRules.minPlayersPerTeam || 0);
-        const maxVal = Number(wiz.tournamentRules.maxPlayersPerTeam || 0);
+  if (wiz.tournamentType === "team") {
+    const minInput = document.getElementById("w-min-players-per-team");
+    const maxInput = document.getElementById("w-max-players-per-team");
 
-        if (!minVal || !maxVal || minVal > maxVal) {
-          alert("Please enter valid minimum and maximum players per team.");
-          return false;
-        }
-      }
+    const minVal = Number(minInput?.value || 0);
+    const maxVal = Number(maxInput?.value || 0);
+
+    if (!minVal || !maxVal || minVal > maxVal) {
+      alert("Please enter valid minimum and maximum players per team.");
+      return false;
     }
+
+    // keep wizard state synced immediately
+    wiz.tournamentRules.minPlayersPerTeam = String(minVal);
+    wiz.tournamentRules.maxPlayersPerTeam = String(maxVal);
+  }
+}
 
     if (n === 4) {
       if (wiz.requirePayment && !document.getElementById("w-amount")?.value) {
@@ -1219,20 +1226,25 @@ async function saveTournamentFromWizard() {
   }
 
 async function shareTournamentCode(t) {
-  const joinLink = `${window.location.origin}/join.html?tournamentId=${encodeURIComponent(tournament.tournamentId)}`;
-  const shareText = `${tournament.tournamentName}\nCode: ${tournament.accessCode}\nJoin link: ${joinLink}`;
+  if (!t) {
+    alert("Tournament details not found.");
+    return;
+  }
+
+  const tournamentId = t.tournamentId ?? t.id;
+  const joinLink = `${window.location.origin}/join.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+  const shareText = `${t.tournamentName}\nCode: ${t.accessCode}\nJoin link: ${joinLink}`;
 
   // 1) Native share first
   if (navigator.share) {
     try {
       await navigator.share({
-        title: tournament.tournamentName,
+        title: t.tournamentName,
         text: shareText,
         url: joinLink,
       });
       return;
     } catch (err) {
-      // user cancel or unsupported behavior -> fall through to copy
       console.warn("navigator.share failed:", err);
     }
   }
@@ -1248,7 +1260,7 @@ async function shareTournamentCode(t) {
     }
   }
 
-  // 3) Final fallback for non-HTTPS / older browsers
+  // 3) Final fallback
   try {
     const textarea = document.createElement("textarea");
     textarea.value = shareText;
@@ -1517,13 +1529,15 @@ function renderMyTournaments(tournaments) {
     card.innerHTML = `
       <div class="tournament-head">
         <h3>${t.tournamentName}</h3>
-        <button type="button" class="code-chip share-code-btn">${t.accessCode || "No code"}</button>
-      </div>
+        <span class="code-chip">${t.accessCode || "No code"}</span>
+        </div>
 
       <p class="muted sport-date">${t.sportName} • ${t.tournamentDates}</p>
       <p class="muted">📍 ${t.venue || "-"}</p>
+      
 
       ${tCats ? `<p class="muted"><strong>Categories:</strong> ${tCats}</p>` : ""}
+
 
       ${(() => {
         const details =
@@ -1556,6 +1570,11 @@ function renderMyTournaments(tournaments) {
         <button type="button" class="delete-btn" data-id="${t.tournamentId}">Delete</button>
       </div>
     `;
+
+    card.querySelector(".code-chip")?.addEventListener("click", async (e) => {
+  e.stopPropagation();
+  await shareTournamentCode(t);
+});
 
     card.addEventListener("click", () => {
       window.location.href = `players.html?tournamentId=${t.tournamentId}`;
