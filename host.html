@@ -5,7 +5,6 @@
     <title>ScheduleIt – Host a tournament</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Fonts to match the rest of the app -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -17,675 +16,645 @@
   </head>
   <body>
     <div class="app-shell">
-      <!-- Top bar -->
-    <header class="topbar">
+      <header class="topbar">
         <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
         <div class="topbar-right">
-            <div class="user-menu">
-            <button type="button" class="user-avatar-btn" id="host-user-menu-trigger" aria-label="User menu">
-                U
+          <div class="user-menu">
+            <button
+              type="button"
+              class="user-avatar-btn"
+              id="host-user-menu-trigger"
+              aria-label="User menu"
+            >
+              U
             </button>
 
             <div class="user-menu-dropdown" id="host-user-menu-dropdown">
-                <button type="button" class="dropdown-item" id="dropdown-signout">
-                    Sign out
-                </button>
-            </div>
-            </div>
-
-            <div class="mode-toggle" role="group" aria-label="Mode toggle">
-                <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
-                <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
-            </div>
-
-        </div>
-    </header>
-
-
-      <!-- Main content -->
-    <main class="main">
-      <div class="host-shell">
-        <aside class="host-sidebar" id="host-sidebar">
-          <div class="host-sidebar-head">
-            <h2>Host panel</h2>
-            <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle-btn">☰</button>
-          </div>
-
-          <section class="host-mode-toggle host-mode-toggle--sidebar">
-            <button
-              class="host-mode-card active"
-              type="button"
-              data-host-mode="dashboard"
-            >
-              <h2>Dashboard</h2>
-              <p>See upcoming tournaments, calendar and quick stats.</p>
-            </button>
-
-            <button
-              class="host-mode-card"
-              type="button"
-              data-host-mode="my"
-            >
-              <h2>My tournaments</h2>
-              <p>See and manage all tournaments you have hosted.</p>
-            </button>
-
-            <button
-              class="host-mode-card"
-              type="button"
-              data-host-mode="new"
-            >
-              <h2>Host new tournament</h2>
-              <p>Create a new tournament and share the access code.</p>
-            </button>
-          </section>
-        </aside>
-
-        <div class="host-content">
-
-    <section
-      id="dashboard-view"
-      class="host-view host-view--active"
-      aria-label="Dashboard"
-    >
-      <div class="dashboard-stack">
-        <div class="dashboard-card">
-          <div class="dashboard-head">
-            <div>
-              <p class="eyebrow">Overview</p>
-              <h2 class="dashboard-title">Upcoming tournaments</h2>
+              <button type="button" class="dropdown-item" id="dropdown-signout">
+                Sign out
+              </button>
             </div>
           </div>
 
-          <div id="dashboard-upcoming-row" class="upcoming-scroll">
-            <div class="dashboard-empty-card">No upcoming tournaments yet.</div>
+          <div class="mode-toggle" role="group" aria-label="Mode toggle">
+            <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
+            <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
           </div>
         </div>
+      </header>
 
-        <div class="dashboard-card">
-          <div class="dashboard-head">
-            <div>
-              <p class="eyebrow">Calendar</p>
-              <h2 class="dashboard-title">Tournament calendar</h2>
-            </div>
-          </div>
-
-          <div class="calendar-toolbar">
-            <button type="button" class="calendar-nav-btn" id="calendar-prev-btn">←</button>
-            <div id="calendar-month-label" class="calendar-month-label">Month Year</div>
-            <button type="button" class="calendar-nav-btn" id="calendar-next-btn">→</button>
-          </div>
-
-          <div class="calendar-grid calendar-weekdays">
-            <div>Sun</div>
-            <div>Mon</div>
-            <div>Tue</div>
-            <div>Wed</div>
-            <div>Thu</div>
-            <div>Fri</div>
-            <div>Sat</div>
-          </div>
-
-          <div id="dashboard-calendar-grid" class="calendar-grid calendar-days"></div>
-        </div>
-
-      <div class="dashboard-bottom-grid">
-        <div class="dashboard-stats-row">
-          <div class="stat-card">
-            <p class="stat-label">Total tournaments</p>
-            <h3 id="stat-total-tournaments">0</h3>
-          </div>
-
-          <div class="stat-card">
-            <p class="stat-label">Total players</p>
-            <h3 id="stat-total-players">0</h3>
-          </div>
-
-          <div class="stat-card">
-            <p class="stat-label">Active events</p>
-            <h3 id="stat-active-events">0</h3>
-          </div>
-        </div>
-
-        <div class="dashboard-card sport-chart-card">
-          <div class="dashboard-head">
-            <div>
-              <p class="eyebrow">Insights</p>
-              <h2 class="dashboard-title">Sport distribution</h2>
-            </div>
-          </div>
-
-          <div class="sport-chart-wrap">
-            <canvas id="sports-pie-chart" width="260" height="260"></canvas>
-            <div id="sports-chart-legend" class="sports-chart-legend"></div>
-          </div>
-        </div>
-      </div>
-      </div>
-    </section>
-    
-    <!-- My tournaments view -->
-    <section
-        id="my-tournaments-view"
-        class="host-view"
-        aria-label="My tournaments"
-    >
-
-        <!-- Sport filter -->
-<div class="filter-toolbar">
-  <div class="field-group filter-group-inline">
-    <label for="filter-sport">Filter by sport</label>
-    <select id="filter-sport">
-      <option value="">All sports</option>
-    </select>
-  </div>
-
-  <div class="field-group filter-group-inline">
-    <label for="sort-tournaments">Sort by</label>
-    <select id="sort-tournaments">
-      <option value="newest">Newest first</option>
-      <option value="oldest">Oldest first</option>
-      <option value="active">Active first</option>
-      <option value="inactive">Inactive first</option>
-      <option value="upcoming">Upcoming first</option>
-      <option value="name_asc">Name A to Z</option>
-      <option value="name_desc">Name Z to A</option>
-    </select>
-  </div>
-</div>
-        <div id="my-tournaments-list" class="tournaments-list">
-            <!-- initial placeholder; JS will replace when needed -->
-            <div class="empty-state">
-            <div class="feature-icon">📋</div>
-            <h3>No tournaments yet</h3>
-            <p class="muted">
-                Once you host tournaments, you’ll see them listed here.
-            </p>
-            </div>
-        </div>
-
-        <!-- NEW: details placeholder shown when a card is clicked -->
-        <div id="tournament-detail" class="tournament-detail hidden">
-            <div class="tournament-detail-card">
-            <h2 id="detail-tournament-name">Tournament name</h2>
-
-            <p class="detail-line">
-                <span class="detail-label">Code:</span>
-                <span id="detail-tournament-code"></span>
-            </p>
-
-            <p class="detail-line">
-                <span class="detail-label">Total registrations:</span>
-                <span id="detail-total-registrations">0</span>
-            </p>
-
-            <button
+      <main class="main">
+        <div class="host-shell">
+          <aside class="host-sidebar" id="host-sidebar">
+            <div class="host-sidebar-head">
+              <h2>Host panel</h2>
+              <button
                 type="button"
-                class="btn-secondary danger-btn"
-                id="stop-registrations-btn"
+                class="sidebar-toggle-btn"
+                id="sidebar-toggle-btn"
+                aria-label="Toggle sidebar"
+              >
+                ☰
+              </button>
+            </div>
+
+            <section class="host-mode-toggle host-mode-toggle--sidebar">
+              <button class="host-mode-card active" type="button" data-host-mode="dashboard">
+                <h2>Dashboard</h2>
+                <p>See upcoming tournaments, calendar and quick stats.</p>
+              </button>
+
+              <button class="host-mode-card" type="button" data-host-mode="my">
+                <h2>My tournaments</h2>
+                <p>See and manage all tournaments you have hosted.</p>
+              </button>
+
+              <button class="host-mode-card" type="button" data-host-mode="new">
+                <h2>Host new tournament</h2>
+                <p>Create a new tournament and share the access code.</p>
+              </button>
+            </section>
+          </aside>
+
+          <div class="host-content">
+            <!-- DASHBOARD VIEW -->
+            <section
+              id="dashboard-view"
+              class="host-view host-view--active"
+              aria-label="Dashboard"
             >
-                Stop registrations
-            </button>
-            </div>
-        </div>
-    </section>
+              <div class="dashboard-stack">
+                <div class="dashboard-card">
+                  <div class="dashboard-head">
+                    <div>
+                      <p class="eyebrow">Overview</p>
+                      <h2 class="dashboard-title">Upcoming tournaments</h2>
+                    </div>
+                  </div>
 
-
-        <!-- Host new tournament view — multi-step wizard -->
-        <section id="new-tournament-view" class="host-view" aria-label="Host new tournament">
-          <section class="host-card wizard-card">
-
-            <!-- Step progress bar -->
-            <div class="wiz-progress" id="wiz-progress">
-              <div class="wiz-step-dot active" data-step="0"><span class="wiz-dot-num">1</span><span class="wiz-dot-label">Basics</span></div>
-              <div class="wiz-progress-line"></div>
-              <div class="wiz-step-dot" data-step="1"><span class="wiz-dot-num">2</span><span class="wiz-dot-label">Format</span></div>
-              <div class="wiz-progress-line"></div>
-              <div class="wiz-step-dot" data-step="2"><span class="wiz-dot-num">3</span><span class="wiz-dot-label">Events</span></div>
-              <div class="wiz-progress-line"></div>
-              <div class="wiz-step-dot" data-step="3"><span class="wiz-dot-num">4</span><span class="wiz-dot-label">Courts</span></div>
-              <div class="wiz-progress-line"></div>
-              <div class="wiz-step-dot" data-step="4"><span class="wiz-dot-num">5</span><span class="wiz-dot-label">Payment</span></div>
-              <div class="wiz-progress-line"></div>
-              <div class="wiz-step-dot" data-step="5"><span class="wiz-dot-num">6</span><span class="wiz-dot-label">Review</span></div>
-            </div>
-
-            <div id="wiz-steps">
-
-              <!-- Step 1: Basics -->
-              <div class="wiz-step active" data-step="0">
-                <p class="eyebrow">Step 1 of 6</p>
-                <h2 class="wiz-step-title">Tournament basics</h2>
-                <div class="field-group">
-                  <label for="w-name">Tournament name <span class="req">*</span></label>
-                  <input type="text" id="w-name" placeholder="e.g. Winter Open 2025" />
+                  <div id="dashboard-upcoming-row" class="upcoming-scroll">
+                    <div class="dashboard-empty-card">No upcoming tournaments yet.</div>
+                  </div>
                 </div>
-                <div class="field-group">
-                  <label for="w-sport">Sport <span class="req">*</span></label>
-                  <select id="w-sport">
-                    <option value="">Select sport</option>
-                    <option value="Football">Football</option>
-                    <option value="Cricket">Cricket</option>
-                    <option value="Badminton">Badminton</option>
-                    <option value="Tennis">Tennis</option>
-                    <option value="Basketball">Basketball</option>
-                    <option value="Pickleball">Pickleball</option>
+
+                <div class="dashboard-card">
+                  <div class="dashboard-head">
+                    <div>
+                      <p class="eyebrow">Calendar</p>
+                      <h2 class="dashboard-title">Tournament calendar</h2>
+                    </div>
+                  </div>
+
+                  <div class="calendar-toolbar">
+                    <button type="button" class="calendar-nav-btn" id="calendar-prev-btn">←</button>
+                    <div id="calendar-month-label" class="calendar-month-label">Month Year</div>
+                    <button type="button" class="calendar-nav-btn" id="calendar-next-btn">→</button>
+                  </div>
+
+                  <div class="calendar-grid calendar-weekdays">
+                    <div>Sun</div>
+                    <div>Mon</div>
+                    <div>Tue</div>
+                    <div>Wed</div>
+                    <div>Thu</div>
+                    <div>Fri</div>
+                    <div>Sat</div>
+                  </div>
+
+                  <div id="dashboard-calendar-grid" class="calendar-grid calendar-days"></div>
+                </div>
+
+                <div class="dashboard-bottom-grid">
+                  <div class="dashboard-stats-row">
+                    <div class="stat-card">
+                      <p class="stat-label">Total tournaments</p>
+                      <h3 id="stat-total-tournaments">0</h3>
+                    </div>
+
+                    <div class="stat-card">
+                      <p class="stat-label">Total players</p>
+                      <h3 id="stat-total-players">0</h3>
+                    </div>
+
+                    <div class="stat-card">
+                      <p class="stat-label">Active events</p>
+                      <h3 id="stat-active-events">0</h3>
+                    </div>
+                  </div>
+
+                  <div class="dashboard-card sport-chart-card">
+                    <div class="dashboard-head">
+                      <div>
+                        <p class="eyebrow">Insights</p>
+                        <h2 class="dashboard-title">Sport distribution</h2>
+                      </div>
+                    </div>
+
+                    <div class="sport-chart-wrap">
+                      <canvas id="sports-pie-chart" width="260" height="260"></canvas>
+                      <div id="sports-chart-legend" class="sports-chart-legend"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- MY TOURNAMENTS VIEW -->
+            <section id="my-tournaments-view" class="host-view" aria-label="My tournaments">
+              <div class="filter-toolbar">
+                <div class="field-group filter-group-inline">
+                  <label for="filter-sport">Filter by sport</label>
+                  <select id="filter-sport">
+                    <option value="">All sports</option>
                   </select>
                 </div>
-                <div class="wiz-date-row">
+
+                <div class="field-group filter-group-inline">
+                  <label for="sort-tournaments">Sort by</label>
+                  <select id="sort-tournaments">
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                    <option value="active">Active first</option>
+                    <option value="inactive">Inactive first</option>
+                    <option value="upcoming">Upcoming first</option>
+                    <option value="name_asc">Name A to Z</option>
+                    <option value="name_desc">Name Z to A</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="my-tournaments-list" class="tournaments-list">
+                <div class="empty-state">
+                  <div class="feature-icon">📋</div>
+                  <h3>No tournaments yet</h3>
+                  <p class="muted">
+                    Once you host tournaments, you’ll see them listed here.
+                  </p>
+                </div>
+              </div>
+
+              <div id="tournament-detail" class="tournament-detail hidden">
+                <div class="tournament-detail-card">
+                  <h2 id="detail-tournament-name">Tournament name</h2>
+
+                  <p class="detail-line">
+                    <span class="detail-label">Code:</span>
+                    <span id="detail-tournament-code">—</span>
+                  </p>
+
+                  <p class="detail-line">
+                    <span class="detail-label">Total registrations:</span>
+                    <span id="detail-total-registrations">0</span>
+                  </p>
+
+                  <div class="actions-row">
+                    <button
+                      type="button"
+                      class="btn-dark"
+                      id="modalViewPlayers"
+                    >
+                      View players
+                    </button>
+
+                    <button
+                      type="button"
+                      class="btn-dark"
+                      id="generate-code-btn"
+                    >
+                      Share code / link
+                    </button>
+
+                    <button
+                      type="button"
+                      class="btn-secondary danger-btn"
+                      id="stop-registrations-btn"
+                    >
+                      Stop registrations
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- HOST NEW TOURNAMENT VIEW -->
+            <section id="new-tournament-view" class="host-view" aria-label="Host new tournament">
+              <section class="host-card wizard-card">
+                <div class="wiz-progress" id="wiz-progress">
+                  <div class="wiz-step-dot active" data-step="0">
+                    <span class="wiz-dot-num">1</span>
+                    <span class="wiz-dot-label">Basics</span>
+                  </div>
+                  <div class="wiz-progress-line"></div>
+
+                  <div class="wiz-step-dot" data-step="1">
+                    <span class="wiz-dot-num">2</span>
+                    <span class="wiz-dot-label">Format</span>
+                  </div>
+                  <div class="wiz-progress-line"></div>
+
+                  <div class="wiz-step-dot" data-step="2">
+                    <span class="wiz-dot-num">3</span>
+                    <span class="wiz-dot-label">Events</span>
+                  </div>
+                  <div class="wiz-progress-line"></div>
+
+                  <div class="wiz-step-dot" data-step="3">
+                    <span class="wiz-dot-num">4</span>
+                    <span class="wiz-dot-label">Courts</span>
+                  </div>
+                  <div class="wiz-progress-line"></div>
+
+                  <div class="wiz-step-dot" data-step="4">
+                    <span class="wiz-dot-num">5</span>
+                    <span class="wiz-dot-label">Payment</span>
+                  </div>
+                  <div class="wiz-progress-line"></div>
+
+                  <div class="wiz-step-dot" data-step="5">
+                    <span class="wiz-dot-num">6</span>
+                    <span class="wiz-dot-label">Review</span>
+                  </div>
+                </div>
+
+                <div id="wiz-steps">
+                  <!-- STEP 1 -->
+                  <div class="wiz-step active" data-step="0">
+                    <p class="eyebrow">Step 1 of 6</p>
+                    <h2 class="wiz-step-title">Tournament basics</h2>
+
                     <div class="field-group">
+                      <label for="w-name">Tournament name <span class="req">*</span></label>
+                      <input type="text" id="w-name" placeholder="e.g. Winter Open 2025" />
+                    </div>
+
+                    <div class="field-group">
+                      <label for="w-sport">Sport <span class="req">*</span></label>
+                      <select id="w-sport">
+                        <option value="">Select sport</option>
+                        <option value="Pickleball">Pickleball</option>
+                        <option value="Badminton">Badminton</option>
+                        <option value="Tennis">Tennis</option>
+                        <option value="Table Tennis">Table Tennis</option>
+                        <option value="Football">Football</option>
+                        <option value="Cricket">Cricket</option>
+                        <option value="Basketball">Basketball</option>
+                        <option value="Volleyball">Volleyball</option>
+                      </select>
+                    </div>
+
+                    <div class="split-fields">
+                      <div class="field-group">
                         <label for="w-date-start">Start date <span class="req">*</span></label>
-                        <div class="wiz-date-input-wrap">
-                        <input type="date" id="w-date-start" />
-                        <button type="button" class="wiz-date-trigger" data-target="w-date-start" aria-label="Open start date calendar">📅</button>
+                        <div class="date-input-wrap">
+                          <input type="date" id="w-date-start" />
+                          <button
+                            type="button"
+                            class="date-picker-btn"
+                            data-open-picker="w-date-start"
+                            aria-label="Open start date picker"
+                          >
+                            📅
+                          </button>
                         </div>
+                      </div>
+
+                      <div class="field-group">
+                        <label for="w-date-end">End date <span class="req">*</span></label>
+                        <div class="date-input-wrap">
+                          <input type="date" id="w-date-end" />
+                          <button
+                            type="button"
+                            class="date-picker-btn"
+                            data-open-picker="w-date-end"
+                            aria-label="Open end date picker"
+                          >
+                            📅
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div class="field-group">
-                        <label for="w-date-end">End date <span class="req">*</span></label>
-                        <div class="wiz-date-input-wrap">
-                        <input type="date" id="w-date-end" />
-                        <button type="button" class="wiz-date-trigger" data-target="w-date-end" aria-label="Open end date calendar">📅</button>
+                      <label for="w-venue">Venue <span class="req">*</span></label>
+                      <input type="text" id="w-venue" placeholder="e.g. IIML Sports Complex" />
+                    </div>
+
+                    <div class="field-group">
+                      <label for="w-details">Additional details</label>
+                      <textarea
+                        id="w-details"
+                        rows="4"
+                        placeholder="Rules, reporting time, equipment notes, referee notes, etc."
+                      ></textarea>
+                    </div>
+
+                    <div class="field-group">
+                      <label for="access-code">Access code</label>
+                      <div class="code-row">
+                        <input
+                          type="text"
+                          id="access-code"
+                          placeholder="Click generate to create code"
+                          readonly
+                        />
+                        <button type="button" class="btn-dark" id="generate-code-btn">
+                          Generate code
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="field-group">
+                      <label>Visibility</label>
+                      <div class="pill-toggle">
+                        <button type="button" class="pill-btn active" id="w-public-yes">Public</button>
+                        <button type="button" class="pill-btn" id="w-public-no">Private</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- STEP 2 -->
+                  <div class="wiz-step" data-step="1">
+                    <p class="eyebrow">Step 2 of 6</p>
+                    <h2 class="wiz-step-title">Tournament format</h2>
+
+                    <div class="field-group">
+                      <label for="w-tournament-type">Type of tournament</label>
+                      <select id="w-tournament-type">
+                        <option value="single">Individual event</option>
+                        <option value="team">Team event</option>
+                      </select>
+                    </div>
+
+                    <div class="field-group">
+                      <label for="w-stage-format">Format of tournament <span class="req">*</span></label>
+                      <select id="w-stage-format">
+                        <option value="">Select format</option>
+                        <option value="knockout">Knockout</option>
+                        <option value="round_robin">Round Robin</option>
+                        <option value="group_knockout">Group + Knockout</option>
+                        <option value="number_draw_league_knockout">Number Draw League + Knockout</option>
+                      </select>
+                    </div>
+
+                    <div class="field-group hidden" id="wiz-group-count-wrap">
+                      <label for="w-group-count">Number of groups</label>
+                      <input
+                        type="number"
+                        id="w-group-count"
+                        min="2"
+                        step="1"
+                        placeholder="Enter power of 2, e.g. 2, 4, 8"
+                      />
+                    </div>
+
+                    <div class="field-group">
+                      <label for="w-event-count">Number of categories</label>
+                      <input
+                        type="number"
+                        id="w-event-count"
+                        min="1"
+                        step="1"
+                        value="1"
+                        placeholder="Enter number of categories"
+                      />
+                    </div>
+
+                    <!-- Advanced Settings block -->
+                    <section class="advanced-settings-card">
+                      <div class="section-head">
+                        <div>
+                          <p class="eyebrow">Advanced settings</p>
+                          <h3 class="section-title">Special event configuration</h3>
                         </div>
-                    </div>
-                </div>
-                <div class="field-group">
-                  <label for="w-venue">Venue <span class="req">*</span></label>
-                  <input type="text" id="w-venue" placeholder="e.g. Andheri Sports Complex, Mumbai" />
-                </div>
-                <div class="field-group">
-                <label for="w-details">Other details <span class="wiz-optional">(optional)</span></label>
-                <textarea id="w-details" rows="3" placeholder="Share any special rules, timings, or notes for players."></textarea>
-              </div>
-
-              <div class="field-group">
-                <label>Visibility</label>
-                <div class="pill-toggle-row">
-                  <button type="button" class="btn-dark active" id="w-public-yes">Public</button>
-                  <button type="button" class="btn-dark" id="w-public-no">Private</button>
-                </div>
-                <p class="helper-text">
-                  Public tournaments can appear in Join mode. Private tournaments can be shared using direct link and code.
-                </p>
-              </div>
-                </div>
-              </div>
-
-
-
-              <!-- Step 2: Format -->
-            <div class="wiz-step" data-step="1">
-            <p class="eyebrow">Step 2 of 6</p>
-            <h2 class="wiz-step-title">Tournament format</h2>
-
-            <div class="field-group">
-                <label>Tournament type <span class="req">*</span></label>
-                <div class="wiz-type-cards">
-                  <button type="button" class="wiz-type-card active" data-type="single">
-                    <span class="wiz-type-icon">🎾</span>
-                    <span class="wiz-type-name">Individual event</span>
-                  </button>
-                  <button type="button" class="wiz-type-card" data-type="team">
-                    <span class="wiz-type-icon">🏆</span>
-                    <span class="wiz-type-name">Team event</span>
-                  </button>
-                </div>
-            </div>
-
-            <div id="wiz-event-count-wrap" class="field-group hidden">
-                <label>Number of categories <span class="req">*</span></label>
-                <div class="wiz-counter-row">
-                <button type="button" class="counter-btn" id="wiz-event-dec">−</button>
-                <span class="wiz-counter-val" id="w-event-count-display">1</span>
-                <button type="button" class="counter-btn" id="wiz-event-inc">+</button>
-                </div>
-            </div>
-
-            <div class="field-group" style="margin-top: 20px;">
-                <label for="w-stage-format">Format of tournament <span class="req">*</span></label>
-                <select id="w-stage-format">
-                <option value="">Select format</option>
-                <option value="knockout">Knockout</option>
-                <option value="round_robin">Round Robin</option>
-                <option value="group_knockout">Group + Knockout</option>
-                </select>
-            </div>
-
-            
-            <div id="wiz-advanced-settings-wrap" class="wiz-section-card" style="margin-top:20px;">
-              <div class="section-head-inline">
-                <div>
-                  <h3 class="wiz-section-title">Advanced settings</h3>
-                  <p class="wiz-helper-text" style="margin-top:6px;">Use this for special event formats like SPL / numbered-team league + knockout.</p>
-                </div>
-                <label class="switch-row"><input type="checkbox" id="w-enable-advanced-settings" /> Enable</label>
-              </div>
-
-              <div id="wiz-advanced-settings-body" class="hidden">
-                <div class="wiz-cfg-grid">
-                  <div class="field-group">
-                    <label for="w-advanced-event-format">Advanced event mode</label>
-                    <select id="w-advanced-event-format">
-                      <option value="">None</option>
-                      <option value="number_draw_league_knockout">Number draw + league + knockout</option>
-                      <option value="spl_team_league">SPL team league</option>
-                    </select>
-                  </div>
-                  <div class="field-group">
-                    <label for="w-round-robin-match-count">No. of matches / rounds in league stage</label>
-                    <input type="number" id="w-round-robin-match-count" min="1" placeholder="e.g. 5" />
-                  </div>
-                  <div class="field-group">
-                    <label for="w-fixed-team-count">Fixed number of teams</label>
-                    <input type="number" id="w-fixed-team-count" min="2" placeholder="e.g. 8" />
-                  </div>
-                  <div class="field-group">
-                    <label for="w-qualifier-count">Teams qualifying to playoffs</label>
-                    <input type="number" id="w-qualifier-count" min="2" placeholder="e.g. 4" />
-                  </div>
-                </div>
-
-                <div class="wiz-subsection-grid" style="margin-top:18px;">
-                  <div class="wiz-subsection-card">
-                    <h4 class="wiz-subsection-title">Tie structure</h4>
-                    <div class="wiz-cfg-grid compact-grid">
-                      <div class="field-group">
-                        <label for="w-tie-submatch-count">Submatches per tie</label>
-                        <input type="number" id="w-tie-submatch-count" min="1" placeholder="e.g. 5" />
                       </div>
-                      <div class="field-group">
-                        <label for="w-lineup-submit-mode">Lineup submission</label>
-                        <select id="w-lineup-submit-mode">
-                          <option value="none">No lineup-slip</option>
-                          <option value="captain_submit_host_lock">Captain submits, host locks</option>
-                          <option value="captain_submit_auto_lock">Captain submits, auto lock</option>
-                        </select>
+
+                      <div class="advanced-grid">
+                        <div class="field-group">
+                          <label for="w-advanced-mode">Advanced mode</label>
+                          <select id="w-advanced-mode">
+                            <option value="">None</option>
+                            <option value="pickleball_team_league">Pickleball team league</option>
+                          </select>
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-rr-rounds">No. of matches / league rounds</label>
+                          <input type="number" id="w-rr-rounds" min="1" step="1" placeholder="e.g. 5" />
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-fixed-team-count">Fixed no. of teams</label>
+                          <input type="number" id="w-fixed-team-count" min="2" step="1" placeholder="e.g. 8" />
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-qualifier-count">Teams qualifying to semis</label>
+                          <input type="number" id="w-qualifier-count" min="2" step="1" placeholder="e.g. 4" />
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-tie-submatch-count">Submatches per tie</label>
+                          <input type="number" id="w-tie-submatch-count" min="1" step="1" placeholder="e.g. 5" />
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-lineup-lock-rule">Lineup lock rule</label>
+                          <select id="w-lineup-lock-rule">
+                            <option value="">None</option>
+                            <option value="captain_submit_host_lock">Captain submit + host lock</option>
+                            <option value="captain_submit_auto_lock">Captain submit + auto lock</option>
+                          </select>
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-participation-rule">Participation rule</label>
+                          <select id="w-participation-rule">
+                            <option value="">None</option>
+                            <option value="all_bench_must_play_once">All bench players must play at least one tie</option>
+                          </select>
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-tiebreak-rule">Tiebreak rule</label>
+                          <select id="w-tiebreak-rule">
+                            <option value="">Default</option>
+                            <option value="points_head_to_head_ties_won_decider">
+                              Points → Head-to-head → Ties won → Decider
+                            </option>
+                          </select>
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-semifinal-pairing">Semifinal pairing rule</label>
+                          <select id="w-semifinal-pairing">
+                            <option value="">Default</option>
+                            <option value="1v4_2v3">1 vs 4 and 2 vs 3</option>
+                          </select>
+                        </div>
                       </div>
-                      <div class="field-group">
-                        <label for="w-lineup-sequence-rule">Playing sequence rule</label>
-                        <select id="w-lineup-sequence-rule">
-                          <option value="none">Not needed</option>
-                          <option value="fixed_order">Fixed order</option>
-                          <option value="host_defined">Host defined order</option>
-                        </select>
-                      </div>
-                    </div>
+                    </section>
                   </div>
 
-                  <div class="wiz-subsection-card">
-                    <h4 class="wiz-subsection-title">Leaderboard</h4>
-                    <div class="wiz-cfg-grid compact-grid">
-                      <div class="field-group">
-                        <label for="w-leaderboard-rank-basis">Rank primarily by</label>
-                        <select id="w-leaderboard-rank-basis">
-                          <option value="total_match_points">Total match points</option>
-                          <option value="ties_won">Ties won</option>
-                        </select>
-                      </div>
-                      <div class="field-group">
-                        <label for="w-tiebreak-order">Tie-break order</label>
-                        <select id="w-tiebreak-order">
-                          <option value="head_to_head_then_ties_won_then_decider">Head-to-head → ties won → decider tie</option>
-                          <option value="ties_won_then_head_to_head_then_decider">Ties won → head-to-head → decider tie</option>
-                        </select>
-                      </div>
-                      <div class="field-group">
-                        <label for="w-enable-decider-tie">Generate decider tie if unresolved</label>
-                        <select id="w-enable-decider-tie">
-                          <option value="true">Yes</option>
-                          <option value="false">No</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  <!-- STEP 3 -->
+                  <div class="wiz-step" data-step="2">
+                    <p class="eyebrow">Step 3 of 6</p>
+                    <h2 class="wiz-step-title">Configure categories and rules</h2>
 
-                <div class="wiz-subsection-grid" style="margin-top:18px;">
-                  <div class="wiz-subsection-card">
-                    <h4 class="wiz-subsection-title">Participation rules</h4>
-                    <div class="wiz-cfg-grid compact-grid">
-                      <div class="field-group">
-                        <label for="w-bench-participation-required">Every roster player must appear at least once?</label>
-                        <select id="w-bench-participation-required">
-                          <option value="false">No</option>
-                          <option value="true">Yes</option>
-                        </select>
+                    <div id="wiz-event-config"></div>
+
+                    <section class="rules-card">
+                      <div class="section-head">
+                        <div>
+                          <p class="eyebrow">Tournament rules</p>
+                          <h3 class="section-title">General rules</h3>
+                        </div>
                       </div>
-                      <div class="field-group">
-                        <label for="w-bench-participation-stage">Apply in stage</label>
-                        <select id="w-bench-participation-stage">
-                          <option value="league_only">League stage only</option>
-                          <option value="entire_tournament">Entire tournament</option>
-                        </select>
+
+                      <div class="rules-grid">
+                        <div class="field-group">
+                          <label for="w-max-matches-per-player">Max matches per player</label>
+                          <input
+                            type="number"
+                            id="w-max-matches-per-player"
+                            min="1"
+                            step="1"
+                            placeholder="e.g. 3"
+                          />
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-best-of-sets">Best of sets</label>
+                          <input
+                            type="number"
+                            id="w-best-of-sets"
+                            min="1"
+                            step="1"
+                            placeholder="e.g. 3"
+                          />
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-points-per-set">Points per set</label>
+                          <input
+                            type="number"
+                            id="w-points-per-set"
+                            min="1"
+                            step="1"
+                            placeholder="e.g. 11"
+                          />
+                        </div>
+
+                        <div class="field-group hidden" id="wiz-min-players-wrap">
+                          <label for="w-min-players-per-team">Minimum players per team</label>
+                          <input
+                            type="number"
+                            id="w-min-players-per-team"
+                            min="1"
+                            step="1"
+                            placeholder="e.g. 6"
+                          />
+                        </div>
+
+                        <div class="field-group hidden" id="wiz-max-players-wrap">
+                          <label for="w-max-players-per-team">Maximum players per team</label>
+                          <input
+                            type="number"
+                            id="w-max-players-per-team"
+                            min="1"
+                            step="1"
+                            placeholder="e.g. 10"
+                          />
+                        </div>
                       </div>
-                      <div class="field-group">
-                        <label for="w-participation-enforcement">Enforcement</label>
-                        <select id="w-participation-enforcement">
-                          <option value="warn">Warn only</option>
-                          <option value="block_late_round_lineups">Block later lineups</option>
-                        </select>
+                    </section>
+
+                    <section class="rules-card hidden" id="wiz-league-points-wrap">
+                      <div class="section-head">
+                        <div>
+                          <p class="eyebrow">Leaderboard</p>
+                          <h3 class="section-title">League points</h3>
+                        </div>
                       </div>
-                    </div>
+
+                      <div class="rules-grid">
+                        <div class="field-group">
+                          <label for="w-points-win">Points for win</label>
+                          <input type="number" id="w-points-win" step="1" placeholder="e.g. 2" />
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-points-loss">Points for loss</label>
+                          <input type="number" id="w-points-loss" step="1" placeholder="e.g. 0" />
+                        </div>
+
+                        <div class="field-group">
+                          <label for="w-points-draw">Points for draw</label>
+                          <input type="number" id="w-points-draw" step="1" placeholder="e.g. 1" />
+                        </div>
+                      </div>
+                    </section>
                   </div>
 
-                  <div class="wiz-subsection-card">
-                    <h4 class="wiz-subsection-title">Qualification rules</h4>
-                    <div class="wiz-cfg-grid compact-grid">
-                      <div class="field-group">
-                        <label for="w-semifinal-seeding">Semifinal seeding</label>
-                        <select id="w-semifinal-seeding">
-                          <option value="1v4_2v3">1st vs 4th, 2nd vs 3rd</option>
-                          <option value="1v2_3v4">1st vs 2nd, 3rd vs 4th</option>
-                        </select>
-                      </div>
-                      <div class="field-group">
-                        <label for="w-auto-generate-semis">Auto-generate semifinals</label>
-                        <select id="w-auto-generate-semis">
-                          <option value="true">Yes</option>
-                          <option value="false">No</option>
-                        </select>
+                  <!-- STEP 4 -->
+                  <div class="wiz-step" data-step="3">
+                    <p class="eyebrow">Step 4 of 6</p>
+                    <h2 class="wiz-step-title">Courts and courts naming</h2>
+
+                    <div class="field-group">
+                      <label>Number of courts</label>
+                      <div class="counter-row">
+                        <button type="button" class="counter-btn" id="w-court-minus">−</button>
+                        <div class="counter-value" id="w-court-count-display">1</div>
+                        <button type="button" class="counter-btn" id="w-court-plus">+</button>
                       </div>
                     </div>
+
+                    <div id="wiz-court-name-fields"></div>
+                  </div>
+
+                  <!-- STEP 5 -->
+                  <div class="wiz-step" data-step="4">
+                    <p class="eyebrow">Step 5 of 6</p>
+                    <h2 class="wiz-step-title">Payment and access</h2>
+
+                    <div class="field-group">
+                      <label>Require payment?</label>
+                      <div class="pill-toggle">
+                        <button type="button" class="pill-btn" id="w-payment-yes">Yes</button>
+                        <button type="button" class="pill-btn active" id="w-payment-no">No</button>
+                      </div>
+                    </div>
+
+                    <div class="field-group hidden" id="wiz-amount-wrap">
+                      <label for="w-amount">Entry fee amount</label>
+                      <input type="number" id="w-amount" min="0" step="1" placeholder="e.g. 500" />
+                    </div>
+                  </div>
+
+                  <!-- STEP 6 -->
+                  <div class="wiz-step" data-step="5">
+                    <p class="eyebrow">Step 6 of 6</p>
+                    <h2 class="wiz-step-title">Review tournament</h2>
+                    <div id="wiz-review-body" class="review-card"></div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-
-            <div id="wiz-group-count-wrap" class="field-group hidden">
-                <label for="w-group-count">How many groups? <span class="req">*</span></label>
-                <input type="number" id="w-group-count" min="2" step="1" placeholder="Enter 2, 4, 8, 16..." />
-                <p class="wiz-helper-text">Only powers of 2 are allowed.</p>
-            </div>
-            </div>
-
-              <!-- Step 3: Configure categories -->
-            <div class="wiz-step" data-step="2">
-            <p class="eyebrow">Step 3 of 6</p>
-            <h2 class="wiz-step-title">Configure categories</h2>
-            <p class="wiz-step-sub">Set rules for each category. All fields are optional.</p>
-
-            <div id="wiz-event-config"></div>
-
-        <div class="wiz-section-card" style="margin-top: 20px;">
-          <h3 class="wiz-section-title">Tournament rules</h3>
-          <div class="wiz-cfg-grid">
-            <div class="field-group">
-              <label for="w-max-matches-per-player">Maximum how many matches one player can play across a single format?</label>
-              <input type="number" id="w-max-matches-per-player" min="1" placeholder="e.g. 3" />
-            </div>
-
-            <div class="field-group">
-              <label for="w-best-of-sets">Best of (Sets)?</label>
-              <input type="number" id="w-best-of-sets" min="1" placeholder="e.g. 3" />
-            </div>
-
-            <div class="field-group">
-              <label for="w-points-per-set">Points per set</label>
-              <input type="number" id="w-points-per-set" min="1" placeholder="e.g. 21" />
-            </div>
-
-            <div class="field-group hidden" id="wiz-min-players-wrap">
-              <label for="w-min-players-per-team">Minimum players per team</label>
-              <input type="number" id="w-min-players-per-team" min="1" placeholder="e.g. 7" />
-            </div>
-
-            <div class="field-group hidden" id="wiz-max-players-wrap">
-              <label for="w-max-players-per-team">Maximum players per team</label>
-              <input type="number" id="w-max-players-per-team" min="1" placeholder="e.g. 11" />
-            </div>
+                <div class="actions-row wizard-actions">
+                  <button type="button" class="btn-secondary hidden" id="wiz-back-btn">← Back</button>
+                  <button type="button" class="btn-dark" id="wiz-cancel-edit-btn">Cancel</button>
+                  <button type="button" class="btn-dark hidden" id="wiz-save-now-btn">💾 Save now</button>
+                  <button type="button" class="btn-dark hidden" id="wiz-view-players-btn">View players</button>
+                  <button type="button" class="btn-dark hidden" id="wiz-edit-view-btn">Edit tournament</button>
+                  <button type="button" class="btn-dark" id="wiz-next-btn">Next →</button>
+                  <button type="button" class="btn-primary hidden" id="wiz-submit-btn">🚀 Create tournament</button>
+                </div>
+              </section>
+            </section>
           </div>
         </div>
-
-            <div id="wiz-league-points-wrap" class="wiz-section-card hidden" style="margin-top: 20px;">
-                <h3 class="wiz-section-title">Points for league matches</h3>
-                <div class="wiz-cfg-grid">
-                <div class="field-group">
-                    <label for="w-points-win">Points for win</label>
-                    <input type="number" id="w-points-win" min="0" placeholder="e.g. 3" />
-                </div>
-
-                <div class="field-group">
-                    <label for="w-points-loss">Points for loss</label>
-                    <input type="number" id="w-points-loss" min="0" placeholder="e.g. 0" />
-                </div>
-
-                <div class="field-group">
-                    <label for="w-points-draw">Points for draw</label>
-                    <input type="number" id="w-points-draw" min="0" placeholder="e.g. 1" />
-                </div>
-                </div>
-            </div>
-            </div>
-
-              <!-- Step 4: Courts -->
-              <div class="wiz-step" data-step="3">
-                <p class="eyebrow">Step 4 of 6</p>
-                <h2 class="wiz-step-title">Courts</h2>
-                <div class="field-group">
-                  <label>Number of courts</label>
-                  <div class="wiz-counter-row">
-                    <button type="button" class="counter-btn" id="wiz-court-dec">−</button>
-                    <span class="wiz-counter-val" id="w-court-count-display">1</span>
-                    <button type="button" class="counter-btn" id="wiz-court-inc">+</button>
-                  </div>
-                </div>
-                <div class="field-group">
-                  <p class="wiz-sublabel">Court names <span class="wiz-optional">(optional)</span></p>
-                  <div id="wiz-court-name-fields"></div>
-                </div>
-              </div>
-
-              <!-- Step 5: Payment -->
-              <div class="wiz-step" data-step="4">
-                <p class="eyebrow">Step 5 of 6</p>
-                <h2 class="wiz-step-title">Payment</h2>
-                <div class="field-group">
-                  <label>Require entry fee?</label>
-                  <div class="wiz-toggle-row">
-                    <button type="button" class="wiz-toggle-btn active" id="w-payment-no">No, free entry</button>
-                    <button type="button" class="wiz-toggle-btn" id="w-payment-yes">Yes, paid entry</button>
-                  </div>
-                </div>
-                <div id="wiz-amount-wrap" class="field-group hidden">
-                  <label for="w-amount">Entry fee amount <span class="req">*</span></label>
-                  <div class="wiz-amount-row">
-                    <span class="wiz-currency">₹</span>
-                    <input type="number" id="w-amount" min="1" placeholder="e.g. 500" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Step 6: Review + Submit -->
-              <div class="wiz-step" data-step="5">
-                <p class="eyebrow">Step 6 of 6</p>
-                <h2 class="wiz-step-title">Review &amp; submit</h2>
-                <div id="wiz-review-body" class="wiz-review-body"></div>
-                <div class="field-group" style="margin-top:20px;">
-                  <label for="access-code">Access code</label>
-                  <div class="code-row">
-                    <input type="text" id="access-code" name="accessCode" placeholder="Click Generate code" readonly />
-                    <button type="button" class="btn-dark" id="generate-code-btn">Generate code</button>
-                  </div>
-                </div>
-                <!-- hidden legacy fields needed by host.js submit -->
-                <input type="hidden" id="tournament-name" />
-                <input type="hidden" id="sport-name" />
-                <input type="hidden" id="tournament-dates" />
-                <input type="hidden" id="tournament-venue" />
-                <textarea id="player-details" style="display:none;"></textarea>
-                <div id="categories-container" style="display:none;"></div>
-              </div>
-
-            </div><!-- /wiz-steps -->
-
-            <!-- Navigation -->
-         <div class="wiz-nav" id="wiz-nav">
-  <div class="wiz-nav-left">
-    <button type="button" class="btn-secondary" id="wiz-back-btn">← Back</button>
-    <button type="button" class="btn-secondary hidden" id="wiz-cancel-edit-btn">Cancel</button>
-  </div>
-
-  <div class="wiz-nav-right">
-    <button type="button" class="btn-secondary hidden" id="wiz-view-players-btn">View players & fixtures</button>
-    <button type="button" class="btn-dark hidden" id="wiz-edit-view-btn">Edit</button>
-
-    <button type="button" class="btn-dark hidden" id="wiz-save-now-btn">💾 Save now</button>
-    <button type="button" class="btn-primary" id="wiz-next-btn">Next →</button>
-    <button type="button" class="btn-primary hidden" id="wiz-submit-btn">🚀 Create tournament</button>
-  </div>
-</div>   
-
-            <!-- hidden legacy form for submit compat -->
-            <form id="host-form" style="display:none;">
-              <button type="submit" style="display:none;" id="host-form-submit-hidden"></button>
-            </form>
-
-          </section>
-        </section>
-        </div>
-      </div>
-    </main>
-
-    
-
+      </main>
     </div>
-
-      <!-- Tournament details popup -->
-    <div class="modal-overlay" id="tournament-details-modal" aria-hidden="true">
-        <div class="modal">
-            <button class="modal-close" type="button" aria-label="Close">&times;</button>
-
-            <p class="eyebrow">Tournament details</p>
-            <h3 id="modalTournamentName"></h3>
-
-            <p class="muted">
-                Code: <span id="modalTournamentCode"></span>
-            </p>
-            <p class="muted">
-                Total registrations: <span id="modalTournamentRegistrations"></span>
-            </p>
-
-            <div class="modal-actions">
-                <button class="btn primary full-width" id="modalStopRegistrations">
-                    Stop registrations
-                </button>
-
-            <!-- Hidden by default – shown only when registrations are closed -->
-                <button
-                    class="btn secondary full-width"
-                    id="modalViewPlayers"
-                    type="button"
-                    style="display: none;"
-                >
-                    View players
-                </button>
-            </div>
-
-        </div>
-    </div>
-
 
     <script type="module" src="scripts/host.js"></script>
   </body>
