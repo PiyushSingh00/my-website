@@ -236,144 +236,143 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderBrowseList() {
-    browseList.innerHTML = "";
+  browseList.innerHTML = "";
 
-    if (!allTournaments.length) {
-      browseList.innerHTML = `
-        <div class="empty-state">
-          <h3>No tournaments available</h3>
-          <p class="muted">Once hosts create tournaments, they will appear here.</p>
-        </div>
-      `;
-      return;
-    }
-
-    allTournaments.forEach((t) => {
-      const card = document.createElement("div");
-      card.className = "browse-card";
-      card.innerHTML = `
-        <div class="browse-card-top">
-          <div>
-            <p class="eyebrow">${escapeHtml(t.sportName || "Tournament")}</p>
-            <h3>${escapeHtml(t.tournamentName || "Untitled tournament")}</h3>
-          </div>
-          <div class="code-chip">${escapeHtml(t.accessCode || "—")}</div>
-        </div>
-
-        <p class="muted">${escapeHtml(t.tournamentDates || "")}</p>
-        <p class="muted">${escapeHtml(t.venue || "")}</p>
-
-        <div class="browse-actions">
-          <button type="button" class="btn-dark" data-action="schedule">View schedule</button>
-          <button type="button" class="btn-primary" data-action="join">Join tournament</button>
-        </div>
-      `;
-
-      card.querySelector('[data-action="schedule"]')?.addEventListener("click", () => {
-        window.location.href = `schedule.html?tournamentId=${encodeURIComponent(t.tournamentId ?? t.id)}`;
-      });
-
-            card.querySelector('[data-action="join"]')?.addEventListener("click", async () => {
-        const tournamentId = t.tournamentId ?? t.id;
-
-        const validateBody = { tournamentId, code: t.accessCode || "", accessCode: t.accessCode || "" };
-
-        const validateCandidates = [
-          `/api/tournaments/validate-code`,
-          `/api/tournaments/${encodeURIComponent(tournamentId)}/validate-code`,
-        ];
-
-        let validated = false;
-        for (const url of validateCandidates) {
-          const r = await apiPost(url, validateBody);
-          if (r.ok) {
-            validated = true;
-            break;
-          }
-        }
-
-        if (!validated) {
-          alert("Could not validate join code for this tournament.");
-          return;
-        }
-
-        const categories = Array.isArray(t.categories)
-          ? t.categories
-          : (() => {
-              try {
-                return typeof t.categories === "string" ? JSON.parse(t.categories) : [];
-              } catch {
-                return [];
-              }
-            })();
-
-        if (!categories.length) {
-          alert("No category found for this tournament.");
-          return;
-        }
-
-        const categoryOptions = categories
-          .map((c, i) => {
-            const id = c.categoryId || c.id || "";
-            const label = [
-              c.ageGroup || "",
-              c.gender || "",
-              c.playingLevel || "",
-              c.teamSize === 1 ? "Singles" :
-              c.teamSize === 2 ? "Doubles" :
-              c.teamSize === 3 ? "Triples" :
-              c.teamSize >= 4 ? `Team ${c.exactTeamSize || ""}`.trim() : ""
-            ].filter(Boolean).join(" • ");
-            return `${i + 1}. ${label || id}`;
-          })
-          .join("\n");
-
-        const choiceRaw = prompt(`Enter category number to join:\n\n${categoryOptions}`);
-        if (!choiceRaw) return;
-
-        const choice = Number(choiceRaw);
-        if (!Number.isFinite(choice) || choice < 1 || choice > categories.length) {
-          alert("Invalid category choice.");
-          return;
-        }
-
-        const chosenCategory = categories[choice - 1];
-        const chosenCategoryId = chosenCategory.categoryId || chosenCategory.id;
-        if (!chosenCategoryId) {
-          alert("Selected category is invalid.");
-          return;
-        }
-
-        const registerPayload = {
-          categoryId: chosenCategoryId,
-          playerName: user.name || user.username || "",
-          phone: "",
-          age: "",
-          gender: "",
-          teamName: "",
-        };
-
-        const registerCandidates = [
-          `/api/player/tournaments/${encodeURIComponent(tournamentId)}/register`,
-          `/api/tournaments/${encodeURIComponent(tournamentId)}/join`,
-        ];
-
-        for (const url of registerCandidates) {
-          const r = await apiPost(url, registerPayload);
-          if (r.ok) {
-            alert("Joined tournament successfully.");
-            await loadMyTournaments();
-            renderMyJoinedList();
-            return;
-          }
-        }
-
-        alert("Could not join tournament. Check backend registration route.");
-            });
-
-      browseList.appendChild(card);
-    });
+  if (!allTournaments.length) {
+    browseList.innerHTML = `
+      <div class="empty-state">
+        <h3>No tournaments available</h3>
+        <p class="muted">Once hosts create tournaments, they will appear here.</p>
+      </div>
+    `;
+    return;
   }
+
+  allTournaments.forEach((t) => {
+    const tournamentId = t.tournamentId ?? t.id;
+
+    const categories = Array.isArray(t.categories)
+      ? t.categories
+      : (() => {
+          try {
+            return typeof t.categories === "string" ? JSON.parse(t.categories) : [];
+          } catch {
+            return [];
+          }
+        })();
+
+    const categoryOptions = categories
+      .map((c) => {
+        const id = c.categoryId || c.id || "";
+        if (!id) return "";
+        const label = [
+          c.eventName || "",
+          c.ageGroup || "",
+          c.gender || "",
+          c.playingLevel || "",
+          c.teamSize === 1 ? "Singles" :
+          c.teamSize === 2 ? "Doubles" :
+          c.teamSize === 3 ? "Triples" :
+          c.teamSize >= 4 ? `Team ${c.exactTeamSize || ""}`.trim() : ""
+        ].filter(Boolean).join(" • ");
+        return `<option value="${escapeHtml(id)}">${escapeHtml(label || id)}</option>`;
+      })
+      .filter(Boolean)
+      .join("");
+
+    const card = document.createElement("div");
+    card.className = "browse-card";
+    card.innerHTML = `
+      <div class="browse-card-top">
+        <div>
+          <p class="eyebrow">${escapeHtml(t.sportName || "Tournament")}</p>
+          <h3>${escapeHtml(t.tournamentName || "Untitled tournament")}</h3>
+        </div>
+      </div>
+
+      <p class="muted">${escapeHtml(t.tournamentDates || "")}</p>
+      <p class="muted">${escapeHtml(t.venue || "")}</p>
+
+      <div class="field-group" style="margin-top:10px;">
+        <label>Select category</label>
+        <select class="join-category-select">
+          <option value="">Select category</option>
+          ${categoryOptions}
+        </select>
+      </div>
+
+      <div class="browse-actions">
+        <button type="button" class="btn-dark" data-action="schedule">View schedule</button>
+        <button type="button" class="btn-primary" data-action="join">Join tournament</button>
+      </div>
+    `;
+
+    card.querySelector('[data-action="schedule"]')?.addEventListener("click", () => {
+      window.location.href = `schedule.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+    });
+
+    card.querySelector('[data-action="join"]')?.addEventListener("click", async () => {
+      const selectedCategoryId = card.querySelector(".join-category-select")?.value || "";
+      if (!selectedCategoryId) {
+        alert("Please select a category first.");
+        return;
+      }
+
+      const validateBody = {
+        tournamentId,
+        code: t.accessCode || "",
+        accessCode: t.accessCode || "",
+      };
+
+      const validateCandidates = [
+        `/api/tournaments/validate-code`,
+        `/api/tournaments/${encodeURIComponent(tournamentId)}/validate-code`,
+      ];
+
+      let validated = false;
+      for (const url of validateCandidates) {
+        const r = await apiPost(url, validateBody);
+        if (r.ok) {
+          validated = true;
+          break;
+        }
+      }
+
+      if (!validated) {
+        alert("Could not validate join code for this tournament.");
+        return;
+      }
+
+      const registerPayload = {
+        categoryId: selectedCategoryId,
+        playerName: user.name || user.username || "",
+        phone: user.phone || "",
+        age: user.age || "",
+        gender: user.gender || "",
+        teamName: "",
+      };
+
+      const registerCandidates = [
+        `/api/player/tournaments/${encodeURIComponent(tournamentId)}/register`,
+        `/api/tournaments/${encodeURIComponent(tournamentId)}/join`,
+      ];
+
+      for (const url of registerCandidates) {
+        const r = await apiPost(url, registerPayload);
+        if (r.ok) {
+          alert("Joined tournament successfully.");
+          await loadMyTournaments();
+          renderMyJoinedList();
+          return;
+        }
+      }
+
+      alert("Could not join tournament. Check backend registration route.");
+    });
+
+    browseList.appendChild(card);
+  });
+}
 
   function renderMyJoinedList() {
     myJoinedList.innerHTML = "";

@@ -599,9 +599,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     return resp.data || null;
   }
 
-  async function hydrateSubmissionState() {
+async function hydrateSubmissionState() {
   const requests = await loadTeamRequestsForTournament();
-  const captainState = await loadCaptainStateForTournament();
+  const captainStateResp = await loadCaptainStateForTournament();
+
+  const captainState =
+    captainStateResp ||
+    tournamentMeta?.captainState ||
+    tournamentMeta?.captains ||
+    {};
 
   if (captainState) {
     tournamentMeta.captainState = captainState;
@@ -611,7 +617,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ? captainState.confirmedCaptains
     : [];
 
-  const isConfirmedCaptain = confirmedCaptains.some((captain) => {
+  const matchingConfirmedCaptain = confirmedCaptains.find((captain) => {
     return (
       identitiesMatch(captain?.playerName, user?.name) ||
       identitiesMatch(captain?.playerName, user?.username) ||
@@ -621,29 +627,23 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const myCaptainRequest = requests.find((req) => isSameCaptain(req, user));
 
-  currentUserIsCaptain = !!isConfirmedCaptain;
-
   if (myCaptainRequest) {
+    currentUserIsCaptain = true;
     currentCaptainSubmission = myCaptainRequest;
-  } else if (isConfirmedCaptain) {
-    const captainMeta = confirmedCaptains.find((captain) => {
-      return (
-        identitiesMatch(captain?.playerName, user?.name) ||
-        identitiesMatch(captain?.playerName, user?.username) ||
-        identitiesMatch(captain?.username, user?.username)
-      );
-    });
-
+  } else if (matchingConfirmedCaptain) {
+    currentUserIsCaptain = true;
     currentCaptainSubmission = {
-      teamName: captainMeta?.teamName || "",
-      captainName: captainMeta?.playerName || user.name || user.username || "",
-      captainUsername: user.username || "",
-      captainPlayerId: captainMeta?.playerId || "",
-      categoryId: captainMeta?.categoryId || "",
-      categoryLabel: captainMeta?.categoryLabel || "",
+      requestId: null,
+      teamName: matchingConfirmedCaptain.teamName || "",
+      captainName: matchingConfirmedCaptain.playerName || user.name || user.username || "",
+      captainUsername: matchingConfirmedCaptain.username || user.username || "",
+      captainPlayerId: matchingConfirmedCaptain.playerId || "",
+      categoryId: matchingConfirmedCaptain.categoryId || "",
+      categoryLabel: matchingConfirmedCaptain.categoryLabel || "",
       invitedPlayers: [],
     };
   } else {
+    currentUserIsCaptain = false;
     currentCaptainSubmission = null;
   }
 

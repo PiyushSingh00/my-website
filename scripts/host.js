@@ -65,19 +65,20 @@ function parseTournamentDateRange(raw) {
   const value = String(raw || "").trim();
   if (!value) return { start: null, end: null };
 
-  const separators = [" to ", "to", " - ", "-", " – ", "–", " — ", "—"];
+  const separators = [" to ", " - ", " – ", " — ", "to", "-", "–", "—"];
   for (const sep of separators) {
-    if (value.includes(sep)) {
-      const parts = value.split(sep).map((x) => x.trim()).filter(Boolean);
-      if (parts.length >= 2) {
-        const start = new Date(parts[0]);
-        const end = new Date(parts[1]);
-        return {
-          start: isValidDate(start) ? start : null,
-          end: isValidDate(end) ? end : null,
-        };
-      }
-    }
+    if (!value.includes(sep)) continue;
+
+    const parts = value.split(sep).map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 2) continue;
+
+    const start = new Date(parts[0]);
+    const end = new Date(parts[1]);
+
+    return {
+      start: isValidDate(start) ? start : null,
+      end: isValidDate(end) ? end : null,
+    };
   }
 
   const single = new Date(value);
@@ -1516,53 +1517,52 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderUpcomingRow(tournaments) {
-    if (!dashboardUpcomingRow) return;
+  if (!dashboardUpcomingRow) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-    const upcoming = [...tournaments]
-      .map((t) => {
-        const { start } = parseTournamentDateRange(t.tournamentDates);
-        return { ...t, _start: start };
-      })
-      .filter((t) => !t._start || t._start >= today)
-      .sort((a, b) => {
-        const aTime = a._start ? a._start.getTime() : Number.MAX_SAFE_INTEGER;
-        const bTime = b._start ? b._start.getTime() : Number.MAX_SAFE_INTEGER;
-        return aTime - bTime;
-      })
-      .slice(0, 8);
+  const upcoming = [...tournaments]
+    .map((t) => {
+      const { start, end } = parseTournamentDateRange(t.tournamentDates || "");
+      return { ...t, _start: start, _end: end || start };
+    })
+    .filter((t) => {
+      if (!t._start) return false;
+      const end = new Date(t._end || t._start);
+      end.setHours(0, 0, 0, 0);
+      return end >= today;
+    })
+    .sort((a, b) => {
+      const aTime = a._start ? a._start.getTime() : Number.MAX_SAFE_INTEGER;
+      const bTime = b._start ? b._start.getTime() : Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    })
+    .slice(0, 8);
 
-    dashboardUpcomingRow.innerHTML = "";
+  dashboardUpcomingRow.innerHTML = "";
 
-    if (!upcoming.length) {
-      dashboardUpcomingRow.innerHTML = `<div class="dashboard-empty-card">No upcoming tournaments yet.</div>`;
-      return;
-    }
-
-    upcoming.forEach((t) => {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "upcoming-card";
-      card.innerHTML = `
-        <div class="upcoming-card-top">
-          <p class="eyebrow">${escapeHtml(t.sportName || "Tournament")}</p>
-          <span class="status-pill ${t.registrationsOpen === false ? "status-pill--rejected" : "status-pill--accepted"}">
-            ${t.registrationsOpen === false ? "Closed" : "Open"}
-          </span>
-        </div>
-        <h3>${escapeHtml(t.tournamentName || "Untitled")}</h3>
-        <p class="muted">${escapeHtml(t.tournamentDates || "")}</p>
-        <p class="muted">${escapeHtml(t.venue || "")}</p>
-      `;
-      card.addEventListener("click", () => {
-        switchHostView("my");
-        renderTournamentDetail(t);
-      });
-      dashboardUpcomingRow.appendChild(card);
-    });
+  if (!upcoming.length) {
+    dashboardUpcomingRow.innerHTML = `<div class="dashboard-empty-card">No upcoming tournaments yet.</div>`;
+    return;
   }
+
+  upcoming.forEach((t) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "upcoming-card";
+    card.innerHTML = `
+      <div class="upcoming-card-top">
+        <p class="eyebrow">${escapeHtml(t.sportName || "Tournament")}</p>
+      </div>
+      <h3>${escapeHtml(t.tournamentName || "Tournament")}</h3>
+      <p class="muted">${escapeHtml(t.tournamentDates || "")}</p>
+      <p class="muted">${escapeHtml(t.venue || "")}</p>
+    `;
+    card.addEventListener("click", () => renderTournamentDetail(t));
+    dashboardUpcomingRow.appendChild(card);
+  });
+}
 
   function renderStats(tournaments) {
     if (statTotalTournaments) statTotalTournaments.textContent = String(tournaments.length);
@@ -1579,64 +1579,84 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderCalendar(tournaments) {
-    if (!calendarGrid || !monthLabel) return;
+  if (!calendarGrid || !monthLabel) return;
 
-    const firstDay = new Date(dashboardYear, dashboardMonth, 1);
-    const lastDay = new Date(dashboardYear, dashboardMonth + 1, 0);
-    const startWeekday = firstDay.getDay();
-    const totalDays = lastDay.getDate();
+  const monthStart = new Date(dashboardYear, dashboardMonth, 1);
+  const monthEnd = new Date(dashboardYear, dashboardMonth + 1, 0);
+  const firstDayIndex = monthStart.getDay();
+  const daysInMonth = monthEnd.getDate();
 
-    monthLabel.textContent = firstDay.toLocaleString(undefined, {
-      month: "long",
-      year: "numeric",
-    });
+  monthLabel.textContent = monthStart.toLocaleString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
 
-    calendarGrid.innerHTML = "";
+  calendarGrid.innerHTML = "";
 
-    const dayMap = new Map();
-    tournaments.forEach((t) => {
-      const { start, end } = parseTournamentDateRange(t.tournamentDates);
-      const d = start || end;
-      if (!d || d.getMonth() !== dashboardMonth || d.getFullYear() !== dashboardYear) return;
-      const day = d.getDate();
-      if (!dayMap.has(day)) dayMap.set(day, []);
-      dayMap.get(day).push(t);
-    });
-
-    for (let i = 0; i < startWeekday; i++) {
-      const blank = document.createElement("div");
-      blank.className = "calendar-day calendar-day--blank";
-      calendarGrid.appendChild(blank);
-    }
-
-    for (let day = 1; day <= totalDays; day++) {
-      const cell = document.createElement("button");
-      cell.type = "button";
-      cell.className = "calendar-day";
-
-      const events = dayMap.get(day) || [];
-      if (events.length) cell.classList.add("has-event");
-
-      cell.innerHTML = `
-        <span class="calendar-day-num">${day}</span>
-        ${
-          events.length
-            ? `<span class="calendar-day-badge">${events.length}</span>`
-            : ""
-        }
-      `;
-
-      cell.addEventListener("click", () => {
-        if (events.length) {
-          switchHostView("my");
-          renderTournamentDetail(events[0]);
-        }
-      });
-
-      calendarGrid.appendChild(cell);
-    }
+  for (let i = 0; i < firstDayIndex; i++) {
+    const blank = document.createElement("div");
+    blank.className = "calendar-day calendar-day--blank";
+    calendarGrid.appendChild(blank);
   }
 
+  const normalized = tournaments.map((t) => {
+    const { start, end } = parseTournamentDateRange(t.tournamentDates || "");
+    return {
+      ...t,
+      _startDate: isValidDate(start) ? start : null,
+      _endDate: isValidDate(end) ? end : null,
+    };
+  });
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cellDate = new Date(dashboardYear, dashboardMonth, day);
+    cellDate.setHours(0, 0, 0, 0);
+
+    const events = normalized.filter((t) => {
+      if (!t._startDate) return false;
+      const start = new Date(t._startDate);
+      const end = new Date(t._endDate || t._startDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      return cellDate >= start && cellDate <= end;
+    });
+
+    const cell = document.createElement("div");
+    cell.className = `calendar-day${events.length ? " has-event" : ""}`;
+
+    const namesHtml = events
+      .slice(0, 2)
+      .map(
+        (ev) =>
+          `<div class="calendar-event-name" title="${escapeHtml(ev.tournamentName || "Tournament")}">${escapeHtml(
+            ev.tournamentName || "Tournament"
+          )}</div>`
+      )
+      .join("");
+
+    const moreHtml =
+      events.length > 2
+        ? `<div class="calendar-event-more">+${events.length - 2} more</div>`
+        : "";
+
+    cell.innerHTML = `
+      <div class="calendar-day-num">${day}</div>
+      <div class="calendar-day-events">
+        ${namesHtml}
+        ${moreHtml}
+      </div>
+    `;
+
+    if (events.length) {
+      cell.addEventListener("click", () => {
+        const first = events[0];
+        if (first) renderTournamentDetail(first);
+      });
+    }
+
+    calendarGrid.appendChild(cell);
+  }
+}
   function renderSportsPieChart(tournaments) {
     if (!sportsPieCanvas || !sportsChartLegend) return;
 
@@ -1841,21 +1861,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     generateCodeBtn?.addEventListener("click", async () => {
-      const inWizard = newTournamentView?.classList.contains("host-view--active");
-      const accessInputVisible = accessCodeInput && !generateCodeBtn.classList.contains("hidden");
+  const isWizardMode = newTournamentView?.classList.contains("host-view--active") && !viewOnlyMode;
 
-      if (inWizard && accessInputVisible && !viewOnlyMode) {
-        const code = generateAccessCode();
-        if (accessCodeInput) accessCodeInput.value = code;
-        wiz.accessCode = code;
-        return;
-      }
+  if (isWizardMode) {
+    const code = generateAccessCode();
+    wiz.accessCode = code;
 
-      const tournament = allTournaments.find(
-        (t) => String(t.tournamentId ?? t.id) === String(selectedTournamentId)
-      );
-      if (tournament) await shareTournamentCode(tournament);
-    });
+    if (accessCodeInput) {
+      accessCodeInput.value = code;
+      accessCodeInput.setAttribute("value", code);
+      accessCodeInput.dispatchEvent(new Event("input", { bubbles: true }));
+      accessCodeInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    return;
+  }
+
+  const tournament = allTournaments.find(
+    (t) => String(t.tournamentId ?? t.id) === String(selectedTournamentId)
+  );
+  if (tournament) await shareTournamentCode(tournament);
+});
 
     stopRegistrationsBtn?.addEventListener("click", stopRegistrationsForSelectedTournament);
 
