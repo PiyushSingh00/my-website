@@ -1872,7 +1872,42 @@ setVal("w-tournament-type", wiz.tournamentType);
       window.location.href = `players.html?tournamentId=${encodeURIComponent(selectedTournamentId)}`;
     });
 
-  generateCodeBtn?.addEventListener("click", async () => {
+  generateCodeBtn?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const isWizardMode =
+    !!newTournamentView?.classList.contains("host-view--active") &&
+    !viewOnlyMode &&
+    !viewingTournamentId;
+
+  if (isWizardMode) {
+    const code = generateAccessCode();
+
+    wiz.accessCode = code;
+
+    if (accessCodeInput) {
+      accessCodeInput.removeAttribute("readonly");
+      accessCodeInput.value = code;
+      accessCodeInput.defaultValue = code;
+      accessCodeInput.setAttribute("value", code);
+      accessCodeInput.readOnly = true;
+    }
+
+    syncFormFromState();
+
+    if (accessCodeInput) {
+      accessCodeInput.removeAttribute("readonly");
+      accessCodeInput.value = code;
+      accessCodeInput.defaultValue = code;
+      accessCodeInput.setAttribute("value", code);
+      accessCodeInput.readOnly = true;
+    }
+
+    console.log("Generated access code:", code, "Input now:", accessCodeInput?.value);
+    return;
+  }
+
   const tournament = allTournaments.find(
     (t) => String(t.tournamentId ?? t.id) === String(selectedTournamentId)
   );
