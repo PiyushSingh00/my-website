@@ -662,20 +662,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function populateCategoryDropdown() {
-    const categories = normalizeCategories(tournamentMeta?.categories);
+  const categories = normalizeCategories(tournamentMeta?.categories);
+  const seen = new Set();
 
-    categorySelect.innerHTML = `<option value="">Select category</option>`;
+  categorySelect.innerHTML = `<option value="">Select category</option>`;
 
-    categories.forEach((category) => {
-      const id = category.categoryId || category.id;
-      if (!id) return;
+  categories.forEach((category) => {
+    const id = String(category.categoryId || category.id || "").trim();
+    if (!id || seen.has(id)) return;
+    seen.add(id);
 
-      const option = document.createElement("option");
-      option.value = id;
-      option.textContent = categoryLabel(category);
-      categorySelect.appendChild(option);
-    });
-  }
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = categoryLabel(category);
+    categorySelect.appendChild(option);
+  });
+}
 
   function saveDraft(showMessage = true) {
     const payload = {
@@ -751,20 +753,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function loadCaptainStateForTournament() {
-    const resp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`);
-    if (!resp.ok) return null;
-    return resp.data || null;
+  const candidates = [
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`,
+    `/api/tournaments/${encodeURIComponent(tournamentId)}`,
+  ];
+
+  for (const url of candidates) {
+    const resp = await apiGet(url);
+    if (!resp.ok) continue;
+
+    if (url.includes("/captains")) return resp.data || null;
+
+    const t = resp.data || null;
+    if (t?.captains) return t.captains;
+    if (t?.captainState) return t.captainState;
   }
+
+  return tournamentMeta?.captains || tournamentMeta?.captainState || null;
+}
 
 async function hydrateSubmissionState() {
   const requests = await loadTeamRequestsForTournament();
-  const captainStateResp = await loadCaptainStateForTournament();
-
-  const captainState =
-    captainStateResp ||
-    tournamentMeta?.captainState ||
-    tournamentMeta?.captains ||
-    {};
+  const captainState = await loadCaptainStateForTournament();
 
   if (captainState) {
     tournamentMeta.captainState = captainState;
@@ -774,30 +784,28 @@ async function hydrateSubmissionState() {
     ? captainState.confirmedCaptains
     : [];
 
-  const matchingConfirmedCaptain = confirmedCaptains.find((captain) => {
+  const myCaptainRequest = requests.find((req) => isSameCaptain(req, user));
+
+  const myConfirmedCaptain = confirmedCaptains.find((c) => {
     return (
-      identitiesMatch(captain?.playerName, user?.name) ||
-      identitiesMatch(captain?.playerName, user?.username) ||
-      identitiesMatch(captain?.username, user?.username)
+      identitiesMatch(c?.username, user?.username) ||
+      identitiesMatch(c?.captainUsername, user?.username) ||
+      identitiesMatch(c?.playerName, user?.name) ||
+      identitiesMatch(c?.playerName, user?.username)
     );
   });
-
-  const myCaptainRequest = requests.find((req) => isSameCaptain(req, user));
 
   if (myCaptainRequest) {
     currentUserIsCaptain = true;
     currentCaptainSubmission = myCaptainRequest;
-  } else if (matchingConfirmedCaptain) {
+  } else if (myConfirmedCaptain) {
     currentUserIsCaptain = true;
     currentCaptainSubmission = {
-      requestId: null,
-      teamName: matchingConfirmedCaptain.teamName || "",
-      captainName: matchingConfirmedCaptain.playerName || user.name || user.username || "",
-      captainUsername: matchingConfirmedCaptain.username || user.username || "",
-      captainPlayerId: matchingConfirmedCaptain.playerId || "",
-      categoryId: matchingConfirmedCaptain.categoryId || "",
-      categoryLabel: matchingConfirmedCaptain.categoryLabel || "",
-      invitedPlayers: [],
+      captainName: myConfirmedCaptain.playerName || user.name || user.username || "Captain",
+      captainUsername: myConfirmedCaptain.username || user.username || "",
+      captainPlayerId: myConfirmedCaptain.playerId || "",
+      categoryId: myConfirmedCaptain.categoryId || "",
+      teamName: myConfirmedCaptain.teamName || "",
     };
   } else {
     currentUserIsCaptain = false;

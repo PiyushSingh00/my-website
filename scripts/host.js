@@ -964,7 +964,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         <p><strong>Sport:</strong> ${escapeHtml(wiz.sport)}</p>
         <p><strong>Dates:</strong> ${escapeHtml(formatDateRange(wiz.dateStart, wiz.dateEnd))}</p>
         <p><strong>Venue:</strong> ${escapeHtml(wiz.venue)}</p>
-        <p><strong>Access code:</strong> ${escapeHtml(wiz.accessCode || "Will be generated later")}</p>
         <p><strong>Visibility:</strong> ${wiz.isPublic ? "Public" : "Private"}</p>
         <p><strong>Details:</strong> ${escapeHtml(wiz.details || "—")}</p>
       </div>
@@ -1149,7 +1148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     hydrateWizardFromTournament(t);
     syncFormFromState();
-    showStep(0);
+    showStep(TOTAL_STEPS - 1);
     switchHostView("new");
   }
 
@@ -1315,14 +1314,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!ok) return;
 
     const attempts = [
-      () => apiPatch(`/api/host/tournaments/${encodeURIComponent(selectedTournamentId)}`, {
-        registrationsOpen: nextOpen,
-      }),
-      () => apiPut(`/api/host/tournaments/${encodeURIComponent(selectedTournamentId)}/registrations`, {
-        registrationsOpen: nextOpen,
-      }),
-      () => apiPost(`/api/host/tournaments/${encodeURIComponent(selectedTournamentId)}/registrations/${nextOpen ? "open" : "close"}`, {}),
-    ];
+  () =>
+    apiPatch(
+      `/api/host/tournaments/${encodeURIComponent(selectedTournamentId)}/registrations-open`,
+      { registrationsOpen: nextOpen }
+    ),
+  () =>
+    apiPatch(`/api/host/tournaments/${encodeURIComponent(selectedTournamentId)}`, {
+      registrationsOpen: nextOpen,
+    }),
+];
 
     for (const attempt of attempts) {
       const res = await attempt();
