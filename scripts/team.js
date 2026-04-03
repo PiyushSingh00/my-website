@@ -248,28 +248,8 @@ function categoryLabel(c) {
   else if (size === 3) type = "Triples";
   else if (size >= 4) type = exact ? `Team ${exact}` : "Team";
 
-  const computed = [age, gender, level, type].filter(Boolean).join(" • ");
-  const eventName = c?.eventName ? String(c.eventName).trim() : "";
-
-  const normalize = (value) =>
-    String(value || "")
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .trim();
-
-  if (eventName) {
-    if (!computed) return eventName;
-
-    const eventNorm = normalize(eventName);
-    const computedNorm = normalize(computed);
-
-    if (eventNorm === computedNorm) return eventName;
-    if (eventNorm.includes(computedNorm)) return eventName;
-
-    return `${eventName} • ${computed}`;
-  }
-
-  return computed || (c?.categoryId || c?.id || "Category");
+  const parts = [age, gender, level, type].filter(Boolean);
+  return parts.length ? parts.join(" • ") : (c?.categoryId || c?.id || "Category");
 }
 
   function getAcceptedPlayers() {
@@ -683,18 +663,26 @@ function categoryLabel(c) {
 
 function populateCategoryDropdown() {
   const categories = normalizeCategories(tournamentMeta?.categories);
-  const seen = new Set();
+  const seenIds = new Set();
+  const seenLabels = new Set();
 
   categorySelect.innerHTML = `<option value="">Select category</option>`;
 
   categories.forEach((category) => {
     const id = String(category.categoryId || category.id || "").trim();
-    if (!id || seen.has(id)) return;
-    seen.add(id);
+    if (!id || seenIds.has(id)) return;
+
+    const label = categoryLabel(category);
+    const labelKey = label.trim().toLowerCase();
+
+    if (seenLabels.has(labelKey)) return;
+
+    seenIds.add(id);
+    seenLabels.add(labelKey);
 
     const option = document.createElement("option");
     option.value = id;
-    option.textContent = categoryLabel(category);
+    option.textContent = label;
     categorySelect.appendChild(option);
   });
 }
