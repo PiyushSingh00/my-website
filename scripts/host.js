@@ -687,7 +687,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     setVal("access-code", wiz.accessCode);
     const accessCodeEl = document.getElementById("access-code");
 if (accessCodeEl) accessCodeEl.setAttribute("value", wiz.accessCode || "");
-    setVal("w-tournament-type", wiz.tournamentType);
+const hideAccessCodeUi = () => {
+  const accessWrap = accessCodeInput?.closest(".field-group") || accessCodeInput?.parentElement;
+  if (accessWrap) accessWrap.style.display = "none";
+
+  const generateWrap = generateCodeBtn?.closest(".field-group") || generateCodeBtn?.parentElement;
+  if (generateWrap) generateWrap.style.display = "none";
+
+  if (generateCodeBtn) generateCodeBtn.style.display = "none";
+  if (accessCodeInput) accessCodeInput.style.display = "none";
+};  
+setVal("w-tournament-type", wiz.tournamentType);
     setVal("w-stage-format", wiz.stageFormat);
     setVal("w-group-count", wiz.groupCount);
     setVal("w-event-count", wiz.eventCount);
@@ -736,7 +746,7 @@ if (accessCodeEl) accessCodeEl.setAttribute("value", wiz.accessCode || "");
     wiz.dateEnd = "";
     wiz.venue = "";
     wiz.details = "";
-    wiz.accessCode = "";
+    wiz.accessCode = generateAccessCode();
     wiz.isPublic = true;
 
     wiz.tournamentType = "single";
@@ -966,7 +976,7 @@ if (accessCodeEl) accessCodeEl.setAttribute("value", wiz.accessCode || "");
         <p><strong>Sport:</strong> ${escapeHtml(wiz.sport)}</p>
         <p><strong>Dates:</strong> ${escapeHtml(formatDateRange(wiz.dateStart, wiz.dateEnd))}</p>
         <p><strong>Venue:</strong> ${escapeHtml(wiz.venue)}</p>
-        <p><strong>Access code:</strong> ${escapeHtml(wiz.accessCode || "Will be generated later")}</p>
+        <p><strong>Access code:</strong> Auto-generated</p>
         <p><strong>Visibility:</strong> ${wiz.isPublic ? "Public" : "Private"}</p>
         <p><strong>Details:</strong> ${escapeHtml(wiz.details || "—")}</p>
       </div>
@@ -1862,42 +1872,7 @@ if (accessCodeEl) accessCodeEl.setAttribute("value", wiz.accessCode || "");
       window.location.href = `players.html?tournamentId=${encodeURIComponent(selectedTournamentId)}`;
     });
 
-  generateCodeBtn?.addEventListener("click", async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const isWizardMode =
-    !!newTournamentView?.classList.contains("host-view--active") &&
-    !viewOnlyMode &&
-    !viewingTournamentId;
-
-  if (isWizardMode) {
-    const code = generateAccessCode();
-
-    wiz.accessCode = code;
-
-    if (accessCodeInput) {
-      accessCodeInput.removeAttribute("readonly");
-      accessCodeInput.value = code;
-      accessCodeInput.defaultValue = code;
-      accessCodeInput.setAttribute("value", code);
-      accessCodeInput.readOnly = true;
-    }
-
-    syncFormFromState();
-
-    if (accessCodeInput) {
-      accessCodeInput.removeAttribute("readonly");
-      accessCodeInput.value = code;
-      accessCodeInput.defaultValue = code;
-      accessCodeInput.setAttribute("value", code);
-      accessCodeInput.readOnly = true;
-    }
-
-    console.log("Generated access code:", code, "Input now:", accessCodeInput?.value);
-    return;
-  }
-
+  generateCodeBtn?.addEventListener("click", async () => {
   const tournament = allTournaments.find(
     (t) => String(t.tournamentId ?? t.id) === String(selectedTournamentId)
   );
@@ -2033,7 +2008,8 @@ if (accessCodeEl) accessCodeEl.setAttribute("value", wiz.accessCode || "");
     });
   });
 
-  resetWizardState();
-  await loadSports();
-  await loadMyTournaments();
+hideAccessCodeUi();
+resetWizardState();
+await loadSports();
+await loadMyTournaments();
 });
