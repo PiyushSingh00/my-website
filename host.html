@@ -633,12 +633,27 @@
                   </div>
 
                   <!-- STEP 6 -->
+                  <!-- STEP 6 -->
                   <div class="wiz-step" data-step="5">
                     <p class="eyebrow">Step 6 of 6</p>
                     <h2 class="wiz-step-title">Review tournament</h2>
                     <div id="wiz-review-body" class="review-card"></div>
+
+                    <div class="field-group" style="margin-top:20px;">
+                      <label for="access-code">Access code</label>
+                      <div class="code-row">
+                        <input
+                          type="text"
+                          id="access-code"
+                          name="accessCode"
+                          placeholder="Click Generate code"
+                          readonly
+                        />
+                        <button type="button" class="btn-dark" id="generate-code-btn">Generate code</button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                                  </div>
 
                 <div class="actions-row wizard-actions">
                   <button type="button" class="btn-secondary hidden" id="wiz-back-btn">← Back</button>

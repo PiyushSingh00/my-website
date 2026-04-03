@@ -600,32 +600,63 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function hydrateSubmissionState() {
-    const requests = await loadTeamRequestsForTournament();
-    const captainState = await loadCaptainStateForTournament();
+  const requests = await loadTeamRequestsForTournament();
+  const captainState = await loadCaptainStateForTournament();
 
-    if (captainState) {
-      tournamentMeta.captainState = captainState;
-    }
+  if (captainState) {
+    tournamentMeta.captainState = captainState;
+  }
 
-    const myCaptainRequest = requests.find((req) => isSameCaptain(req, user));
-    if (myCaptainRequest) {
-      currentUserIsCaptain = true;
-      currentCaptainSubmission = myCaptainRequest;
-    } else {
-      currentUserIsCaptain = false;
-      currentCaptainSubmission = null;
-    }
+  const confirmedCaptains = Array.isArray(captainState?.confirmedCaptains)
+    ? captainState.confirmedCaptains
+    : [];
 
-    const acceptedInvite = requests.find((req) => {
-      const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
-      return invited.some((invite) => {
-        const sameUser = isSameUserByInviteFields(invite, user);
-        return sameUser && invite.inviteStatus === "accepted";
-      });
+  const isConfirmedCaptain = confirmedCaptains.some((captain) => {
+    return (
+      identitiesMatch(captain?.playerName, user?.name) ||
+      identitiesMatch(captain?.playerName, user?.username) ||
+      identitiesMatch(captain?.username, user?.username)
+    );
+  });
+
+  const myCaptainRequest = requests.find((req) => isSameCaptain(req, user));
+
+  currentUserIsCaptain = !!isConfirmedCaptain;
+
+  if (myCaptainRequest) {
+    currentCaptainSubmission = myCaptainRequest;
+  } else if (isConfirmedCaptain) {
+    const captainMeta = confirmedCaptains.find((captain) => {
+      return (
+        identitiesMatch(captain?.playerName, user?.name) ||
+        identitiesMatch(captain?.playerName, user?.username) ||
+        identitiesMatch(captain?.username, user?.username)
+      );
     });
 
-    currentAcceptedInvite = acceptedInvite || null;
+    currentCaptainSubmission = {
+      teamName: captainMeta?.teamName || "",
+      captainName: captainMeta?.playerName || user.name || user.username || "",
+      captainUsername: user.username || "",
+      captainPlayerId: captainMeta?.playerId || "",
+      categoryId: captainMeta?.categoryId || "",
+      categoryLabel: captainMeta?.categoryLabel || "",
+      invitedPlayers: [],
+    };
+  } else {
+    currentCaptainSubmission = null;
   }
+
+  const acceptedInvite = requests.find((req) => {
+    const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+    return invited.some((invite) => {
+      const sameUser = isSameUserByInviteFields(invite, user);
+      return sameUser && invite.inviteStatus === "accepted";
+    });
+  });
+
+  currentAcceptedInvite = acceptedInvite || null;
+}
 
   function hydratePage() {
     tournamentNameEl.textContent = tournamentMeta?.tournamentName || "-";
@@ -657,11 +688,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (currentUserIsCaptain) {
-      pageTitleEl.textContent = "Create / Manage team";
-      pageSubtitleEl.textContent = "Invite players to your team and manage pending team requests.";
-      createTeamTabBtn?.classList.remove("hidden");
-      lineupTabBtn?.classList.remove("hidden");
-    } else if (currentAcceptedInvite) {
+  pageTitleEl.textContent = currentCaptainSubmission?.invitedPlayers?.length
+    ? "Create / Manage team"
+    : "Create team";
+  pageSubtitleEl.textContent = "Invite players to your team and manage pending team requests.";
+  createTeamTabBtn?.classList.remove("hidden");
+  lineupTabBtn?.classList.remove("hidden");
+}else if (currentAcceptedInvite) {
       pageTitleEl.textContent = "My team";
       pageSubtitleEl.textContent = "View the team you are part of for this tournament.";
       createTeamTabBtn?.classList.add("hidden");

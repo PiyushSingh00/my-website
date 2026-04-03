@@ -65,14 +65,19 @@ function parseTournamentDateRange(raw) {
   const value = String(raw || "").trim();
   if (!value) return { start: null, end: null };
 
-  if (value.includes(" to ")) {
-    const [startStr, endStr] = value.split(" to ").map((x) => x.trim());
-    const start = new Date(startStr);
-    const end = new Date(endStr);
-    return {
-      start: isValidDate(start) ? start : null,
-      end: isValidDate(end) ? end : null,
-    };
+  const separators = [" to ", "to", " - ", "-", " – ", "–", " — ", "—"];
+  for (const sep of separators) {
+    if (value.includes(sep)) {
+      const parts = value.split(sep).map((x) => x.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        const start = new Date(parts[0]);
+        const end = new Date(parts[1]);
+        return {
+          start: isValidDate(start) ? start : null,
+          end: isValidDate(end) ? end : null,
+        };
+      }
+    }
   }
 
   const single = new Date(value);
@@ -1132,7 +1137,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     allTournaments = normalizeTournamentList(res.data);
     populateSportFilter(allTournaments);
-    renderDashboard(allTournaments);
+    renderDashboard(getFilteredAndSortedTournaments());
     renderMyTournaments(getFilteredAndSortedTournaments());
   }
 
