@@ -685,19 +685,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setVal("w-venue", wiz.venue);
     setVal("w-details", wiz.details);
     setVal("access-code", wiz.accessCode);
-    const accessCodeEl = document.getElementById("access-code");
-if (accessCodeEl) accessCodeEl.setAttribute("value", wiz.accessCode || "");
-const hideAccessCodeUi = () => {
-  const accessWrap = accessCodeInput?.closest(".field-group") || accessCodeInput?.parentElement;
-  if (accessWrap) accessWrap.style.display = "none";
-
-  const generateWrap = generateCodeBtn?.closest(".field-group") || generateCodeBtn?.parentElement;
-  if (generateWrap) generateWrap.style.display = "none";
-
-  if (generateCodeBtn) generateCodeBtn.style.display = "none";
-  if (accessCodeInput) accessCodeInput.style.display = "none";
-};  
-setVal("w-tournament-type", wiz.tournamentType);
+    setVal("w-tournament-type", wiz.tournamentType);
     setVal("w-stage-format", wiz.stageFormat);
     setVal("w-group-count", wiz.groupCount);
     setVal("w-event-count", wiz.eventCount);
@@ -746,7 +734,7 @@ setVal("w-tournament-type", wiz.tournamentType);
     wiz.dateEnd = "";
     wiz.venue = "";
     wiz.details = "";
-    wiz.accessCode = generateAccessCode();
+    wiz.accessCode = "";
     wiz.isPublic = true;
 
     wiz.tournamentType = "single";
@@ -976,7 +964,7 @@ setVal("w-tournament-type", wiz.tournamentType);
         <p><strong>Sport:</strong> ${escapeHtml(wiz.sport)}</p>
         <p><strong>Dates:</strong> ${escapeHtml(formatDateRange(wiz.dateStart, wiz.dateEnd))}</p>
         <p><strong>Venue:</strong> ${escapeHtml(wiz.venue)}</p>
-        <p><strong>Access code:</strong> Auto-generated</p>
+        <p><strong>Access code:</strong> ${escapeHtml(wiz.accessCode || "Will be generated later")}</p>
         <p><strong>Visibility:</strong> ${wiz.isPublic ? "Public" : "Private"}</p>
         <p><strong>Details:</strong> ${escapeHtml(wiz.details || "—")}</p>
       </div>
@@ -2043,8 +2031,7 @@ setVal("w-tournament-type", wiz.tournamentType);
     });
   });
 
-hideAccessCodeUi();
-resetWizardState();
-await loadSports();
-await loadMyTournaments();
+  resetWizardState();
+  await loadSports();
+  await loadMyTournaments();
 });
