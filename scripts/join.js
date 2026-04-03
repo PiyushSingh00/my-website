@@ -484,38 +484,45 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function updateInviteStatus(request, status) {
-    const payload = {
-      teamRequestId: request.teamRequestId || request.id,
-      tournamentId: request.tournamentId,
-      status,
-      username: user.username || "",
-      playerName: user.name || user.username || "",
-    };
+  const invite = (Array.isArray(request?.invitedPlayers) ? request.invitedPlayers : []).find((p) =>
+    isSameUserByInviteFields(p, user)
+  );
 
-    const candidates = [
-      `/api/player/team-requests/${encodeURIComponent(request.teamRequestId || request.id)}/${status}`,
-      `/api/player/team-requests/respond`,
-      `/api/team-requests/respond`,
-    ];
-
-    for (const url of candidates) {
-      const body =
-        url.endsWith(`/${status}`) ? {} : payload;
-
-      const r = await apiPost(url, body);
-      if (r.ok) {
-        await loadTeamInvites();
-        await loadNotifications();
-        renderNotifications();
-        renderTeamInvites();
-        await loadMyTournaments();
-        renderMyJoinedList();
-        return;
-      }
-    }
-
-    alert(`Could not ${status} invite.`);
+  if (!invite?.playerId) {
+    alert("Could not identify invited player record.");
+    return;
   }
+
+  const r = await apiPost(
+    `/api/host/tournaments/${encodeURIComponent(request.tournamentId)}/team-requests/${encodeURIComponent(request.requestId || request.teamRequestId || request.id)}`,
+    null
+  );
+
+  // fallback because apiPost always POST, but this endpoint is PATCH
+  const patchRes = await apiJson(
+    `/api/host/tournaments/${encodeURIComponent(request.tournamentId)}/team-requests/${encodeURIComponent(request.requestId || request.teamRequestId || request.id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        playerId: invite.playerId,
+        status,
+      }),
+    }
+  );
+
+  if (!patchRes.ok) {
+    alert(`Could not ${status} invite.`);
+    return;
+  }
+
+  await loadTeamInvites();
+  await loadNotifications();
+  renderNotifications();
+  renderTeamInvites();
+  await loadMyTournaments();
+  renderMyJoinedList();
+}
 
   joinCodeBtn?.addEventListener("click", async () => {
     const code = joinCodeInput.value.trim();

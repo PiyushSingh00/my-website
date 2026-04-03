@@ -360,32 +360,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   refreshBtn?.addEventListener("click", refreshSuggestion);
 
   finalizeBtn?.addEventListener("click", async () => {
-    const schemaToSave = collectSelectedSchema();
-    statusEl.textContent = "Saving finalized schema...";
+  const schemaToSave = collectSelectedSchema();
+  statusEl.textContent = "Saving finalized schema...";
 
-    const payload = {
-      tournamentId,
-      categoryId,
-      schema: schemaToSave,
-    };
+  const payload = {
+    categoryId,
+    scoringSchema: schemaToSave,
+  };
 
-    const candidates = [
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/finalize`,
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`,
-    ];
+  const candidates = [
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema/finalize`,
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`,
+  ];
 
-    for (const url of candidates) {
-      const r = await apiPost(url, payload);
-      if (r.ok) {
-        statusEl.textContent = "Schema finalized successfully.";
-        alert("Scoring schema finalized.");
-        return;
-      }
+  for (const url of candidates) {
+    const r = await apiPost(url, url.includes("/finalize") ? payload : { schema: schemaToSave });
+    if (r.ok) {
+      statusEl.textContent = "Schema finalized successfully.";
+      alert("Scoring schema finalized.");
+      return;
     }
+  }
 
-    statusEl.textContent = "Could not finalize schema.";
-    alert("Could not finalize schema. Check backend route.");
-  });
+  statusEl.textContent = "Could not finalize schema.";
+  alert("Could not finalize schema. Check backend route.");
+});
 
   backBtn?.addEventListener("click", () => {
     window.location.href = `fixtures.html?tournamentId=${encodeURIComponent(tournamentId)}`;

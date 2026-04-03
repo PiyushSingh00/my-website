@@ -204,22 +204,44 @@
           </section>
 
           <!-- LINEUP TAB -->
+          <!-- LINEUP TAB -->
           <section class="team-tab-panel" data-panel="lineup">
             <div class="lineup-shell">
               <div class="rules-box">
                 <h3>Lineup submission</h3>
-                <p class="helper-text">
-                  This area is reserved for tie-wise playing-sequence submission. It can be wired
-                  to your backend lineup endpoints once those routes are ready.
+                <p class="helper-text" id="lineup-help-text">
+                  Captains can submit tie-wise lineup slips here.
                 </p>
               </div>
 
               <div id="lineup-empty-state" class="empty-state-card">
-                <h3>No tie selected yet</h3>
+                <h3>No lineup available</h3>
                 <p class="helper-text">
-                  Once tie-level lineup workflow is enabled, captain lineup slips will appear here.
+                  Captains will see the lineup form here once their team is available.
                 </p>
               </div>
+
+              <div id="lineup-builder" class="hidden">
+                <div class="field-group">
+                  <label for="lineup-tie-label">Tie label</label>
+                  <input type="text" id="lineup-tie-label" placeholder="e.g. League Tie 1" />
+                </div>
+
+                <div class="field-group">
+                  <label for="lineup-category-select">Category</label>
+                  <select id="lineup-category-select">
+                    <option value="">Select category</option>
+                  </select>
+                </div>
+
+                <div id="lineup-submatches-wrap" class="team-player-rows"></div>
+
+                <div class="form-actions">
+                  <button type="button" class="btn-dark" id="lineup-save-btn">Save lineup</button>
+                </div>
+              </div>
+
+              <div id="lineup-existing-list" class="my-team-player-list"></div>
             </div>
           </section>
         </section>

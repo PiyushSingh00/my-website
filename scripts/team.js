@@ -897,6 +897,269 @@ document.addEventListener("DOMContentLoaded", async () => {
     alert("Could not create team request. Please verify backend route.");
   });
 
+    // ---------------------------------------------------------------------------
+  // LINEUP TAB
+  // ---------------------------------------------------------------------------
+  const lineupEmptyStateEl = document.getElementById("lineup-empty-state");
+  const lineupBuilderEl = document.getElementById("lineup-builder");
+  const lineupExistingListEl = document.getElementById("lineup-existing-list");
+  const lineupTieLabelInput = document.getElementById("lineup-tie-label");
+  const lineupCategorySelect = document.getElementById("lineup-category-select");
+  const lineupSubmatchesWrap = document.getElementById("lineup-submatches-wrap");
+  const lineupSaveBtn = document.getElementById("lineup-save-btn");
+  const lineupHelpTextEl = document.getElementById("lineup-help-text");
+
+  let lineupStateLocal = {
+    existing: [],
+    myRequest: null,
+  };
+
+  function getAdvancedSettingsSafe() {
+    const raw = tournamentMeta?.advancedSettings;
+    if (!raw) return {};
+    if (typeof raw === "object") return raw;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+
+  function getSubmatchCount() {
+    const adv = getAdvancedSettingsSafe();
+    return Math.max(1, Number(adv.tieSubmatchCount || 5));
+  }
+
+  async function loadMyTeamRequestForLineup() {
+    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`);
+    const requests = Array.isArray(r.data) ? r.data : [];
+
+    lineupStateLocal.myRequest =
+      requests.find((req) => isSameCaptain(req, user)) ||
+      requests.find((req) => {
+        const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+        return invited.some((p) => isSameUserByInviteFields(p, user) && p.inviteStatus === "accepted");
+      }) ||
+      null;
+  }
+
+  async function loadExistingLineupsForMe() {
+    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups`);
+    lineupStateLocal.existing = Array.isArray(r.data?.ties) ? r.data.ties : [];
+  }
+
+  function getMyTeamRoster() {
+    const req = lineupStateLocal.myRequest;
+    if (!req) return [];
+
+    const roster = [];
+    const captainName = req.captainName || user.name || user.username || "Captain";
+    const captainUsername = req.captainUsername || user.username || "";
+
+    roster.push({
+      playerId: req.captainPlayerId || captainUsername || captainName,
+      playerName: captainName,
+    });
+
+    const invited = Array.isArray(req.invitedPlayers) ? req.invitedPlayers : [];
+    invited.forEach((p) => {
+      if (String(p.inviteStatus || "").toLowerCase() !== "accepted") return;
+      roster.push({
+        playerId: p.playerId,
+        playerName: p.inviteeName || p.playerName || p.name || p.username || "Player",
+      });
+    });
+
+    const seen = new Set();
+    return roster.filter((p) => {
+      const id = String(p.playerId || p.playerName);
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }
+
+  function buildLineupPlayerOptions(currentValue = "") {
+    const players = getMyTeamRoster();
+    return players
+      .map((p) => {
+        const v = String(p.playerId || "");
+        return `<option value="${escapeHtml(v)}" ${v === String(currentValue) ? "selected" : ""}>${escapeHtml(p.playerName || "Player")}</option>`;
+      })
+      .join("");
+  }
+
+  function populateLineupCategories() {
+    if (!lineupCategorySelect) return;
+    lineupCategorySelect.innerHTML = `<option value="">Select category</option>`;
+
+    normalizeCategories(tournamentMeta?.categories).forEach((c) => {
+      const id = String(c.categoryId || c.id || "");
+      if (!id) return;
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = categoryLabel(c);
+      lineupCategorySelect.appendChild(opt);
+    });
+
+    if (lineupStateLocal.myRequest?.categoryId) {
+      lineupCategorySelect.value = String(lineupStateLocal.myRequest.categoryId);
+    }
+  }
+
+  function renderLineupSubmatches(savedSubmatches = []) {
+    if (!lineupSubmatchesWrap) return;
+    lineupSubmatchesWrap.innerHTML = "";
+
+    const count = getSubmatchCount();
+    for (let i = 0; i < count; i++) {
+      const row = savedSubmatches[i] || {};
+      const card = document.createElement("div");
+      card.className = "lineup-slot-card";
+      card.innerHTML = `
+        <div class="lineup-slot-title">Submatch ${i + 1}</div>
+        <div class="lineup-two-col">
+          <div class="field-group">
+            <label>Player 1</label>
+            <select class="lineup-player-a" data-index="${i}">
+              <option value="">Select player</option>
+              ${buildLineupPlayerOptions(row.playerIds?.[0] || "")}
+            </select>
+          </div>
+          <div class="field-group">
+            <label>Player 2</label>
+            <select class="lineup-player-b" data-index="${i}">
+              <option value="">Select player</option>
+              ${buildLineupPlayerOptions(row.playerIds?.[1] || "")}
+            </select>
+          </div>
+        </div>
+      `;
+      lineupSubmatchesWrap.appendChild(card);
+    }
+  }
+
+  function collectLineupPayload() {
+    const req = lineupStateLocal.myRequest;
+    const rosterMap = new Map(getMyTeamRoster().map((p) => [String(p.playerId), p.playerName]));
+
+    const submatches = Array.from(lineupSubmatchesWrap.querySelectorAll(".lineup-slot-card")).map((card, idx) => {
+      const a = card.querySelector(".lineup-player-a")?.value || "";
+      const b = card.querySelector(".lineup-player-b")?.value || "";
+
+      return {
+        slot: idx + 1,
+        playerIds: [a, b].filter(Boolean),
+        playerNames: [rosterMap.get(a), rosterMap.get(b)].filter(Boolean),
+      };
+    });
+
+    return {
+      tieId: req?.requestId || undefined,
+      tieLabel: lineupTieLabelInput?.value?.trim() || `Tie ${req?.teamName || ""}`.trim(),
+      teamA: req?.teamName || "My Team",
+      teamB: "",
+      teamKey: req?.requestId || "",
+      categoryId: lineupCategorySelect?.value || req?.categoryId || "",
+      captainUsername: req?.captainUsername || user.username || "",
+      captainName: req?.captainName || user.name || user.username || "",
+      submatches,
+      locked: false,
+    };
+  }
+
+  function renderExistingLineups() {
+    if (!lineupExistingListEl) return;
+    lineupExistingListEl.innerHTML = "";
+
+    if (!lineupStateLocal.existing.length) {
+      lineupExistingListEl.innerHTML = `<div class="helper-text">No lineup submitted yet.</div>`;
+      return;
+    }
+
+    lineupStateLocal.existing.forEach((tie) => {
+      const card = document.createElement("div");
+      card.className = "meta-chip";
+      card.innerHTML = `
+        <strong>${escapeHtml(tie.tieLabel || "Tie")}</strong>
+        <span class="helper-text">${escapeHtml(tie.teamA || "")}</span>
+        <span class="helper-text">${tie.locked ? "Locked" : "Pending"}</span>
+      `;
+      lineupExistingListEl.appendChild(card);
+    });
+  }
+
+  async function setupLineupTab() {
+    if (!lineupTabBtn) return;
+
+    const adv = getAdvancedSettingsSafe();
+    const isPickleballLeague = adv.advancedMode === "pickleball_team_league";
+
+    if (!isPickleballLeague) {
+      lineupTabBtn.classList.add("hidden");
+      return;
+    }
+
+    await loadMyTeamRequestForLineup();
+    await loadExistingLineupsForMe();
+
+    if (!lineupStateLocal.myRequest) {
+      lineupTabBtn.classList.add("hidden");
+      return;
+    }
+
+    lineupTabBtn.classList.remove("hidden");
+    populateLineupCategories();
+    renderLineupSubmatches();
+    renderExistingLineups();
+
+    const isCaptain =
+      (lineupStateLocal.myRequest?.captainUsername && identitiesMatch(lineupStateLocal.myRequest.captainUsername, user.username)) ||
+      (lineupStateLocal.myRequest?.captainName && identitiesMatch(lineupStateLocal.myRequest.captainName, user.name)) ||
+      (lineupStateLocal.myRequest?.captainName && identitiesMatch(lineupStateLocal.myRequest.captainName, user.username));
+
+    if (isCaptain) {
+      lineupEmptyStateEl?.classList.add("hidden");
+      lineupBuilderEl?.classList.remove("hidden");
+      if (lineupHelpTextEl) {
+        lineupHelpTextEl.textContent = "Submit your team lineup for this tie.";
+      }
+    } else {
+      lineupEmptyStateEl?.classList.add("hidden");
+      lineupBuilderEl?.classList.add("hidden");
+      if (lineupHelpTextEl) {
+        lineupHelpTextEl.textContent = "You can view submitted lineups here.";
+      }
+    }
+  }
+
+  lineupSaveBtn?.addEventListener("click", async () => {
+    const payload = collectLineupPayload();
+
+    if (!payload.categoryId) {
+      alert("Select category first.");
+      return;
+    }
+
+    const hasAtLeastOne = payload.submatches.some((m) => (m.playerIds || []).length > 0);
+    if (!hasAtLeastOne) {
+      alert("Add at least one submatch lineup.");
+      return;
+    }
+
+    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups`, payload);
+    if (!r.ok) {
+      alert("Could not save lineup.");
+      return;
+    }
+
+    alert("Lineup saved.");
+    await loadExistingLineupsForMe();
+    renderExistingLineups();
+  });
+
+  await setupLineupTab();
+
   // ---------------------------------------------------------------------------
   // INITIAL LOAD
   // ---------------------------------------------------------------------------
@@ -910,4 +1173,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   allPlayers = await loadPlayers();
   await hydrateSubmissionState();
   hydratePage();
+
+
 });

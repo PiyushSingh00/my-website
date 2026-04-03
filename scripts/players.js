@@ -1311,30 +1311,65 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderLineupReview() {
-    if (!lineupReviewSection || !lineupReviewList) return;
+  if (!lineupReviewSection || !lineupReviewList) return;
 
-    lineupReviewList.innerHTML = "";
+  lineupReviewList.innerHTML = "";
 
-    if (!lineupState.ties.length) {
-      lineupReviewList.innerHTML = `<div class="muted">No lineup submissions yet.</div>`;
-      return;
-    }
-
-    lineupState.ties.forEach((tie) => {
-      const card = document.createElement("div");
-      card.className = "lineup-review-card";
-      card.innerHTML = `
-        <div class="lineup-review-head">
-          <strong>${escapeHtml(tie.teamA || "Team A")} vs ${escapeHtml(tie.teamB || "Team B")}</strong>
-          <span class="status-pill ${tie.locked ? "status-pill--accepted" : "status-pill--pending"}">
-            ${tie.locked ? "Locked" : "Pending"}
-          </span>
-        </div>
-      `;
-      lineupReviewList.appendChild(card);
-    });
+  if (!lineupState.ties.length) {
+    lineupReviewList.innerHTML = `<div class="muted">No lineup submissions yet.</div>`;
+    return;
   }
 
+  lineupState.ties.forEach((tie) => {
+    const card = document.createElement("div");
+    card.className = "lineup-review-card";
+
+    const rows = Array.isArray(tie.submatches)
+      ? tie.submatches.map((m) => {
+          const players = Array.isArray(m.playerNames) ? m.playerNames.join(" + ") : "";
+          return `<div class="helper-text">Submatch ${m.slot || "-"}: ${escapeHtml(players || "-")}</div>`;
+        }).join("")
+      : `<div class="helper-text">No submatches submitted.</div>`;
+
+    card.innerHTML = `
+      <div class="lineup-review-head">
+        <strong>${escapeHtml(tie.tieLabel || tie.teamA || "Tie")}</strong>
+        <span class="status-pill ${tie.locked ? "status-pill--accepted" : "status-pill--pending"}">
+          ${tie.locked ? "Locked" : "Pending"}
+        </span>
+      </div>
+      <div class="helper-text">${escapeHtml(tie.teamA || "")}</div>
+      <div>${rows}</div>
+      ${
+        tie.locked
+          ? ""
+          : `<div class="row-actions">
+               <button type="button" class="action-btn accept" data-lock-tie="${escapeHtml(tie.tieId || "")}">
+                 Lock lineup
+               </button>
+             </div>`
+      }
+    `;
+
+    card.querySelector("[data-lock-tie]")?.addEventListener("click", async () => {
+      const tieId = tie.tieId;
+      const r = await apiPatch(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups/${encodeURIComponent(tieId)}/lock`,
+        { locked: true }
+      );
+
+      if (!r.ok) {
+        alert("Could not lock lineup.");
+        return;
+      }
+
+      await loadLineupsFromDb();
+      renderLineupReview();
+    });
+
+    lineupReviewList.appendChild(card);
+  });
+}
   // ===========================================================================
   // LEADERBOARD (OPTIONAL NEW BLOCK)
   // ===========================================================================
