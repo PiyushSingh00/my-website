@@ -235,22 +235,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     return apiJson(url, { method: "DELETE" });
   }
 
-  function categoryLabel(c) {
-    const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
-    const gender = c?.gender ? String(c.gender).trim() : "";
-    const size = c?.teamSize ? Number(c.teamSize) : null;
-    const exact = c?.exactTeamSize ? Number(c.exactTeamSize) : null;
+function categoryLabel(c) {
+  const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
+  const gender = c?.gender ? String(c.gender).trim() : "";
+  const level = c?.playingLevel ? String(c.playingLevel).trim() : "";
+  const size = c?.teamSize ? Number(c.teamSize) : null;
+  const exact = c?.exactTeamSize ? Number(c.exactTeamSize) : null;
 
-    let type = "";
-    if (size === 1) type = "Singles";
-    else if (size === 2) type = "Doubles";
-    else if (size === 3) type = "Triples";
-    else if (size >= 4) type = exact ? `Team ${exact}` : "Team";
+  let type = "";
+  if (size === 1) type = "Singles";
+  else if (size === 2) type = "Doubles";
+  else if (size === 3) type = "Triples";
+  else if (size >= 4) type = exact ? `Team ${exact}` : "Team";
 
-    const eventName = c?.eventName ? String(c.eventName).trim() : "";
-    const parts = [eventName, age, gender, type].filter(Boolean);
-    return parts.length ? parts.join(" • ") : (c?.categoryId || c?.id || "Category");
+  const computed = [age, gender, level, type].filter(Boolean).join(" • ");
+  const eventName = c?.eventName ? String(c.eventName).trim() : "";
+
+  const normalize = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (eventName) {
+    if (!computed) return eventName;
+
+    const eventNorm = normalize(eventName);
+    const computedNorm = normalize(computed);
+
+    if (eventNorm === computedNorm) return eventName;
+    if (eventNorm.includes(computedNorm)) return eventName;
+
+    return `${eventName} • ${computed}`;
   }
+
+  return computed || (c?.categoryId || c?.id || "Category");
+}
 
   function getAcceptedPlayers() {
     return allPlayers.filter((p) => normalizeStatus(p) === "accepted");
@@ -661,7 +681,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     selectedCountEl.textContent = String(getSelectedValues().length + 1);
   }
 
-  function populateCategoryDropdown() {
+function populateCategoryDropdown() {
   const categories = normalizeCategories(tournamentMeta?.categories);
   const seen = new Set();
 
