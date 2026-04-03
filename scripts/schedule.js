@@ -10,7 +10,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // topbar avatar style same as players page
   const trigger = document.getElementById("schedule-user-menu-trigger");
   const dropdown = document.getElementById("schedule-user-menu-dropdown");
 
@@ -19,7 +18,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     trigger.textContent = label.charAt(0).toUpperCase();
   }
 
-  trigger?.addEventListener("click", () => {
+  trigger?.addEventListener("click", (e) => {
+    e.stopPropagation();
     dropdown?.classList.toggle("is-open");
   });
 
@@ -42,9 +42,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   hostBtn?.classList.remove("is-active");
 
   playerBtn?.addEventListener("click", async () => {
-    playerBtn.classList.add("is-active");
-    hostBtn?.classList.remove("is-active");
-
     try {
       await fetch("/api/user/mode", {
         method: "POST",
@@ -60,9 +57,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   hostBtn?.addEventListener("click", async () => {
-    hostBtn.classList.add("is-active");
-    playerBtn?.classList.remove("is-active");
-
     try {
       await fetch("/api/user/mode", {
         method: "POST",
@@ -84,7 +78,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const params = new URLSearchParams(window.location.search);
   const tournamentId = params.get("tournamentId");
-  if (!tournamentId) return;
+  if (!tournamentId) {
+    alert("Missing tournamentId in URL");
+    return;
+  }
 
   const titleEl = document.getElementById("schedule-tournament-name");
   const metaEl = document.getElementById("schedule-tournament-meta");
@@ -93,8 +90,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const contentWrap = document.getElementById("schedule-content-wrap");
   const bracketWrap = document.getElementById("schedule-bracket-wrap");
   const liveWrap = document.getElementById("schedule-live-wrap");
-  const standingsWrap = document.getElementById("schedule-standings-wrap");
-  const standingsBody = document.getElementById("schedule-standings-body");
+  const leaderboardWrap = document.getElementById("schedule-leaderboard-wrap");
 
   const categoryToggle = document.getElementById("schedule-category-toggle");
   const groupsEl = document.getElementById("schedule-groups");
@@ -103,11 +99,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const liveListEl = document.getElementById("schedule-live-list");
   const liveEmptyEl = document.getElementById("schedule-live-empty");
 
+  const leaderboardBody = document.getElementById("schedule-leaderboard-body");
+  const leaderboardTableWrap = document.getElementById("schedule-leaderboard-table-wrap");
+  const leaderboardEmptyEl = document.getElementById("schedule-leaderboard-empty");
+
   const state = {
     tournamentMeta: null,
     fixtures: null,
     activeCategoryId: null,
     scoringSchema: null,
+    leaderboard: [],
     activeView: "bracket",
   };
 
@@ -129,6 +130,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     return { ok: res.ok, status: res.status, data };
   }
 
+  function safeJson(value, fallback = null) {
+    if (value == null) return fallback;
+    if (typeof value === "object") return value;
+    if (typeof value !== "string") return fallback;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+
   function normalizeCategories(cats) {
     if (!cats) return [];
     if (Array.isArray(cats)) return cats;
@@ -146,12 +158,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   function categoryLabel(c) {
     const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
     const gender = c?.gender ? String(c.gender).trim() : "";
+    const level = c?.playingLevel ? String(c.playingLevel).trim() : "";
     const size = c?.teamSize ? Number(c.teamSize) : null;
+    const exact = c?.exactTeamSize ? Number(c.exactTeamSize) : null;
 
-    const type =
-      size === 1 ? "Singles" : size === 2 ? "Doubles" : size ? `Team ${size}` : "";
+    let type = "";
+    if (size === 1) type = "Singles";
+    else if (size === 2) type = "Doubles";
+    else if (size === 3) type = "Triples";
+    else if (size >= 4) type = exact ? `Team ${exact}` : "Team";
 
-    const parts = [age, gender, type].filter(Boolean);
+    const parts = [age, gender, level, type].filter(Boolean);
     return parts.length ? parts.join(" • ") : (c?.categoryId || c?.id || "Category");
   }
 
@@ -228,412 +245,358 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (playerState.goals !== undefined && playerState.goals !== null) return playerState.goals;
     if (playerState.runs !== undefined && playerState.runs !== null) return playerState.runs;
     if (playerState.score !== undefined && playerState.score !== null) return playerState.score;
-
     return null;
   }
 
-  function setActiveView(view) {
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function switchView(view) {
     state.activeView = view;
 
     document.querySelectorAll(".schedule-view-tab").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.view === view);
     });
 
-    bracketWrap.style.display = view === "bracket" ? "block" : "none";
-    liveWrap.style.display = view === "live" ? "block" : "none";
+    bracketWrap?.classList.toggle("hidden", view !== "bracket");
+    liveWrap?.classList.toggle("hidden", view !== "live");
+    leaderboardWrap?.classList.toggle("hidden", view !== "leaderboard");
   }
 
-  function wireViewTabs() {
-    document.querySelectorAll(".schedule-view-tab").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        setActiveView(btn.dataset.view || "bracket");
-      });
+  document.querySelectorAll(".schedule-view-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      switchView(btn.dataset.view);
     });
+  });
+
+  async function loadTournamentMeta() {
+    const r = await apiGet("/api/tournaments");
+    if (!r.ok) return null;
+
+    const list = Array.isArray(r.data)
+      ? r.data
+      : Array.isArray(r.data?.data)
+        ? r.data.data
+        : Array.isArray(r.data?.tournaments)
+          ? r.data.tournaments
+          : [];
+
+    return list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId)) || null;
   }
 
-  function renderCategoryToggles(categories) {
-    if (!categoryToggle) return;
+  async function loadFixtures() {
+    const r = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+    if (!r.ok) return null;
+    return migrateFixtures(r.data?.data || r.data || null);
+  }
+
+  async function loadScoringSchema() {
+    const r = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
+    if (!r.ok) return null;
+    return r.data?.data || r.data || null;
+  }
+
+  async function loadLeaderboard() {
+    const candidates = [
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/leaderboard`,
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard`,
+    ];
+
+    for (const url of candidates) {
+      const r = await apiGet(url);
+      if (!r.ok) continue;
+
+      if (Array.isArray(r.data)) return r.data;
+      if (Array.isArray(r.data?.rows)) return r.data.rows;
+      if (Array.isArray(r.data?.data)) return r.data.data;
+    }
+
+    return [];
+  }
+
+  function renderHeader() {
+    titleEl.textContent = state.tournamentMeta?.tournamentName || "Tournament schedule";
+    metaEl.textContent = [
+      state.tournamentMeta?.sportName || "",
+      state.tournamentMeta?.tournamentDates || "",
+      state.tournamentMeta?.venue || "",
+    ]
+      .filter(Boolean)
+      .join(" • ");
+  }
+
+  function renderCategoryToggles() {
     categoryToggle.innerHTML = "";
 
-    categories.forEach((c) => {
+    const categories = normalizeCategories(state.tournamentMeta?.categories);
+    if (!categories.length) {
+      categoryToggle.innerHTML = `<div class="muted">No categories found.</div>`;
+      return;
+    }
+
+    categories.forEach((category) => {
+      const id = category.categoryId || category.id;
+      if (!id) return;
+
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "toggle-btn";
-      btn.textContent = c.label || "Category";
+      btn.textContent = categoryLabel(category);
 
-      if (String(state.activeCategoryId) === String(c.id)) {
-        btn.classList.add("active");
-      }
+      if (String(state.activeCategoryId) === String(id)) btn.classList.add("active");
 
       btn.addEventListener("click", () => {
-        state.activeCategoryId = c.id;
-        noneSelectedEl && (noneSelectedEl.style.display = "none");
-
-        categoryToggle.querySelectorAll(".toggle-btn").forEach((b) => {
-          b.classList.remove("active");
-        });
+        state.activeCategoryId = id;
+        categoryToggle.querySelectorAll(".toggle-btn").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
-
-        renderCategoryBracket(c.id);
+        noneSelectedEl.style.display = "none";
+        renderBracketView();
       });
 
       categoryToggle.appendChild(btn);
     });
   }
 
-  function renderCategoryBracket(categoryId) {
-    if (!groupsEl) return;
+  function renderLeaguePlaceholder() {
+    groupsEl.innerHTML = `
+      <div class="schedule-group">
+        <div class="schedule-group-header">
+          <h3 class="schedule-group-title">Advanced league / tie mode</h3>
+        </div>
+        <div class="empty-state">
+          <div class="feature-icon">🏓</div>
+          <h3>League tie rendering pending</h3>
+          <p class="muted">
+            This tournament is using the advanced league + knockout format.
+            Schedule page is ready to show leaderboard and public updates, but full tie-round rendering
+            still depends on backend tie-generation and public tie endpoints.
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBracketView() {
     groupsEl.innerHTML = "";
 
-    const cat = state.fixtures?.categories?.[categoryId];
+    if (!state.activeCategoryId) {
+      noneSelectedEl.style.display = "flex";
+      return;
+    }
+
+    const advanced = safeJson(state.tournamentMeta?.advancedSettings, state.tournamentMeta?.advancedSettings) || {};
+    const isLeagueMode =
+      state.tournamentMeta?.stageFormat === "number_draw_league_knockout" ||
+      advanced?.advancedMode === "pickleball_team_league";
+
+    if (isLeagueMode) {
+      renderLeaguePlaceholder();
+      return;
+    }
+
+    const cat = state.fixtures?.categories?.[state.activeCategoryId];
     if (!cat || !Array.isArray(cat.rounds) || !cat.rounds.length) {
       groupsEl.innerHTML = `
-        <div class="empty-state" style="display:flex;">
-          <div class="feature-icon">🧩</div>
-          <h3>No fixtures yet</h3>
-          <p class="muted">Fixtures have not been published for this category.</p>
+        <div class="empty-state">
+          <div class="feature-icon">📅</div>
+          <h3>No schedule found</h3>
+          <p class="muted">Fixtures are not available for this category yet.</p>
         </div>
       `;
       return;
     }
 
-    const scoreKey = state.scoringSchema?.winnerLogic?.field || "points";
-    const totalRounds = cat.totalRounds || cat.total_rounds || cat.rounds.length;
+    const roundsHtml = cat.rounds
+      .map((round, r) => {
+        const matches = round
+          .map((m) => {
+            const homeScore = getSlotScore(m, "home", state.scoringSchema?.winnerLogic?.field);
+            const awayScore = getSlotScore(m, "away", state.scoringSchema?.winnerLogic?.field);
 
-    const COL_W = 220;
-    const COL_GAP = 56;
-    const CARD_H = 132;
-    const ROW_GAP = 16;
-    const HEADER_H = 32;
-    const PAD_V = 12;
-    const PAD_H = 12;
+            return `
+              <div class="bk-card">
+                <div class="fixture-line">
+                  <span>${escapeHtml(m?.home ?? "BYE")}</span>
+                  <span class="fixture-score">${homeScore ?? ""}</span>
+                </div>
+                <div class="fixture-line">
+                  <span>${escapeHtml(m?.away ?? "BYE")}</span>
+                  <span class="fixture-score">${awayScore ?? ""}</span>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
 
-    const tops = [];
-    const UNIT = CARD_H + ROW_GAP;
-
-    tops.push(cat.rounds[0].map((_, i) => HEADER_H + PAD_V + i * UNIT));
-
-    for (let r = 1; r < cat.rounds.length; r++) {
-      const prev = tops[r - 1];
-      tops.push(cat.rounds[r].map((_, i) => {
-        const f1 = i * 2;
-        const f2 = i * 2 + 1;
-        const mid1 = (prev[f1] ?? prev[prev.length - 1]) + CARD_H / 2;
-        const mid2 = (prev[f2] ?? mid1) + CARD_H / 2;
-        return Math.round((mid1 + mid2) / 2 - CARD_H / 2);
-      }));
-    }
-
-    const canvasH = tops.reduce((max, rt) => {
-      const last = rt[rt.length - 1] ?? 0;
-      return Math.max(max, last + CARD_H + PAD_V);
-    }, 200);
-
-    const canvasW = PAD_H + cat.rounds.length * (COL_W + COL_GAP);
-
-    function slotHtml(name, score, isBye) {
-      return `
-        <div class="bk-slot${isBye ? " bk-bye" : ""}">
-          <span class="bk-slot-name">${name}</span>
-          <span class="bk-slot-score ${score === null || score === undefined ? "is-empty" : ""}">
-            ${score === null || score === undefined ? "-" : score}
-          </span>
-        </div>
-      `;
-    }
-
-    function buildCard(m, r, i) {
-      const home = m?.home ?? "TBD";
-      const away = m?.away ?? "TBD";
-      const homeBye = String(home).toUpperCase() === "BYE";
-      const awayBye = String(away).toUpperCase() === "BYE";
-
-      const homeScore = getSlotScore(m, "home", scoreKey);
-      const awayScore = getSlotScore(m, "away", scoreKey);
-
-      const scoreSummary =
-        homeScore !== null && awayScore !== null ? `${homeScore} – ${awayScore}` : "Score not available";
-
-      return `
-        <div class="bk-card" style="width:${COL_W}px;height:${CARD_H}px;">
-          <div class="bk-match-label">Match ${i + 1}</div>
-          ${slotHtml(home, homeScore, homeBye)}
-          ${slotHtml(away, awayScore, awayBye)}
-          <div class="bk-footer">
-            <span class="bk-score-summary">${scoreSummary}</span>
-            ${m?.winner ? `<span class="bk-winner-badge">🏆 ${m.winner}</span>` : ""}
+        return `
+          <div class="schedule-round-col">
+            <div class="round-title">${escapeHtml(getRoundLabel(r, cat.totalRounds || cat.rounds.length))}</div>
+            ${matches}
           </div>
-        </div>
-      `;
-    }
+        `;
+      })
+      .join("");
 
-    const wrapper = document.createElement("div");
-    wrapper.className = "schedule-group";
-    wrapper.innerHTML = `
-      <div class="schedule-group-header">
-        <h2 class="schedule-group-title">${cat.label || "Fixtures"}</h2>
+    groupsEl.innerHTML = `
+      <div class="schedule-group">
+        <div class="schedule-group-header">
+          <h3 class="schedule-group-title">${escapeHtml(cat.label || "Category")}</h3>
+        </div>
+        <div class="schedule-bracket">
+          <div class="schedule-rounds">${roundsHtml}</div>
+        </div>
       </div>
     `;
-
-    const bracketOuter = document.createElement("div");
-    bracketOuter.className = "schedule-bracket";
-
-    const canvas = document.createElement("div");
-    canvas.style.cssText = `position:relative;height:${canvasH}px;width:${canvasW}px;`;
-
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;pointer-events:none;overflow:visible;`;
-
-    for (let r = 1; r < cat.rounds.length; r++) {
-      cat.rounds[r].forEach((_, i) => {
-        const x1 = PAD_H + (r - 1) * (COL_W + COL_GAP) + COL_W;
-        const x2 = PAD_H + r * (COL_W + COL_GAP);
-        const midX = (x1 + x2) / 2;
-        const myMidY = tops[r][i] + CARD_H / 2;
-        const prev = tops[r - 1];
-
-        [i * 2, i * 2 + 1].forEach((fi) => {
-          if (fi >= prev.length) return;
-          const fMidY = prev[fi] + CARD_H / 2;
-          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", `M ${x1} ${fMidY} H ${midX} V ${myMidY} H ${x2}`);
-          path.setAttribute("fill", "none");
-          path.setAttribute("stroke", "rgba(77,208,225,0.40)");
-          path.setAttribute("stroke-width", "1.5");
-          path.setAttribute("stroke-linecap", "round");
-          path.setAttribute("stroke-linejoin", "round");
-          svg.appendChild(path);
-        });
-      });
-    }
-
-    canvas.appendChild(svg);
-
-    cat.rounds.forEach((round, r) => {
-      const colLeft = PAD_H + r * (COL_W + COL_GAP);
-
-      const lbl = document.createElement("div");
-      lbl.className = "round-title";
-      lbl.style.cssText = `position:absolute;left:${colLeft}px;top:${PAD_V}px;width:${COL_W}px;height:${HEADER_H}px;display:flex;align-items:center;`;
-      lbl.textContent = getRoundLabel(r, totalRounds);
-      canvas.appendChild(lbl);
-
-      round.forEach((m, i) => {
-        const wrap = document.createElement("div");
-        wrap.style.cssText = `position:absolute;left:${colLeft}px;top:${tops[r][i]}px;`;
-        wrap.innerHTML = buildCard(m, r, i);
-        canvas.appendChild(wrap);
-      });
-    });
-
-    bracketOuter.appendChild(canvas);
-    wrapper.appendChild(bracketOuter);
-    groupsEl.appendChild(wrapper);
   }
 
-  function renderLiveScores() {
-    if (!liveListEl) return;
+  function renderLiveView() {
     liveListEl.innerHTML = "";
 
-    const scoreKey = state.scoringSchema?.winnerLogic?.field || "points";
-    const liveMatches = [];
-
     const categories = state.fixtures?.categories || {};
+    const liveCards = [];
+
     Object.keys(categories).forEach((cid) => {
       const cat = categories[cid];
-      const rounds = Array.isArray(cat?.rounds) ? cat.rounds : [];
-
-      rounds.forEach((round, roundIndex) => {
+      (cat.rounds || []).forEach((round, roundIndex) => {
         round.forEach((match, matchIndex) => {
-          const hasScore =
-            match?.score &&
-            match?.score?.state &&
-            (
-              match?.score?.state?.A ||
-              match?.score?.state?.B
-            );
+          if (!match?.score?.state) return;
 
-          const isActiveLike =
-            hasScore &&
-            !match?.winner &&
-            String(match?.home || "").toUpperCase() !== "BYE" &&
-            String(match?.away || "").toUpperCase() !== "BYE" &&
-            String(match?.home || "").toUpperCase() !== "TBD" &&
-            String(match?.away || "").toUpperCase() !== "TBD";
+          const homeScore = getSlotScore(match, "home", state.scoringSchema?.winnerLogic?.field);
+          const awayScore = getSlotScore(match, "away", state.scoringSchema?.winnerLogic?.field);
 
-          if (!isActiveLike) return;
+          const homePlayers = Array.isArray(match.homePlayers) ? match.homePlayers : splitTeamName(match.home);
+          const awayPlayers = Array.isArray(match.awayPlayers) ? match.awayPlayers : splitTeamName(match.away);
 
-          liveMatches.push({
-            categoryLabel: cat?.label || cid,
+          liveCards.push({
+            categoryLabel: cat.label || cid,
             roundIndex,
             matchIndex,
+            home: match.home || "Home",
+            away: match.away || "Away",
+            homeScore,
+            awayScore,
+            homePlayers,
+            awayPlayers,
             match,
           });
         });
       });
     });
 
-    if (!liveMatches.length) {
-      liveEmptyEl.style.display = "flex";
+    if (!liveCards.length) {
+      liveEmptyEl.classList.remove("hidden");
       return;
     }
 
-    liveEmptyEl.style.display = "none";
+    liveEmptyEl.classList.add("hidden");
 
-    liveMatches.forEach((item) => {
-      const match = item.match;
-      const homeName = match?.home || "Home";
-      const awayName = match?.away || "Away";
+    liveCards.forEach((item) => {
+      const homePlayerRows = item.homePlayers
+        .map((name) => {
+          const playerScore = getPlayerLiveScore(item.match, "home", name, state.scoringSchema?.winnerLogic?.field);
+          return `<div class="live-player-row"><span>${escapeHtml(name)}</span><span>${playerScore ?? ""}</span></div>`;
+        })
+        .join("");
 
-      const homeScore = getSlotScore(match, "home", scoreKey);
-      const awayScore = getSlotScore(match, "away", scoreKey);
-
-      const homePlayers = Array.isArray(match?.homePlayers) ? match.homePlayers : splitTeamName(match?.home);
-      const awayPlayers = Array.isArray(match?.awayPlayers) ? match.awayPlayers : splitTeamName(match?.away);
-
-      const homePlayersHtml = homePlayers.length
-        ? homePlayers.map((player) => {
-            const ps = getPlayerLiveScore(match, "home", player, scoreKey);
-            return `
-              <div class="live-player-row">
-                <span class="live-player-name">${player}</span>
-                <span class="live-player-score">${ps === null || ps === undefined ? "-" : ps}</span>
-              </div>
-            `;
-          }).join("")
-        : `<div class="live-player-row"><span class="live-player-name">${homeName}</span><span class="live-player-score">${homeScore ?? "-"}</span></div>`;
-
-      const awayPlayersHtml = awayPlayers.length
-        ? awayPlayers.map((player) => {
-            const ps = getPlayerLiveScore(match, "away", player, scoreKey);
-            return `
-              <div class="live-player-row">
-                <span class="live-player-name">${player}</span>
-                <span class="live-player-score">${ps === null || ps === undefined ? "-" : ps}</span>
-              </div>
-            `;
-          }).join("")
-        : `<div class="live-player-row"><span class="live-player-name">${awayName}</span><span class="live-player-score">${awayScore ?? "-"}</span></div>`;
+      const awayPlayerRows = item.awayPlayers
+        .map((name) => {
+          const playerScore = getPlayerLiveScore(item.match, "away", name, state.scoringSchema?.winnerLogic?.field);
+          return `<div class="live-player-row"><span>${escapeHtml(name)}</span><span>${playerScore ?? ""}</span></div>`;
+        })
+        .join("");
 
       const card = document.createElement("div");
       card.className = "live-score-card";
       card.innerHTML = `
         <div class="live-score-top">
-          <div class="live-score-meta">${item.categoryLabel} • Round ${item.roundIndex + 1} • Match ${item.matchIndex + 1}</div>
-          <div class="live-pill">Live</div>
+          <span class="live-badge">${escapeHtml(item.categoryLabel)}</span>
+          <span class="live-badge">Round ${item.roundIndex + 1}</span>
         </div>
 
-        <div class="live-scoreboard">
-          <div class="live-team">
-            <div class="live-team-name">${homeName}</div>
-            <div class="live-team-score">${homeScore === null || homeScore === undefined ? "-" : homeScore}</div>
-            <div class="live-players">${homePlayersHtml}</div>
+        <div class="live-score-main">
+          <div class="live-team-block">
+            <div class="live-team-name">${escapeHtml(item.home)}</div>
+            <div class="live-team-score">${item.homeScore ?? "-"}</div>
+            <div class="live-player-list">${homePlayerRows || `<div class="muted">No players</div>`}</div>
           </div>
 
-          <div class="live-vs">vs</div>
+          <div class="live-vs">VS</div>
 
-          <div class="live-team">
-            <div class="live-team-name">${awayName}</div>
-            <div class="live-team-score">${awayScore === null || awayScore === undefined ? "-" : awayScore}</div>
-            <div class="live-players">${awayPlayersHtml}</div>
+          <div class="live-team-block">
+            <div class="live-team-name">${escapeHtml(item.away)}</div>
+            <div class="live-team-score">${item.awayScore ?? "-"}</div>
+            <div class="live-player-list">${awayPlayerRows || `<div class="muted">No players</div>`}</div>
           </div>
         </div>
       `;
-
       liveListEl.appendChild(card);
     });
   }
 
-  async function loadMeta() {
-    const res = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}`);
-    if (!res.ok || !res.data) return;
+  function renderLeaderboard() {
+    leaderboardBody.innerHTML = "";
 
-    const t = res.data;
-    state.tournamentMeta = t;
-
-    if (titleEl) titleEl.textContent = t.tournamentName ?? "Tournament";
-    if (metaEl) metaEl.textContent = [t.sportName, t.tournamentDates].filter(Boolean).join(" • ");
-  }
-
-  async function loadFixtures() {
-    const res = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-    if (res.ok && res.data) {
-      state.fixtures = migrateFixtures(res.data);
+    if (!state.leaderboard.length) {
+      leaderboardEmptyEl.classList.remove("hidden");
+      leaderboardTableWrap.classList.add("hidden");
       return;
     }
-    state.fixtures = null;
+
+    leaderboardEmptyEl.classList.add("hidden");
+    leaderboardTableWrap.classList.remove("hidden");
+
+    state.leaderboard.forEach((row, idx) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(row.teamName || "—")}</td>
+        <td>${escapeHtml(row.matchPoints ?? 0)}</td>
+        <td>${escapeHtml(row.tiesWon ?? 0)}</td>
+        <td>${escapeHtml(row.headToHead ?? "—")}</td>
+        <td>${escapeHtml(row.qualified ? "Yes" : "No")}</td>
+      `;
+      leaderboardBody.appendChild(tr);
+    });
   }
 
-  async function loadScoringSchema() {
-    const res = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/scoring-schema`);
-    if (res.ok && res.data) {
-      state.scoringSchema = res.data;
+  async function init() {
+    state.tournamentMeta = await loadTournamentMeta();
+
+    if (!state.tournamentMeta) {
+      contentWrap?.classList.add("hidden");
+      emptyEl?.classList.remove("hidden");
+      titleEl.textContent = "Tournament not found";
+      metaEl.textContent = "Could not load tournament metadata.";
+      return;
     }
+
+    state.fixtures = await loadFixtures();
+    state.scoringSchema = await loadScoringSchema();
+    state.leaderboard = await loadLeaderboard();
+
+    const categories = normalizeCategories(state.tournamentMeta?.categories);
+    state.activeCategoryId = String(categories?.[0]?.categoryId || categories?.[0]?.id || "");
+
+    renderHeader();
+    renderCategoryToggles();
+    renderBracketView();
+    renderLiveView();
+    renderLeaderboard();
+
+    if (!state.fixtures?.categories) {
+      emptyEl?.classList.remove("hidden");
+    } else {
+      emptyEl?.classList.add("hidden");
+    }
+
+    switchView("bracket");
   }
 
-  await loadMeta();
-  await loadFixtures();
-  await loadScoringSchema();
-
-  if (!state.fixtures?.categories || !Object.keys(state.fixtures.categories).length) {
-    emptyEl && (emptyEl.style.display = "block");
-    contentWrap && (contentWrap.style.display = "none");
-    return;
-  }
-
-  const categoriesFromMeta = normalizeCategories(state.tournamentMeta?.categories);
-  const fixtureCategoryIds = Object.keys(state.fixtures.categories);
-
-  const categoryList = fixtureCategoryIds.map((cid) => {
-    const found = categoriesFromMeta.find(
-      (c) => String(c.categoryId || c.id) === String(cid)
-    );
-
-    return {
-      id: cid,
-      label: state.fixtures.categories[cid]?.label || categoryLabel(found || { categoryId: cid }),
-    };
-  });
-
-  emptyEl && (emptyEl.style.display = "none");
-  contentWrap && (contentWrap.style.display = "block");
-
-  wireViewTabs();
-  renderCategoryToggles(categoryList);
-  renderLiveScores();
-  setActiveView("bracket");
-
-  if (categoryList.length) {
-    state.activeCategoryId = categoryList[0].id;
-    const firstBtn = categoryToggle?.querySelector(".toggle-btn");
-    firstBtn?.classList.add("active");
-    noneSelectedEl && (noneSelectedEl.style.display = "none");
-    renderCategoryBracket(state.activeCategoryId);
-  }
-});
-
-// ---- Advanced standings view patch ----
-document.addEventListener("DOMContentLoaded", () => {
-  const standingsBody = document.getElementById('schedule-standings-body');
-  const standingsWrap = document.getElementById('schedule-standings-wrap');
-  const bracketWrap = document.getElementById('schedule-bracket-wrap');
-  const liveWrap = document.getElementById('schedule-live-wrap');
-  document.querySelectorAll('.schedule-view-tab').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const view = btn.dataset.view;
-      if (standingsWrap) standingsWrap.style.display = view === 'standings' ? '' : 'none';
-      if (bracketWrap) bracketWrap.style.display = view === 'bracket' ? '' : 'none';
-      if (liveWrap) liveWrap.style.display = view === 'live' ? '' : 'none';
-      document.querySelectorAll('.schedule-view-tab').forEach((b) => b.classList.toggle('active', b === btn));
-    });
-  });
-  window.renderAdvancedStandings = function(rows = []) {
-    if (!standingsBody) return;
-    standingsBody.innerHTML = rows.length ? '' : '<tr><td colspan="5" class="muted">No standings available yet.</td></tr>';
-    rows.forEach((row, idx) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${idx + 1}</td><td>${row.teamName || row.team || '-'}</td><td>${row.matchPoints ?? 0}</td><td>${row.tiesWon ?? 0}</td><td>${row.played ?? 0}</td>`;
-      standingsBody.appendChild(tr);
-    });
-  }
+  await init();
 });

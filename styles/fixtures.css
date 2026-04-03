@@ -1,9 +1,8 @@
-/* Reuse look & feel from host */
 @import url("host.css");
 
 .fixtures-card {
-  width: min(900px, 100%);
-  margin: 26px auto 40px;
+  width: min(1080px, 100%);
+  margin: 22px auto 40px;
   padding: 24px 22px 30px;
   border-radius: var(--radius-lg);
   background:
@@ -15,102 +14,8 @@
 
 .fixtures-header h1 {
   margin: 0 0 6px;
-  font-size: 24px;
-}
-.fixture-player-grid{
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-/* Prevent selects from overflowing their slot */
-.player-slot,
-.player-slot-inner,
-.player-slot-name {
-  min-width: 0;                 /* critical in flex layouts */
-}
-
-.fixture-player-select {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;        /* critical: includes padding/border in width */
-  display: block;
-}
-
-/* --- Edit fixtures dropdown: pill, clean chevron, no overflow --- */
-.player-slot {               /* keep everything inside the pill */
-  overflow: hidden;
-}
-
-.fixture-player-select{
-  flex: 1;                   /* IMPORTANT: constrain inside flex pill */
-  min-width: 0;              /* IMPORTANT: prevents overflow in flex */
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  display: block;
-
-  background: rgba(6, 12, 26, 0.95);
-  color: var(--text);
-  border: 1px solid rgba(145, 163, 196, 0.55);
-  border-radius: 999px;      /* match your player-slot pill */
-  padding: 9px 38px 9px 12px;/* space for chevron */
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  outline: none;
-
-  /* subtle “button” depth */
-  box-shadow:
-    0 8px 16px rgba(0,0,0,0.22),
-    0 1px 0 rgba(255,255,255,0.07) inset;
-
-  /* clean chevron (SVG) */
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 12px 12px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23cfe3ff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-}
-
-.fixture-player-select:hover{
-  border-color: rgba(77, 208, 225, 0.55);
-  filter: brightness(1.04);
-}
-
-.fixture-player-select:focus{
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 2px rgba(77, 208, 225, 0.18),
-    0 10px 18px rgba(0,0,0,0.24),
-    0 1px 0 rgba(255,255,255,0.07) inset;
-}
-
-.fixture-player-select option{
-  background: rgba(6, 12, 26, 1);
-  color: var(--text);
-}
-
-.fixture-player-select:hover{
-  border-color: rgba(77, 208, 225, 0.55);
-  filter: brightness(1.04);
-}
-
-.fixture-player-select:focus{
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 2px rgba(77, 208, 225, 0.20),
-    0 12px 20px rgba(0,0,0,0.24),
-    0 1px 0 rgba(255,255,255,0.08) inset;
-}
-
-/* Options list in dropdown */
-.fixture-player-select option{
-  background: rgba(6, 12, 26, 1);
-  color: var(--text);
+  font-size: 26px;
+  font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
 .fixtures-meta {
@@ -123,7 +28,6 @@
   white-space: nowrap;
 }
 
-/* Toolbar */
 .fixtures-toolbar {
   margin-top: 14px;
   margin-bottom: 8px;
@@ -132,10 +36,9 @@
   gap: 10px;
 }
 
-/* Toast: "Draws generated" */
 .fixtures-toast {
   margin-top: 4px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   padding: 5px 12px;
   border-radius: 999px;
   display: inline-flex;
@@ -147,214 +50,16 @@
   color: #bbf7d0;
 }
 
-/* Toggle buttons for male / female */
 .fixtures-toggle {
   margin-top: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   display: inline-flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.fixtures-toggle-btn {
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.fixtures-toggle-btn.active {
-  border-color: var(--accent);
-  background: rgba(77, 208, 225, 0.18);
-  color: var(--text);
-}
-
-/* Groups are stacked vertically now */
-.fixtures-group {
-  margin-top: 18px;
-  padding: 14px 14px 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(4, 10, 24, 0.95);
-}
-
-.fixtures-group-title {
-  font-size: 16px;
-  margin: 0 0 8px;
-}
-
-/* Header row inside each category group (title + actions) */
-.fixtures-group-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-
-.fixtures-group-header-left {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.fixtures-group-header-left .muted {
-  margin: 0;
-}
-
-
-
-.configure-fields-btn:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 14px 22px rgba(0, 0, 0, 0.26),
-    0 2px 0 rgba(255, 255, 255, 0.12) inset;
-  filter: brightness(1.05);
-}
-
-.configure-fields-btn:active {
-  transform: translateY(1px);
-  box-shadow:
-    0 8px 14px rgba(0, 0, 0, 0.20),
-    0 1px 0 rgba(255, 255, 255, 0.10) inset;
-}
-
-
-/* Bracket layout – rounds as branches */
-.fixtures-bracket {
-  margin-top: 16px;
-  overflow-x: auto;
-}
-
-.bracket-rounds {
-  display: flex;
-  gap: 24px;
-  padding-bottom: 6px;
-  min-width: 100%;
-}
-
-.bracket-round {
-  min-width: 210px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  position: relative;
-}
-
-/* Subtle vertical line to suggest branching */
-.bracket-round:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  left: -12px;
-  top: 24px;
-  bottom: 8px;
-  border-left: 1px dashed rgba(148, 163, 184, 0.4);
-}
-
-.round-title {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 2px;
-}
-
-.bracket-match {
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 14, 30, 0.9);
-  padding: 10px 12px;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
-}
-
-.match-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-/* Player row (name + score + winner button) */
-.player-slot {
-  padding: 7px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(145, 163, 196, 0.5);
-  font-size: 14px;
-  margin-bottom: 6px;
-  background: rgba(4, 10, 24, 0.96);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.player-slot:last-child {
-  margin-bottom: 0;
-}
-
-.player-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Score input */
-.player-score-input {
-  width: 48px;
-  background: transparent;
-  border: 1px solid rgba(145, 163, 196, 0.6);
-  border-radius: 999px;
-  padding: 2px 6px;
-  color: var(--text);
-  font-size: 13px;
-}
-
-/* Winner toggle button */
-.winner-button {
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  border: 1px solid rgba(129, 230, 217, 0.5);
-  background: transparent;
-  color: rgba(129, 230, 217, 0.9);
-  font-size: 13px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-/* Winner highlight */
-.player-slot.winner {
-  border-color: rgba(129, 230, 217, 0.9);
-  box-shadow: 0 0 0 1px rgba(129, 230, 217, 0.45);
-}
-
-/* Highlight BYE matches */
-.player-slot.bye {
-  font-style: italic;
-  color: var(--muted);
-  border-style: dashed;
-  opacity: 0.8;
-}
-
-.player-slot.bye .player-score-input,
-.player-slot.bye .winner-button {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-/*reupload*/
-
-/* Category tabs (match dark theme) */
 .fixtures-toggle .toggle-btn {
-  padding: 6px 14px;
+  padding: 7px 14px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.03);
@@ -371,141 +76,112 @@
 }
 
 .fixtures-toggle .toggle-btn.active {
-  border-color: var(--accent);
+  border-color: var(--accent-2);
   background: rgba(77, 208, 225, 0.18);
   color: var(--text);
 }
 
-/* Edit fixtures dropdown (player select) – match dark theme */
-.fixture-select {
-  width: 100%;
-  background: rgba(4, 10, 24, 0.96);
-  color: var(--text);
-  border: 1px solid rgba(145, 163, 196, 0.6);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 13px;
-  outline: none;
-}
-
-.fixture-select:hover {
-  border-color: rgba(77, 208, 225, 0.45);
-}
-
-.fixture-select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(77, 208, 225, 0.18);
-}
-
-/* Options inside dropdown */
-.fixture-select option {
-  background: rgba(4, 10, 24, 0.98);
-  color: var(--text);
-}
-
-/* ---------- Bracket Tree Layout (Left -> Right) ---------- */
-.fixtures-bracket {
-  margin-top: 14px;
-  overflow-x: auto;       /* horizontal scroll */
-  overflow-y: hidden;
-  padding-bottom: 10px;   /* room for scrollbar */
+.fixtures-group {
+  margin-top: 18px;
+  padding: 14px 14px 16px;
   border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(4, 10, 24, 0.95);
 }
 
-/* Make content wider than container so scrollbar appears */
-.bracket-rounds {
-  display: flex;
-  align-items: flex-start;
-  gap: 28px;
-  padding: 8px 8px 14px;
-  min-width: max-content; /* key: enables horizontal scroll */
+.fixtures-group-title {
+  font-size: 17px;
+  margin: 0 0 12px;
+  font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
-/* Each round is a column */
-.bracket-round {
-  min-width: 240px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--round-gap, 12px);
-  padding-top: var(--round-offset, 0px);
-  position: relative;
+.fixtures-rounds {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 1fr);
+  gap: 18px;
+  overflow-x: auto;
+  padding-bottom: 10px;
 }
 
-/* Subtle vertical guide inside each round */
-.bracket-round::before {
-  content: "";
-  position: absolute;
-  left: -14px;
-  top: 28px;
-  bottom: 10px;
-  border-left: 1px dashed rgba(148, 163, 184, 0.28);
-}
-
-/* Connector line to next round (visual tree) */
-.bracket-round:not(:last-child) .bracket-match::after {
-  content: "";
-  position: absolute;
-  right: -28px;
-  top: 50%;
-  width: 28px;
-  border-top: 1px dashed rgba(148, 163, 184, 0.35);
-  transform: translateY(-50%);
-}
-
-/* Match block needs positioning for connectors */
-.bracket-match {
-  position: relative;
-}
-
-/* nicer scrollbar (chrome/edge) */
-.fixtures-bracket::-webkit-scrollbar {
+.fixtures-rounds::-webkit-scrollbar {
   height: 10px;
 }
-.fixtures-bracket::-webkit-scrollbar-track {
+
+.fixtures-rounds::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 999px;
 }
-.fixtures-bracket::-webkit-scrollbar-thumb {
+
+.fixtures-rounds::-webkit-scrollbar-thumb {
   background: rgba(77, 208, 225, 0.35);
   border-radius: 999px;
 }
-.fixtures-bracket::-webkit-scrollbar-thumb:hover {
+
+.fixtures-rounds::-webkit-scrollbar-thumb:hover {
   background: rgba(77, 208, 225, 0.55);
 }
 
-/* Start scoring button under each match */
-.match-actions {
-  margin-top: 10px;
-  display: flex;
-  justify-content: flex-end;
+.fixtures-round-col {
+  display: grid;
+  gap: 10px;
+  align-content: start;
 }
 
-
-/* Start scoring button styled like category toggle buttons */
-.start-scoring-btn {
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+.round-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  font-weight: 600;
 }
 
-.start-scoring-btn:hover {
-  border-color: rgba(77, 208, 225, 0.45);
+.bk-card {
+  box-sizing: border-box;
+  background: rgba(8, 14, 30, 0.93);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.fixture-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 14px;
   color: var(--text);
 }
 
-.start-scoring-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.fixture-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
-.tie-round-grid{display:grid;gap:12px;margin-top:14px;}
-.tie-card{padding:14px 16px;border-radius:16px;background:rgba(6,12,26,.9);border:1px solid rgba(255,255,255,.08);display:grid;gap:10px;}
-.tie-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
-.tie-submatch-list{display:grid;gap:8px;}
-.tie-submatch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);}
+@media (max-width: 720px) {
+  .fixtures-card {
+    padding: 18px 16px 22px;
+  }
+
+  .fixtures-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fixtures-toolbar > * {
+    width: 100%;
+  }
+
+  .fixtures-rounds {
+    grid-auto-columns: minmax(210px, 1fr);
+  }
+
+  .fixtures-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

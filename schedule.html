@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>ScheduleIt – Tournament schedule</title>
+    <title>ScheduleIt – Schedule</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,13 +12,12 @@
       rel="stylesheet"
     />
 
-    <link rel="stylesheet" href="styles/join.css" />
     <link rel="stylesheet" href="styles/schedule.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div class="brand">ScheduleIt</div>
+        <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
         <div class="topbar-right">
           <div class="user-menu">
@@ -39,78 +38,102 @@
           </div>
 
           <div class="mode-toggle" role="group" aria-label="Mode toggle">
-            <button class="mode-btn is-active" id="mode-player-btn" type="button">Join mode</button>
-            <button class="mode-btn" id="mode-host-btn" type="button">Host mode</button>
+            <button class="mode-btn is-active" id="mode-player-btn" type="button">
+              Join mode
+            </button>
+            <button class="mode-btn" id="mode-host-btn" type="button">
+              Host mode
+            </button>
           </div>
         </div>
       </header>
 
       <main class="schedule-main">
         <header class="schedule-header">
-          <button type="button" id="back-to-join" class="back-link-btn">
-            ← Back to tournaments
-          </button>
+          <button type="button" class="back-link-btn" id="back-to-join">← Back</button>
 
           <div class="schedule-title-block">
-            <h1 id="schedule-tournament-name">Tournament</h1>
-            <p id="schedule-tournament-meta" class="helper-text schedule-meta"></p>
+            <h1 id="schedule-tournament-name">Tournament schedule</h1>
+            <p class="helper-text schedule-meta" id="schedule-tournament-meta">
+              Loading tournament details...
+            </p>
           </div>
         </header>
 
         <section class="schedule-card">
-          <p id="schedule-empty" class="helper-text">
-            Host has not published the schedule yet. Please check again later.
-          </p>
+          <div class="schedule-view-tabs">
+            <button type="button" class="schedule-view-tab active" data-view="bracket">
+              View schedule
+            </button>
+            <button type="button" class="schedule-view-tab" data-view="live">
+              View live score
+            </button>
+            <button type="button" class="schedule-view-tab" data-view="leaderboard">
+              Leaderboard
+            </button>
+          </div>
 
-          <div id="schedule-content-wrap" style="display: none;">
-            <div class="schedule-view-tabs" id="schedule-view-tabs">
-              <button type="button" class="schedule-view-tab active" data-view="bracket">
-                Tournament schedule
-              </button>
-              <button type="button" class="schedule-view-tab" data-view="live">
-                View live score
-              </button>
-              <button type="button" class="schedule-view-tab" data-view="standings">
-                Leaderboard
-              </button>
-            </div>
-
-            <!-- BRACKET VIEW -->
+          <!-- BRACKET / SCHEDULE -->
+          <div id="schedule-content-wrap">
             <div id="schedule-bracket-wrap" class="schedule-bracket-wrap">
-              <div id="schedule-category-toggle" class="schedule-category-toggle"></div>
+              <div class="schedule-category-toggle" id="schedule-category-toggle"></div>
 
               <div id="schedule-none-selected" class="empty-state" style="display:flex;">
                 <div class="feature-icon">🎯</div>
-                <h3>Choose which fixtures to view</h3>
+                <h3>Select a category</h3>
                 <p class="muted">
-                  Select a <strong>Category</strong> above to see the knockout bracket.
+                  Pick a category to see the tournament schedule.
                 </p>
               </div>
 
               <div id="schedule-groups"></div>
             </div>
 
-            <div id="schedule-standings-wrap" class="schedule-live-wrap" style="display:none;">
-              <div class="players-table-wrapper" style="display:block;max-height:none;">
-                <table class="players-table">
-                  <thead><tr><th>Rank</th><th>Team</th><th>Match points</th><th>Ties won</th><th>Played</th></tr></thead>
-                  <tbody id="schedule-standings-body"><tr><td colspan="5" class="muted">Leaderboard will appear here for advanced league events.</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- LIVE SCORE VIEW -->
-            <div id="schedule-live-wrap" class="schedule-live-wrap" style="display:none;">
-              <div id="schedule-live-empty" class="empty-state" style="display:none;">
+            <!-- LIVE -->
+            <div id="schedule-live-wrap" class="hidden">
+              <div id="schedule-live-empty" class="empty-state">
                 <div class="feature-icon">📡</div>
-                <h3>No live matches right now</h3>
+                <h3>No live scores yet</h3>
                 <p class="muted">
-                  Ongoing matches with saved scores will appear here.
+                  Ongoing matches with scores will appear here.
                 </p>
               </div>
 
               <div id="schedule-live-list" class="schedule-live-list"></div>
             </div>
+
+            <!-- LEADERBOARD -->
+            <div id="schedule-leaderboard-wrap" class="hidden">
+              <div id="schedule-leaderboard-empty" class="empty-state">
+                <div class="feature-icon">🏆</div>
+                <h3>No leaderboard data yet</h3>
+                <p class="muted">
+                  Leaderboard will appear when league data is available.
+                </p>
+              </div>
+
+              <div class="schedule-table-wrap hidden" id="schedule-leaderboard-table-wrap">
+                <table class="schedule-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Team</th>
+                      <th>Match points</th>
+                      <th>Ties won</th>
+                      <th>Head-to-head</th>
+                      <th>Qualified</th>
+                    </tr>
+                  </thead>
+                  <tbody id="schedule-leaderboard-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="schedule-empty" class="empty-state hidden">
+            <div class="feature-icon">📅</div>
+            <h3>No schedule found</h3>
+            <p class="muted">Fixtures are not available for this tournament yet.</p>
           </div>
         </section>
       </main>

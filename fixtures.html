@@ -5,7 +5,6 @@
     <title>ScheduleIt – Tournament fixtures</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Fonts to match other pages -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -17,40 +16,38 @@
   </head>
   <body>
     <div class="app-shell">
-      <!-- Top bar (same structure as host) -->
       <header class="topbar">
-      <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
+        <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
-      <div class="topbar-right">
-        <div class="user-menu">
-          <button
-            type="button"
-            class="user-avatar-btn"
-            id="host-user-menu-trigger"
-            aria-label="User menu"
-          >
-            U
-          </button>
-
-          <div class="user-menu-dropdown" id="host-user-menu-dropdown">
-            <button type="button" class="dropdown-item" id="dropdown-signout">
-              Sign out
+        <div class="topbar-right">
+          <div class="user-menu">
+            <button
+              type="button"
+              class="user-avatar-btn"
+              id="host-user-menu-trigger"
+              aria-label="User menu"
+            >
+              U
             </button>
+
+            <div class="user-menu-dropdown" id="host-user-menu-dropdown">
+              <button type="button" class="dropdown-item" id="dropdown-signout">
+                Sign out
+              </button>
+            </div>
+          </div>
+
+          <div class="mode-toggle" role="group" aria-label="Mode toggle">
+            <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
+            <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
           </div>
         </div>
-
-        <div class="mode-toggle" role="group" aria-label="Mode toggle">
-          <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
-          <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
-        </div>
-      </div>
-
       </header>
 
       <main class="main">
         <section class="fixtures-card">
           <header class="fixtures-header">
-            <p class="eyebrow">Tournament fixtures</p>
+            <p class="eyebrow" id="fixtures-page-kicker">Knockout fixtures</p>
             <h1 id="fixtures-tournament-name">Tournament name</h1>
             <p class="helper-text fixtures-meta">
               <span id="fixtures-tournament-sport"></span>
@@ -59,17 +56,13 @@
             </p>
           </header>
 
-          <!-- Toolbar with Back + Generate buttons -->
           <div class="fixtures-toolbar">
-            
-            <button
-              type="button"
-              class="btn-primary"
-              id="fixtures-generate-btn"
-            >
+            <button type="button" class="btn-dark" id="fixtures-back-btn">← Back</button>
+
+            <button type="button" class="btn-primary" id="fixtures-generate-btn">
               Regenerate fixtures
             </button>
-            
+
             <button type="button" class="btn-dark" id="fixtures-configure-fields-btn">
               Configure scoring fields
             </button>
@@ -77,49 +70,36 @@
             <button type="button" class="btn-dark" id="fixtures-edit-btn" style="display:none;">
               Edit fixtures
             </button>
-
           </div>
 
-          <!-- Small toast for "Draws generated" -->
-          <div
-            id="fixtures-toast"
-            class="fixtures-toast"
-            style="display: none;"
-          >
-            ✓ Draws generated
+          <div id="fixtures-toast" class="fixtures-toast" style="display:none;">
+            ✓ Done
           </div>
 
-          <p class="helper-text">
-            Fixtures now support both knockout brackets and advanced numbered-team league ties. For advanced team formats, rounds are shown as tie cards instead of only brackets.
+          <p class="helper-text" id="fixtures-helper-text">
+            Fixtures are auto-generated in random order for each category.
+            BYE indicates a free pass to the next round.
           </p>
 
-          <!-- Toggle for Male / Female -->
-          <!-- Toggle for Categories (dynamic) -->
-<div class="fixtures-toggle" id="fixtures-toggle"></div>
+          <div class="fixtures-toggle" id="fixtures-toggle"></div>
 
-
-          <!-- Center message / "no fixtures" message -->
           <div
             id="fixtures-none-selected"
             class="empty-state"
-            style="display: flex;"
+            style="display:flex;"
           >
             <div class="feature-icon">🎯</div>
             <h3>Choose which fixtures to view</h3>
             <p class="muted">
-              Select a <strong>Category</strong> above to see the knockout bracket.
+              Select a <strong>Category</strong> above to see the tournament view.
             </p>
           </div>
 
-          <!-- Male fixtures group (hidden by default) -->
-          <!-- Fixtures groups will be injected here dynamically -->
           <div id="fixtures-groups"></div>
         </section>
       </main>
     </div>
 
-<script type="module" src="scripts/fixtures.js"></script>
-
+    <script type="module" src="scripts/fixtures.js"></script>
   </body>
 </html>
-<!--reupload-->
