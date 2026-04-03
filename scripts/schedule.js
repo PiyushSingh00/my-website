@@ -130,6 +130,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     return { ok: res.ok, status: res.status, data };
   }
 
+  async function loadBackendLeaderboard(categoryId) {
+  if (!categoryId) {
+    state.leaderboard = [];
+    renderLeaderboard();
+    return;
+  }
+
+  const r = await apiGet(
+    `/api/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`
+  );
+
+  state.leaderboard = r.ok ? (Array.isArray(r.data?.rows) ? r.data.rows : []) : [];
+  renderLeaderboard();
+}
+
   function safeJson(value, fallback = null) {
     if (value == null) return fallback;
     if (typeof value === "object") return value;
@@ -270,8 +285,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   document.querySelectorAll(".schedule-view-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       switchView(btn.dataset.view);
+
+      if (btn.dataset.view === "leaderboard") {
+        state.leaderboard = await loadLeaderboard();
+        renderLeaderboard();
+      }
+
+      if (btn.dataset.view === "live") {
+        renderLiveView();
+      }
+
+      if (btn.dataset.view === "bracket") {
+        renderBracketView();
+      }
     });
   });
 
@@ -302,19 +330,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     return r.data?.data || r.data || null;
   }
 
-  async function loadLeaderboard() {
+    async function loadLeaderboard() {
+    if (!state.activeCategoryId) return [];
+
     const candidates = [
-      `/api/tournaments/${encodeURIComponent(tournamentId)}/leaderboard`,
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(state.activeCategoryId)}`,
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(state.activeCategoryId)}`,
     ];
 
     for (const url of candidates) {
       const r = await apiGet(url);
       if (!r.ok) continue;
 
-      if (Array.isArray(r.data)) return r.data;
       if (Array.isArray(r.data?.rows)) return r.data.rows;
       if (Array.isArray(r.data?.data)) return r.data.data;
+      if (Array.isArray(r.data)) return r.data;
     }
 
     return [];
@@ -351,11 +381,23 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (String(state.activeCategoryId) === String(id)) btn.classList.add("active");
 
-      btn.addEventListener("click", () => {
+            btn.addEventListener("click", async () => {
         state.activeCategoryId = id;
         categoryToggle.querySelectorAll(".toggle-btn").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         noneSelectedEl.style.display = "none";
+
+        if (state.activeView === "leaderboard") {
+          state.leaderboard = await loadLeaderboard();
+          renderLeaderboard();
+          return;
+        }
+
+        if (state.activeView === "live") {
+          renderLiveView();
+          return;
+        }
+
         renderBracketView();
       });
 
@@ -542,7 +584,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderLeaderboard() {
     leaderboardBody.innerHTML = "";
 
-    if (!state.leaderboard.length) {
+    if (!Array.isArray(state.leaderboard) || !state.leaderboard.length) {
       leaderboardEmptyEl.classList.remove("hidden");
       leaderboardTableWrap.classList.add("hidden");
       return;
@@ -551,20 +593,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     leaderboardEmptyEl.classList.add("hidden");
     leaderboardTableWrap.classList.remove("hidden");
 
-    state.leaderboard.forEach((row, idx) => {
+    state.leaderboard.forEach((row) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(row.teamName || "—")}</td>
-        <td>${escapeHtml(row.matchPoints ?? 0)}</td>
-        <td>${escapeHtml(row.tiesWon ?? 0)}</td>
-        <td>${escapeHtml(row.headToHead ?? "—")}</td>
-        <td>${escapeHtml(row.qualified ? "Yes" : "No")}</td>
+        <td>${row.rank ?? "-"}</td>
+        <td>${escapeHtml(row.teamName || "-")}</td>
+        <td>${row.matchPoints ?? 0}</td>
+        <td>${row.tiesWon ?? 0}</td>
+        <td>${escapeHtml(row.headToHead || "-")}</td>
+        <td>${row.qualified ? "Yes" : "No"}</td>
       `;
       leaderboardBody.appendChild(tr);
     });
   }
-
   async function init() {
     state.tournamentMeta = await loadTournamentMeta();
 

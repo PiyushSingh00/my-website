@@ -640,20 +640,40 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---------------------------------------------------------------------------
   // GENERATE / EDIT / SAVE
   // ---------------------------------------------------------------------------
-  generateBtn?.addEventListener("click", async () => {
-    const advanced = safeJson(tournamentMeta?.advancedSettings, tournamentMeta?.advancedSettings) || {};
+ 
+    async function generateCategoryFixturesFromBackend(categoryId) {
+    if (!categoryId) {
+      showToast("Select a category first");
+      return;
+    }
+
+    const advanced =
+      safeJson(tournamentMeta?.advancedSettings, tournamentMeta?.advancedSettings) || {};
+
     const isLeagueMode =
       tournamentMeta?.stageFormat === "number_draw_league_knockout" ||
       advanced?.advancedMode === "pickleball_team_league";
 
     if (isLeagueMode) {
-      showToast("Advanced league mode needs tie-generation backend, not knockout generation.");
-      return;
-    }
+      const r = await apiPost(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/generate-league`,
+        { categoryId }
+      );
 
-    if (!fixtures) fixtures = { categories: {} };
-    if (fixtures.__locked) {
-      showToast("Fixtures already generated");
+      if (!r.ok) {
+        showToast(r.data?.message || "Could not generate league ties");
+        return;
+      }
+
+      fixtures = r.data?.fixtures || r.data || fixtures;
+      fixtures.__locked = true;
+      generateBtn.disabled = true;
+      editMode = false;
+      setEditUI();
+      showToast("League ties generated");
+
+      renderCategoryToggles();
+      if (activeCategoryId) renderCategoryBracket(activeCategoryId);
       return;
     }
 
@@ -736,6 +756,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     renderCategoryToggles();
     if (activeCategoryId) renderCategoryBracket(activeCategoryId);
+  }
+
+  generateBtn?.addEventListener("click", async () => {
+    await generateCategoryFixturesFromBackend(activeCategoryId);
   });
 
   editBtn?.addEventListener("click", async () => {

@@ -66,7 +66,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const myTeamPlayerListEl = document.getElementById("my-team-player-list");
   const myTeamEmptyStateEl = document.getElementById("my-team-empty-state");
   const myTeamEmptyTextEl = document.getElementById("my-team-empty-text");
-
+  const lineupPanel = document.getElementById("team-lineup-panel");
+  const lineupStatus = document.getElementById("team-lineup-status");
   // ---------------------------------------------------------------------------
   // TOPBAR
   // ---------------------------------------------------------------------------
@@ -230,6 +231,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+    async function apiDelete(url) {
+    return apiJson(url, { method: "DELETE" });
+  }
+
   function categoryLabel(c) {
     const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
     const gender = c?.gender ? String(c.gender).trim() : "";
@@ -265,7 +270,159 @@ document.addEventListener("DOMContentLoaded", async () => {
   function getTournamentCaptainState() {
     return tournamentMeta?.captainState || tournamentMeta?.captains || {};
   }
+  function getCurrentTeamCategoryId() {
+    return currentCaptainSubmission?.categoryId || currentAcceptedInvite?.categoryId || "";
+  }
 
+  async function loadMyTieWorkflow() {
+    if (!lineupPanel || !lineupTabBtn) return;
+
+    const categoryId = getCurrentTeamCategoryId();
+    if (!categoryId) {
+      lineupTabBtn.classList.add("hidden");
+      lineupPanel.innerHTML = `
+        <div class="empty-state-card">
+          <h3>No tie workflow yet</h3>
+          <p class="helper-text">Join or create a team first.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const resp = await apiGet(
+      `/api/player/tournaments/${encodeURIComponent(tournamentId)}/lineups?categoryId=${encodeURIComponent(categoryId)}`
+    );
+
+    if (!resp.ok) {
+      lineupTabBtn.classList.add("hidden");
+      lineupPanel.innerHTML = `
+        <div class="empty-state-card">
+          <h3>No generated ties yet</h3>
+          <p class="helper-text">${escapeHtml(resp.data?.message || "Host has not generated ties yet.")}</p>
+        </div>
+      `;
+      return;
+    }
+
+    lineupTabBtn.classList.remove("hidden");
+    renderMyTieWorkflow(resp.data || {});
+  }
+
+  function renderMyTieWorkflow(payload) {
+    const team = payload?.team || null;
+    const ties = Array.isArray(payload?.ties) ? payload.ties : [];
+
+    if (!lineupPanel) return;
+
+    if (!team || !ties.length) {
+      lineupPanel.innerHTML = `
+        <div class="empty-state-card">
+          <h3>No generated ties yet</h3>
+          <p class="helper-text">Host needs to generate league ties first.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const myRoster = Array.isArray(team.players) ? team.players : [];
+    const myPlayerOptions = myRoster
+      .map(
+        (p) => `<option value="${escapeHtml(p.playerName)}">${escapeHtml(p.playerName)}</option>`
+      )
+      .join("");
+
+    lineupPanel.innerHTML = ties
+      .map((tie) => {
+        const side = tie.mySide === "home" ? "home" : "away";
+        const opponent = side === "home" ? tie.away : tie.home;
+        const locked = Boolean(tie.lineupLocked);
+        const submatches = Array.isArray(tie.submatches) ? tie.submatches : [];
+
+        const builder = submatches
+          .map(
+            (sm, idx) => `
+              <div class="lineup-slot-card">
+                <div><strong>${escapeHtml(sm.roundLabel || `Tie ${idx + 1}`)}</strong></div>
+                <div class="lineup-slot-grid">
+                  <select class="lineup-player-select" data-tie-id="${escapeHtml(tie.tieId)}" data-score-index="${idx}" data-pick="0" ${locked ? "disabled" : ""}>
+                    <option value="">Select player</option>
+                    ${myPlayerOptions}
+                  </select>
+                  <select class="lineup-player-select" data-tie-id="${escapeHtml(tie.tieId)}" data-score-index="${idx}" data-pick="1" ${locked ? "disabled" : ""}>
+                    <option value="">Select player</option>
+                    ${myPlayerOptions}
+                  </select>
+                </div>
+                <div class="helper-text">Opponent: ${escapeHtml(opponent || "-")}</div>
+              </div>
+            `
+          )
+          .join("");
+
+        return `
+          <div class="lineup-review-card">
+            <div class="lineup-review-head">
+              <div>
+                <h3>${escapeHtml(team.teamName || "My team")} vs ${escapeHtml(opponent || "-")}</h3>
+                <p class="helper-text">${escapeHtml(tie.roundLabel || "")}</p>
+              </div>
+              <div class="team-name-chip">${locked ? "Locked" : "Open"}</div>
+            </div>
+            <div class="lineup-builder-wrap">${builder}</div>
+            <div class="row-actions">
+              <button type="button" class="action-btn accept" data-save-lineup="${escapeHtml(tie.tieId)}" ${locked ? "disabled" : ""}>
+                Save lineup
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    lineupPanel.querySelectorAll("[data-save-lineup]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const tieId = btn.getAttribute("data-save-lineup");
+        const categoryId = getCurrentTeamCategoryId();
+
+        const slotEls = Array.from(
+          lineupPanel.querySelectorAll(`[data-tie-id="${CSS.escape(String(tieId))}"]`)
+        );
+
+        const grouped = new Map();
+
+        slotEls.forEach((el) => {
+          const scoreIndex = Number(el.getAttribute("data-score-index"));
+          const pick = Number(el.getAttribute("data-pick"));
+          if (!grouped.has(scoreIndex)) grouped.set(scoreIndex, []);
+          grouped.get(scoreIndex)[pick] = el.value;
+        });
+
+        const assignments = Array.from(grouped.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([scoreIndex, players]) => ({
+            scoreIndex,
+            players: (players || []).filter(Boolean),
+          }));
+
+        const resp = await apiPost(
+          `/api/player/tournaments/${encodeURIComponent(tournamentId)}/lineups`,
+          {
+            categoryId,
+            tieId,
+            assignments,
+          }
+        );
+
+        if (!resp.ok) {
+          if (lineupStatus) lineupStatus.textContent = resp.data?.message || "Failed to save lineup";
+          return;
+        }
+
+        if (lineupStatus) lineupStatus.textContent = "Lineup saved";
+        await loadMyTieWorkflow();
+      });
+    });
+  }
   function getOtherCaptainNamesForTournament() {
     const captainState = getTournamentCaptainState();
     const confirmed = Array.isArray(captainState?.confirmedCaptains) ? captainState.confirmedCaptains : [];
@@ -1206,6 +1363,7 @@ async function hydrateSubmissionState() {
   allPlayers = await loadPlayers();
   await hydrateSubmissionState();
   hydratePage();
+    await loadMyTieWorkflow();
 
 
 });

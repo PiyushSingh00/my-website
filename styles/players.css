@@ -672,3 +672,7 @@
     align-items: flex-start;
   }
 }
+#lineup-review-list {
+  display: grid;
+  gap: 12px;
+}

@@ -574,3 +574,38 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+#team-lineup-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.lineup-builder-wrap {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.lineup-slot-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(5, 11, 24, 0.72);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.lineup-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.lineup-player-select {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(5, 11, 24, 0.96);
+  color: var(--text);
+  font: inherit;
+}

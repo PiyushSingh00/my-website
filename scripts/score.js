@@ -753,7 +753,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    saveMsg.textContent = "Saved";
+    saveMsg.textContent = "Saved and standings updated";
     renderPills();
 
     homeScoreEl.classList.add("bump");

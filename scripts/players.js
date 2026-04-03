@@ -152,7 +152,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const lineupReviewSection = document.getElementById("lineup-review-section");
   const lineupReviewList = document.getElementById("lineup-review-list");
-
+  const finalizeProgressionBtn = document.getElementById("finalize-progression-btn");
   const leaderboardSection = document.getElementById("leaderboard-section");
   const leaderboardTableBody = document.getElementById("leaderboard-table-body");
 
@@ -490,10 +490,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         <span>${escapeHtml(tab.label)}</span>
         <span class="tab-count">${tab.count}</span>
       `;
-      btn.addEventListener("click", () => {
+            btn.addEventListener("click", async () => {
         activeFilter = tab.key;
         renderPlayerTabs();
         renderPlayers();
+        await loadLineupsFromDb();
+        await loadLeaderboardFromDb();
+        renderLineupReview();
+        renderLeaderboard();
       });
       playersTabs.appendChild(btn);
     });
@@ -1305,76 +1309,118 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===========================================================================
   // LINEUP REVIEW (OPTIONAL NEW BLOCK)
   // ===========================================================================
-  async function loadLineupsFromDb() {
-    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups`);
+    async function loadLineupsFromDb() {
+    const categoryId =
+      String(activeFilter === "all"
+        ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
+        : activeFilter);
+
+    if (!categoryId) {
+      lineupState.ties = [];
+      return;
+    }
+
+    const r = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups?categoryId=${encodeURIComponent(categoryId)}`
+    );
+
     lineupState.ties = r.ok && Array.isArray(r.data?.ties) ? r.data.ties : [];
   }
 
-  function renderLineupReview() {
-  if (!lineupReviewSection || !lineupReviewList) return;
+    function renderLineupReview() {
+    if (!lineupReviewSection || !lineupReviewList) return;
 
-  lineupReviewList.innerHTML = "";
+    lineupReviewList.innerHTML = "";
 
-  if (!lineupState.ties.length) {
-    lineupReviewList.innerHTML = `<div class="muted">No lineup submissions yet.</div>`;
-    return;
-  }
+    if (!lineupState.ties.length) {
+      lineupReviewList.innerHTML = `
+        <div class="empty-state compact-empty">
+          <div class="feature-icon">📝</div>
+          <h3>No lineup submissions yet</h3>
+          <p class="muted">Captain lineup slips will appear here once submitted.</p>
+        </div>
+      `;
+      return;
+    }
 
-  lineupState.ties.forEach((tie) => {
-    const card = document.createElement("div");
-    card.className = "lineup-review-card";
+    lineupState.ties.forEach((tie) => {
+      const card = document.createElement("div");
+      card.className = "lineup-review-card";
+      card.innerHTML = `
+        <div class="lineup-review-head">
+          <div>
+            <strong>${escapeHtml(tie.home || "Team A")} vs ${escapeHtml(tie.away || "Team B")}</strong>
+            <div class="captain-summary-meta">${escapeHtml(tie.roundLabel || "")}</div>
+          </div>
+          <span class="status-pill ${tie.lineupLocked ? "status-pill--accepted" : "status-pill--pending"}">
+            ${tie.lineupLocked ? "Locked" : "Open"}
+          </span>
+        </div>
 
-    const rows = Array.isArray(tie.submatches)
-      ? tie.submatches.map((m) => {
-          const players = Array.isArray(m.playerNames) ? m.playerNames.join(" + ") : "";
-          return `<div class="helper-text">Submatch ${m.slot || "-"}: ${escapeHtml(players || "-")}</div>`;
-        }).join("")
-      : `<div class="helper-text">No submatches submitted.</div>`;
+        <div class="captain-summary-meta" style="width:100%;">
+          Home approval: ${escapeHtml(tie?.lineupApproval?.home || "pending")} •
+          Away approval: ${escapeHtml(tie?.lineupApproval?.away || "pending")}
+        </div>
 
-    card.innerHTML = `
-      <div class="lineup-review-head">
-        <strong>${escapeHtml(tie.tieLabel || tie.teamA || "Tie")}</strong>
-        <span class="status-pill ${tie.locked ? "status-pill--accepted" : "status-pill--pending"}">
-          ${tie.locked ? "Locked" : "Pending"}
-        </span>
-      </div>
-      <div class="helper-text">${escapeHtml(tie.teamA || "")}</div>
-      <div>${rows}</div>
-      ${
-        tie.locked
-          ? ""
-          : `<div class="row-actions">
-               <button type="button" class="action-btn accept" data-lock-tie="${escapeHtml(tie.tieId || "")}">
-                 Lock lineup
-               </button>
-             </div>`
-      }
-    `;
+        <div class="row-actions">
+          <button type="button" class="action-btn accept" data-lineup-action="approve" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">Approve home</button>
+          <button type="button" class="action-btn reject" data-lineup-action="reject" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">Reject home</button>
+          <button type="button" class="action-btn accept" data-lineup-action="approve" data-side="away" data-tie-id="${escapeHtml(tie.tieId)}">Approve away</button>
+          <button type="button" class="action-btn reject" data-lineup-action="reject" data-side="away" data-tie-id="${escapeHtml(tie.tieId)}">Reject away</button>
+          <button type="button" class="action-btn" data-lineup-action="${tie.lineupLocked ? "unlock" : "lock"}" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">
+            ${tie.lineupLocked ? "Unlock" : "Lock"}
+          </button>
+        </div>
+      `;
 
-    card.querySelector("[data-lock-tie]")?.addEventListener("click", async () => {
-      const tieId = tie.tieId;
-      const r = await apiPatch(
-        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups/${encodeURIComponent(tieId)}/lock`,
-        { locked: true }
-      );
-
-      if (!r.ok) {
-        alert("Could not lock lineup.");
-        return;
-      }
-
-      await loadLineupsFromDb();
-      renderLineupReview();
+      lineupReviewList.appendChild(card);
     });
 
-    lineupReviewList.appendChild(card);
-  });
-}
+    lineupReviewList.querySelectorAll("[data-lineup-action]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const action = btn.getAttribute("data-lineup-action");
+        const side = btn.getAttribute("data-side");
+        const tieId = btn.getAttribute("data-tie-id");
+
+        const categoryId =
+          String(activeFilter === "all"
+            ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
+            : activeFilter);
+
+        const r = await apiPost(
+          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups/review`,
+          { categoryId, tieId, side, action }
+        );
+
+        if (!r.ok) {
+          showToast(r.data?.message || "Failed to update lineup review");
+          return;
+        }
+
+        showToast("Lineup review updated");
+        await loadLineupsFromDb();
+        renderLineupReview();
+      });
+    });
+  }
   // ===========================================================================
   // LEADERBOARD (OPTIONAL NEW BLOCK)
   // ===========================================================================
-  async function loadLeaderboardFromDb() {
-    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard`);
+    async function loadLeaderboardFromDb() {
+    const categoryId =
+      String(activeFilter === "all"
+        ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
+        : activeFilter);
+
+    if (!categoryId) {
+      leaderboardState.rows = [];
+      return;
+    }
+
+    const r = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`
+    );
+
     leaderboardState.rows = r.ok
       ? Array.isArray(r.data?.rows)
         ? r.data.rows
@@ -1396,6 +1442,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+
     leaderboardState.rows.forEach((row, idx) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -1409,7 +1456,34 @@ document.addEventListener("DOMContentLoaded", async () => {
       leaderboardTableBody.appendChild(tr);
     });
   }
+  async function finalizeHostProgression() {
+    const categoryId =
+      String(activeFilter === "all"
+        ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
+        : activeFilter);
 
+    if (!categoryId) {
+      showToast("Select a category first");
+      return;
+    }
+
+    const r = await apiPost(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/progression/finalize`,
+      { categoryId }
+    );
+
+    if (!r.ok) {
+      showToast(r.data?.message || "Failed to finalize progression");
+      return;
+    }
+
+    showToast(r.data?.changed ? "Knockout generated" : "No new progression yet");
+
+    await loadLineupsFromDb();
+    await loadLeaderboardFromDb();
+    renderLineupReview();
+    renderLeaderboard();
+  }
   // ===========================================================================
   // FIXTURES EMBED
   // ===========================================================================
@@ -1731,6 +1805,101 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderCategoryToggles();
     if (fixturesState.activeCategoryId) renderCategoryBracket(fixturesState.activeCategoryId);
   }
+  async function loadHostLineupReview(categoryId) {
+  if (!lineupReviewList || !categoryId) return;
+
+  const resp = await apiGet(
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups?categoryId=${encodeURIComponent(categoryId)}`
+  );
+
+  if (!resp.ok) {
+    lineupReviewList.innerHTML = `
+      <div class="empty-state compact-empty">
+        <h3>No tie lineups yet</h3>
+        <p class="muted">${escapeHtml(resp.data?.message || "Nothing submitted yet.")}</p>
+      </div>
+    `;
+    return;
+  }
+
+  const ties = Array.isArray(resp.data?.ties) ? resp.data.ties : [];
+  if (!ties.length) {
+    lineupReviewList.innerHTML = `
+      <div class="empty-state compact-empty">
+        <h3>No tie lineups yet</h3>
+        <p class="muted">Captains will appear here after they submit lineups.</p>
+      </div>
+    `;
+    return;
+  }
+
+  lineupReviewList.innerHTML = ties
+    .map((tie) => `
+      <div class="lineup-review-card">
+        <div class="lineup-review-head">
+          <div>
+            <strong>${escapeHtml(tie.home || "-")} vs ${escapeHtml(tie.away || "-")}</strong>
+            <div class="captain-summary-meta">${escapeHtml(tie.roundLabel || "")}</div>
+          </div>
+          <div class="team-name-chip">${tie.lineupLocked ? "Locked" : "Open"}</div>
+        </div>
+
+        <div class="captain-summary-meta" style="width:100%;">
+          Home approval: ${escapeHtml(tie?.lineupApproval?.home || "pending")} •
+          Away approval: ${escapeHtml(tie?.lineupApproval?.away || "pending")}
+        </div>
+
+        <div class="row-actions">
+          <button type="button" class="action-btn accept" data-lineup-action="approve" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">Approve home</button>
+          <button type="button" class="action-btn reject" data-lineup-action="reject" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">Reject home</button>
+          <button type="button" class="action-btn accept" data-lineup-action="approve" data-side="away" data-tie-id="${escapeHtml(tie.tieId)}">Approve away</button>
+          <button type="button" class="action-btn reject" data-lineup-action="reject" data-side="away" data-tie-id="${escapeHtml(tie.tieId)}">Reject away</button>
+          <button type="button" class="action-btn" data-lineup-action="${tie.lineupLocked ? "unlock" : "lock"}" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">
+            ${tie.lineupLocked ? "Unlock" : "Lock"}
+          </button>
+        </div>
+      </div>
+    `)
+    .join("");
+
+  lineupReviewList.querySelectorAll("[data-lineup-action]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const action = btn.getAttribute("data-lineup-action");
+      const side = btn.getAttribute("data-side");
+      const tieId = btn.getAttribute("data-tie-id");
+
+      const resp2 = await apiPost(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups/review`,
+        { categoryId, tieId, side, action }
+      );
+
+      if (!resp2.ok) {
+        showToast(resp2.data?.message || "Failed to update lineup review");
+        return;
+      }
+
+      showToast("Lineup review updated");
+      await loadHostLineupReview(categoryId);
+    });
+  });
+}
+
+async function finalizeHostProgression(categoryId) {
+  if (!categoryId) return;
+
+  const resp = await apiPost(
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/progression/finalize`,
+    { categoryId }
+  );
+
+  if (!resp.ok) {
+    showToast(resp.data?.message || "Failed to finalize progression");
+    return;
+  }
+
+  showToast(resp.data?.changed ? "Knockout generated" : "No new progression yet");
+  await loadHostLineupReview(categoryId);
+}
 
   async function initFixturesIfNeeded() {
     if (fixturesUi.didInit) return;
@@ -1801,7 +1970,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   createFixturesBtn?.addEventListener("click", openAndLoadFixtures);
-
+  finalizeProgressionBtn?.addEventListener("click", finalizeHostProgression);
   // ===========================================================================
   // LOAD EVERYTHING
   // ===========================================================================
