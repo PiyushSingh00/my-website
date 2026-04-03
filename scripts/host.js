@@ -685,6 +685,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setVal("w-venue", wiz.venue);
     setVal("w-details", wiz.details);
     setVal("access-code", wiz.accessCode);
+    const accessCodeEl = document.getElementById("access-code");
+if (accessCodeEl) accessCodeEl.setAttribute("value", wiz.accessCode || "");
     setVal("w-tournament-type", wiz.tournamentType);
     setVal("w-stage-format", wiz.stageFormat);
     setVal("w-group-count", wiz.groupCount);
@@ -1860,20 +1862,39 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.location.href = `players.html?tournamentId=${encodeURIComponent(selectedTournamentId)}`;
     });
 
-    generateCodeBtn?.addEventListener("click", async () => {
-  const isWizardMode = newTournamentView?.classList.contains("host-view--active") && !viewOnlyMode;
+  generateCodeBtn?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const isWizardMode =
+    !!newTournamentView?.classList.contains("host-view--active") &&
+    !viewOnlyMode &&
+    !viewingTournamentId;
 
   if (isWizardMode) {
     const code = generateAccessCode();
+
     wiz.accessCode = code;
 
     if (accessCodeInput) {
+      accessCodeInput.removeAttribute("readonly");
       accessCodeInput.value = code;
+      accessCodeInput.defaultValue = code;
       accessCodeInput.setAttribute("value", code);
-      accessCodeInput.dispatchEvent(new Event("input", { bubbles: true }));
-      accessCodeInput.dispatchEvent(new Event("change", { bubbles: true }));
+      accessCodeInput.readOnly = true;
     }
 
+    syncFormFromState();
+
+    if (accessCodeInput) {
+      accessCodeInput.removeAttribute("readonly");
+      accessCodeInput.value = code;
+      accessCodeInput.defaultValue = code;
+      accessCodeInput.setAttribute("value", code);
+      accessCodeInput.readOnly = true;
+    }
+
+    console.log("Generated access code:", code, "Input now:", accessCodeInput?.value);
     return;
   }
 
