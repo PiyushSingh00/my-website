@@ -1,90 +1,93 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Scoring Fields</title>
+    <title>ScheduleIt – Configure scoring schema</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Use the SAME pattern as other pages: styles live in /styles -->
-    <link rel="stylesheet" href="styles/host.css" />
-    <link rel="stylesheet" href="styles/fixtures.css" />
-    <link rel="stylesheet" href="styles/schema.css">
-    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles/schema.css" />
   </head>
-
   <body>
-    <!-- Keep it simple; no extra auth.js script tag here -->
-    <div class="schema-wrap">
-      <div class="schema-header">
-        <div>
-          <h1 style="margin:0;">Scoring Fields</h1>
-          <div class="schema-meta">
-            <div><span class="muted">Tournament:</span> <span id="schema-tournament-id">—</span></div>
-            <div><span class="muted">Category:</span> <span id="schema-category-id">—</span></div>
-            <div><span class="muted">Sport:</span> <span id="schema-sport-name">—</span></div>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
+
+        <div class="topbar-right">
+          <div class="user-menu">
+            <button
+              type="button"
+              class="user-avatar-btn"
+              id="schema-user-menu-trigger"
+              aria-label="User menu"
+            >
+              U
+            </button>
+
+            <div class="user-menu-dropdown" id="schema-user-menu-dropdown">
+              <button type="button" class="dropdown-item" id="dropdown-signout">
+                Sign out
+              </button>
+            </div>
           </div>
 
-          <div class="schema-actions">
-            <button type="button" class="btn" id="btn-generate-ai">Generate AI Suggestions</button>
-            <button type="button" class="btn" id="btn-select-all">Select all</button>
-            <button type="button" class="btn" id="btn-select-none">Select none</button>
-            <button type="button" class="btn" id="btn-add-custom">+ Add custom field</button>
-            <button type="button" class="btn-primary" id="btn-finalize">Finalize & Save</button>
-          </div>
-
-          <div id="schema-msg" class="small muted" style="margin-top:10px;"></div>
-        </div>
-
-        <div class="row">
-          <button type="button" class="btn-dark" id="btn-back">← Back</button>
-        </div>
-      </div>
-
-      <div class="schema-grid">
-        <div class="schema-card">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <h2 style="margin:0;">Available fields</h2>
-            <div class="small muted">Tick what you want in scoring</div>
-          </div>
-
-          <div id="schema-empty" class="muted" style="margin-top:10px;">
-            No draft schema yet. Click “Generate AI Suggestions”.
-          </div>
-
-          <div id="schema-error" class="error small" style="margin-top:10px; display:none;"></div>
-
-          <div id="schema-fields" class="schema-list"></div>
-        </div>
-
-        <div class="schema-card">
-          <h2 style="margin:0;">Add custom field</h2>
-          <div class="muted small" style="margin-top:8px;">
-            Use this if the host realizes mid-game something is missing.
-          </div>
-
-          <div class="row" style="margin-top:12px;">
-            <input class="input" id="custom-key" placeholder="key (e.g. yellow_cards)" style="min-width:220px;" />
-            <input class="input" id="custom-label" placeholder="label (e.g. Yellow cards)" style="min-width:220px;" />
-            <select class="input" id="custom-type">
-              <option value="counter">counter</option>
-              <option value="number">number</option>
-              <option value="text">text</option>
-            </select>
-            <select class="input" id="custom-level">
-              <option value="basic">basic</option>
-              <option value="advanced">advanced</option>
-              <option value="pro">pro</option>
-            </select>
-            <button class="btn" type="button" id="btn-add-custom-inline">Add</button>
-          </div>
-          <div class="small muted" style="margin-top:10px;">
-            Note: key should be lowercase with underscores only.
+          <div class="mode-toggle" role="group" aria-label="Mode toggle">
+            <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
+            <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
           </div>
         </div>
-      </div>
+      </header>
+
+      <main class="main">
+        <section class="schema-wrap">
+          <div class="schema-header">
+            <div>
+              <p class="eyebrow">Scoring schema</p>
+              <h1 id="schema-title">Configure scoring fields</h1>
+              <p id="schema-meta" class="schema-meta">Loading tournament and category...</p>
+            </div>
+
+            <div class="schema-actions">
+              <button type="button" class="btn-dark" id="schema-back-btn">← Back</button>
+              <button type="button" class="btn" id="schema-refresh-btn">Refresh suggestion</button>
+              <button type="button" class="btn-primary" id="schema-finalize-btn">Finalize schema</button>
+            </div>
+          </div>
+
+          <div id="schema-status" class="small muted" style="margin-top: 8px;">Loading...</div>
+
+          <div class="schema-grid">
+            <section class="schema-card">
+              <h3>Match config fields</h3>
+              <p class="helper-text">
+                These fields are entered once for the match, like target points or whether win-by-two is enabled.
+              </p>
+              <div id="config-fields-list" class="schema-list"></div>
+            </section>
+
+            <section class="schema-card">
+              <h3>Player fields</h3>
+              <p class="helper-text">
+                These are the live stat fields shown while scoring each player.
+              </p>
+              <div id="player-fields-list" class="schema-list"></div>
+            </section>
+
+            <section class="schema-card">
+              <h3>Winner logic</h3>
+              <div id="winner-logic-box" class="row"></div>
+            </section>
+          </div>
+        </section>
+      </main>
     </div>
 
-    <!-- IMPORTANT: module script -->
     <script type="module" src="scripts/schema.js"></script>
   </body>
 </html>
