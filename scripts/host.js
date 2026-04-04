@@ -1400,11 +1400,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---------------------------------------------------------------------------
   // RENDERING
   // ---------------------------------------------------------------------------
-  function renderTournamentDetail(t) {
+  function renderTournamentDetail(t, anchorCard = null) {
     if (!tournamentDetail) return;
 
     selectedTournamentId = t.tournamentId ?? t.id ?? null;
-    tournamentDetail.classList.remove("hidden");
+
     detailTournamentName.textContent = t.tournamentName || "Tournament name";
     detailTournamentCode.textContent = t.accessCode || "—";
     detailTotalRegistrations.textContent = String(
@@ -1417,6 +1417,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (stopRegistrationsBtn) {
       stopRegistrationsBtn.textContent =
         t.registrationsOpen === false ? "Re-open registrations" : "Stop registrations";
+    }
+
+    tournamentDetail.classList.remove("hidden");
+
+    if (anchorCard) {
+      anchorCard.insertAdjacentElement("afterend", tournamentDetail);
     }
   }
 
@@ -1482,7 +1488,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       `;
 
-      card.addEventListener("click", () => renderTournamentDetail(t));
+      card.addEventListener("click", () => renderTournamentDetail(t, card));
 
       card.querySelector(".code-chip")?.addEventListener("click", async (e) => {
         e.stopPropagation();
