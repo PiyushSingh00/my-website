@@ -16,129 +16,127 @@
   </head>
   <body>
     <div class="app-shell">
+
+      <!-- Topbar -->
       <header class="topbar">
         <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
 
         <div class="topbar-right">
           <div class="user-menu">
-            <button
-              type="button"
-              class="user-avatar-btn"
-              id="join-user-menu-trigger"
-              aria-label="User menu"
-            >
-              U
-            </button>
-
+            <button type="button" class="user-avatar-btn" id="join-user-menu-trigger" aria-label="User menu">U</button>
             <div class="user-menu-dropdown" id="join-user-menu-dropdown">
-              <button type="button" class="dropdown-item" id="dropdown-signout">
-                Sign out
-              </button>
+              <button type="button" class="dropdown-item" id="dropdown-signout">Sign out</button>
             </div>
           </div>
 
           <div class="mode-toggle" role="group" aria-label="Mode toggle">
-            <button class="mode-btn is-active" id="mode-player-btn" type="button">
-              Join mode
-            </button>
-            <button class="mode-btn" id="mode-host-btn" type="button">
-              Host mode
-            </button>
+            <button class="mode-btn is-active" id="mode-player-btn" type="button">Join mode</button>
+            <button class="mode-btn"            id="mode-host-btn"   type="button">Host mode</button>
           </div>
         </div>
       </header>
 
       <main class="join-main">
         <div class="join-shell">
+
+          <!-- Sidebar -->
           <aside class="join-sidebar" id="join-sidebar">
             <div class="join-sidebar-head">
-              <h2>Join panel</h2>
-              <button
-                type="button"
-                class="sidebar-toggle-btn"
-                id="join-sidebar-toggle"
-                aria-label="Toggle sidebar"
-              >
-                ☰
+              <h2>Player panel</h2>
+              <button type="button" class="sidebar-toggle-btn" id="join-sidebar-toggle" aria-label="Toggle sidebar">
+                <!-- hamburger / close icon swapped by JS class -->
+                <svg class="icon-menu"  width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="2" y1="4.5"  x2="16" y2="4.5"/><line x1="2" y1="9"    x2="16" y2="9"/><line x1="2" y1="13.5" x2="16" y2="13.5"/></svg>
+                <svg class="icon-close" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="3" x2="15" y2="15"/><line x1="15" y1="3" x2="3" y2="15"/></svg>
               </button>
             </div>
 
             <nav class="join-nav">
-              <button type="button" class="join-nav-btn active" data-view="browse">
-                <span>Browse tournaments</span>
+              <!-- data-view must match JS exactly -->
+              <button type="button" class="join-nav-btn active" data-view="browse" title="Browse tournaments">
+                <span class="join-nav-icon">
+                  <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="8"/>
+                    <path d="M2 10h16M10 2a14 14 0 0 1 0 16M10 2a14 14 0 0 0 0 16"/>
+                  </svg>
+                </span>
+                <span class="join-nav-label">Browse</span>
               </button>
-              <button type="button" class="join-nav-btn" data-view="my">
-                <span>My tournaments</span>
+
+              <button type="button" class="join-nav-btn" data-view="my" title="My tournaments">
+                <span class="join-nav-icon">
+                  <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 3h10l1.5 5H3.5L5 3z"/><path d="M10 8v9M7 14l3 3 3-3"/>
+                  </svg>
+                </span>
+                <span class="join-nav-label">My tournaments</span>
               </button>
-              <button type="button" class="join-nav-btn" data-view="notifications">
-                <span>Notifications</span>
+
+              <button type="button" class="join-nav-btn" data-view="notifications" title="Notifications">
+                <span class="join-nav-icon">
+                  <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 2a6 6 0 0 1 6 6c0 3.5 1.5 5 1.5 5h-15S4 11.5 4 8a6 6 0 0 1 6-6z"/><path d="M8.5 17a1.5 1.5 0 0 0 3 0"/>
+                  </svg>
+                </span>
+                <span class="join-nav-label">Notifications</span>
               </button>
             </nav>
           </aside>
 
+          <!-- Content -->
           <section class="join-content">
+
             <!-- BROWSE -->
             <section class="join-view join-view--active" id="join-view-browse">
-              <div class="join-card">
-                <div class="join-card-head">
-                  <div>
-                    <p class="eyebrow">Join a tournament</p>
-                    <h1>Browse tournaments</h1>
-                  </div>
-                </div>
-
-                <div class="join-form-row">
-                  <input
-                    type="text"
-                    id="join-code-input"
-                    placeholder="Enter code or open shared tournament"
-                  />
-                  <button type="button" class="btn-primary" id="join-code-btn">Validate code</button>
-                </div>
-
-                <div id="browse-tournaments-list" class="browse-list"></div>
+              <div class="view-header">
+                <p class="eyebrow">Discover</p>
+                <h1 class="view-title">Browse tournaments</h1>
+                <p class="view-sub">Find a tournament and join with a code or directly.</p>
               </div>
+
+              <!-- Code entry -->
+              <div class="code-entry-card">
+                <label class="code-entry-label" for="join-code-input">
+                  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="8" width="14" height="10" rx="2"/><path d="M7 8V6a3 3 0 0 1 6 0v2"/></svg>
+                  Enter tournament code
+                </label>
+                <div class="code-entry-row">
+                  <input type="text" id="join-code-input" class="code-input" placeholder="e.g. ABCD-1234" autocomplete="off" spellcheck="false" />
+                  <button type="button" class="btn-primary" id="join-code-btn">Join</button>
+                </div>
+              </div>
+
+              <!-- Tournament cards -->
+              <div class="section-label">All available tournaments</div>
+              <div id="browse-tournaments-list" class="card-list"></div>
             </section>
 
             <!-- MY TOURNAMENTS -->
             <section class="join-view" id="join-view-my">
-              <div class="join-card">
-                <div class="join-card-head">
-                  <div>
-                    <p class="eyebrow">Your activity</p>
-                    <h1>My tournaments</h1>
-                  </div>
-                </div>
-
-                <div id="my-joined-tournaments" class="browse-list"></div>
+              <div class="view-header">
+                <p class="eyebrow">Your activity</p>
+                <h1 class="view-title">My tournaments</h1>
+                <p class="view-sub">Tournaments you have registered for.</p>
               </div>
+              <div id="my-joined-tournaments" class="card-list"></div>
             </section>
 
             <!-- NOTIFICATIONS -->
             <section class="join-view" id="join-view-notifications">
-              <div class="join-card">
-                <div class="join-card-head">
-                  <div>
-                    <p class="eyebrow">Updates</p>
-                    <h1>Notifications</h1>
-                  </div>
-                </div>
-
-                <div id="join-notifications-list" class="browse-list"></div>
-
-                <section id="team-invite-section" class="team-invite-section hidden">
-                  <div class="section-head">
-                    <div>
-                      <p class="eyebrow">Team requests</p>
-                      <h2 class="section-title">Team invites</h2>
-                    </div>
-                  </div>
-
-                  <div id="team-invite-list" class="browse-list"></div>
-                </section>
+              <div class="view-header">
+                <p class="eyebrow">Updates</p>
+                <h1 class="view-title">Notifications</h1>
+                <p class="view-sub">Team invites and status updates.</p>
               </div>
+
+              <div id="join-notifications-list" class="card-list"></div>
+
+              <section id="team-invite-section" class="team-invite-section hidden">
+                <div class="section-label" style="margin-top:20px;">Team invites</div>
+                <div id="team-invite-list" class="card-list"></div>
+              </section>
             </section>
-          </section>
+
+          </section><!-- /join-content -->
         </div>
       </main>
     </div>
