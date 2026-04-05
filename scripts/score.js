@@ -258,6 +258,444 @@ document.addEventListener("DOMContentLoaded", async () => {
     return `score_team_tie_state::${tournamentId}::${roundIndex}::${matchIndex}`;
   }
 
+  function getTournamentSportName(rawFixtures) {
+    return safeText(
+      rawFixtures?.sportName ||
+        rawFixtures?.meta?.sportName ||
+        rawFixtures?.tournament?.sportName ||
+        rawFixtures?.meta?.sport ||
+        rawFixtures?.tournament?.sport ||
+        params.get("sportName") ||
+        params.get("sport"),
+      ""
+    );
+  }
+
+  function normalizeSportKey(sportName) {
+    const value = safeText(sportName).toLowerCase();
+    if (!value) return "";
+    if (value.includes("pickle")) return "pickleball";
+    if (value.includes("badminton")) return "badminton";
+    if (value.includes("tennis")) return "tennis";
+    if (value.includes("football") || value.includes("soccer")) return "football";
+    if (value.includes("cricket")) return "cricket";
+    return value;
+  }
+
+  function hasPresetSportSchema(sportKey) {
+    return ["cricket", "badminton", "tennis", "pickleball", "football"].includes(sportKey);
+  }
+
+  function createDefaultPresetSportData(sportKey) {
+    if (sportKey === "cricket") {
+      return {
+        homeRuns: 0,
+        awayRuns: 0,
+        homeWickets: 0,
+        awayWickets: 0,
+        homeOvers: "0.0",
+        awayOvers: "0.0",
+      };
+    }
+
+    if (sportKey === "football") {
+      return {
+        homeGoals: 0,
+        awayGoals: 0,
+        homeYellow: 0,
+        awayYellow: 0,
+        homeRed: 0,
+        awayRed: 0,
+      };
+    }
+
+    if (sportKey === "badminton" || sportKey === "pickleball") {
+      return {
+        bestOf: 3,
+        games: [
+          { a: 0, b: 0 },
+          { a: 0, b: 0 },
+          { a: 0, b: 0 },
+        ],
+      };
+    }
+
+    if (sportKey === "tennis") {
+      return {
+        bestOf: 3,
+        sets: [
+          { a: 0, b: 0 },
+          { a: 0, b: 0 },
+          { a: 0, b: 0 },
+        ],
+      };
+    }
+
+    return null;
+  }
+
+  function cloneDefaultPresetSportData(sportKey) {
+    const base = createDefaultPresetSportData(sportKey);
+    return base ? JSON.parse(JSON.stringify(base)) : null;
+  }
+
+  function getPresetSuggestion(category, homeTeamLabel, awayTeamLabel) {
+    const sportKey = category?.sportKey;
+    const data = category?.sportData || {};
+
+    if (sportKey === "cricket") {
+      const a = Number(data.homeRuns || 0);
+      const b = Number(data.awayRuns || 0);
+      if (a === 0 && b === 0) return null;
+      if (a === b) return { side: null, text: "Scores level" };
+      return {
+        side: a > b ? "A" : "B",
+        text: `${a > b ? homeTeamLabel : awayTeamLabel} leading by ${Math.abs(a - b)} run(s)`,
+      };
+    }
+
+    if (sportKey === "football") {
+      const a = Number(data.homeGoals || 0);
+      const b = Number(data.awayGoals || 0);
+      if (a === 0 && b === 0) return null;
+      if (a === b) return { side: null, text: `Level at ${a}-${b}` };
+      return {
+        side: a > b ? "A" : "B",
+        text: `${a > b ? homeTeamLabel : awayTeamLabel} leading ${Math.max(a, b)}-${Math.min(a, b)}`,
+      };
+    }
+
+    if (sportKey === "badminton" || sportKey === "pickleball") {
+      const games = Array.isArray(data.games) ? data.games : [];
+      const aWins = games.filter((g) => Number(g?.a || 0) > Number(g?.b || 0)).length;
+      const bWins = games.filter((g) => Number(g?.b || 0) > Number(g?.a || 0)).length;
+      if (aWins === 0 && bWins === 0) return null;
+      if (aWins === bWins) return { side: null, text: `Games tied ${aWins}-${bWins}` };
+      return {
+        side: aWins > bWins ? "A" : "B",
+        text: `${aWins > bWins ? homeTeamLabel : awayTeamLabel} leading ${Math.max(aWins, bWins)}-${Math.min(aWins, bWins)} in games`,
+      };
+    }
+
+    if (sportKey === "tennis") {
+      const sets = Array.isArray(data.sets) ? data.sets : [];
+      const aWins = sets.filter((s) => Number(s?.a || 0) > Number(s?.b || 0)).length;
+      const bWins = sets.filter((s) => Number(s?.b || 0) > Number(s?.a || 0)).length;
+      if (aWins === 0 && bWins === 0) return null;
+      if (aWins === bWins) return { side: null, text: `Sets tied ${aWins}-${bWins}` };
+      return {
+        side: aWins > bWins ? "A" : "B",
+        text: `${aWins > bWins ? homeTeamLabel : awayTeamLabel} leading ${Math.max(aWins, bWins)}-${Math.min(aWins, bWins)} in sets`,
+      };
+    }
+
+    return null;
+  }
+
+  function getCategoryResultInfo(category, homeTeamLabel, awayTeamLabel) {
+    if (category.winnerSide === "A") {
+      return { chipClass: "category-result-chip completed", text: `${homeTeamLabel} won` };
+    }
+    if (category.winnerSide === "B") {
+      return { chipClass: "category-result-chip completed", text: `${awayTeamLabel} won` };
+    }
+
+    const suggestion = getPresetSuggestion(category, homeTeamLabel, awayTeamLabel);
+    if (suggestion?.text) {
+      return { chipClass: "category-result-chip pending", text: suggestion.text };
+    }
+
+    return { chipClass: "category-result-chip pending", text: "Result pending" };
+  }
+
+  function buildPresetScoringMarkup(category, homeTeamLabel, awayTeamLabel) {
+    const sportKey = category?.sportKey || "";
+    const data = category?.sportData || {};
+
+    if (sportKey === "cricket") {
+      return `
+        <div class="preset-sport-tag">Preset scoring: Cricket</div>
+        <div class="category-scoring-grid">
+          <div class="score-mini-card">
+            <div class="score-mini-team">${escapeHtml(homeTeamLabel)}</div>
+            <div class="helper-text">${escapeHtml(category.homePlayer || "No lineup selected")}</div>
+            <div class="preset-metric-row">
+              <span>Runs</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="homeRuns" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.homeRuns ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="homeRuns" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="preset-metric-row">
+              <span>Wickets</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="homeWickets" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.homeWickets ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="homeWickets" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="field-stack">
+              <label>Overs</label>
+              <input type="text" data-preset-input="homeOvers" value="${escapeHtml(data.homeOvers ?? "0.0")}" placeholder="Eg. 20.0" />
+            </div>
+          </div>
+
+          <div class="score-mini-card">
+            <div class="score-mini-team">${escapeHtml(awayTeamLabel)}</div>
+            <div class="helper-text">${escapeHtml(category.awayPlayer || "No lineup selected")}</div>
+            <div class="preset-metric-row">
+              <span>Runs</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="awayRuns" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.awayRuns ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="awayRuns" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="preset-metric-row">
+              <span>Wickets</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="awayWickets" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.awayWickets ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="awayWickets" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="field-stack">
+              <label>Overs</label>
+              <input type="text" data-preset-input="awayOvers" value="${escapeHtml(data.awayOvers ?? "0.0")}" placeholder="Eg. 20.0" />
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (sportKey === "football") {
+      return `
+        <div class="preset-sport-tag">Preset scoring: Football</div>
+        <div class="category-scoring-grid">
+          <div class="score-mini-card">
+            <div class="score-mini-team">${escapeHtml(homeTeamLabel)}</div>
+            <div class="helper-text">${escapeHtml(category.homePlayer || "No lineup selected")}</div>
+            <div class="preset-metric-row">
+              <span>Goals</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="homeGoals" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.homeGoals ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="homeGoals" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="preset-metric-row">
+              <span>Yellow cards</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="homeYellow" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.homeYellow ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="homeYellow" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="preset-metric-row">
+              <span>Red cards</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="homeRed" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.homeRed ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="homeRed" data-step="1">+</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="score-mini-card">
+            <div class="score-mini-team">${escapeHtml(awayTeamLabel)}</div>
+            <div class="helper-text">${escapeHtml(category.awayPlayer || "No lineup selected")}</div>
+            <div class="preset-metric-row">
+              <span>Goals</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="awayGoals" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.awayGoals ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="awayGoals" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="preset-metric-row">
+              <span>Yellow cards</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="awayYellow" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.awayYellow ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="awayYellow" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="preset-metric-row">
+              <span>Red cards</span>
+              <div class="score-stepper">
+                <button type="button" class="score-stepper-btn" data-preset-field="awayRed" data-step="-1">−</button>
+                <div class="score-stepper-value">${escapeHtml(data.awayRed ?? 0)}</div>
+                <button type="button" class="score-stepper-btn" data-preset-field="awayRed" data-step="1">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (sportKey === "badminton" || sportKey === "pickleball") {
+      const games = Array.isArray(data.games) ? data.games : [];
+      const label = sportKey === "pickleball" ? "Preset scoring: Pickleball" : "Preset scoring: Badminton";
+
+      return `
+        <div class="preset-sport-tag">${label}</div>
+        <div class="preset-sets-wrap">
+          ${games
+            .map(
+              (game, index) => `
+                <div class="preset-set-row">
+                  <div class="preset-set-title">Game ${index + 1}</div>
+                  <div class="preset-set-score">
+                    <span class="preset-side-name">${escapeHtml(homeTeamLabel)}</span>
+                    <div class="score-stepper compact">
+                      <button type="button" class="score-stepper-btn" data-preset-collection="games" data-index="${index}" data-side="a" data-step="-1">−</button>
+                      <div class="score-stepper-value small">${escapeHtml(game?.a ?? 0)}</div>
+                      <button type="button" class="score-stepper-btn" data-preset-collection="games" data-index="${index}" data-side="a" data-step="1">+</button>
+                    </div>
+                  </div>
+                  <div class="preset-set-score">
+                    <span class="preset-side-name">${escapeHtml(awayTeamLabel)}</span>
+                    <div class="score-stepper compact">
+                      <button type="button" class="score-stepper-btn" data-preset-collection="games" data-index="${index}" data-side="b" data-step="-1">−</button>
+                      <div class="score-stepper-value small">${escapeHtml(game?.b ?? 0)}</div>
+                      <button type="button" class="score-stepper-btn" data-preset-collection="games" data-index="${index}" data-side="b" data-step="1">+</button>
+                    </div>
+                  </div>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+      `;
+    }
+
+    if (sportKey === "tennis") {
+      const sets = Array.isArray(data.sets) ? data.sets : [];
+
+      return `
+        <div class="preset-sport-tag">Preset scoring: Tennis</div>
+        <div class="preset-sets-wrap">
+          ${sets
+            .map(
+              (setRow, index) => `
+                <div class="preset-set-row">
+                  <div class="preset-set-title">Set ${index + 1}</div>
+                  <div class="preset-set-score">
+                    <span class="preset-side-name">${escapeHtml(homeTeamLabel)}</span>
+                    <div class="score-stepper compact">
+                      <button type="button" class="score-stepper-btn" data-preset-collection="sets" data-index="${index}" data-side="a" data-step="-1">−</button>
+                      <div class="score-stepper-value small">${escapeHtml(setRow?.a ?? 0)}</div>
+                      <button type="button" class="score-stepper-btn" data-preset-collection="sets" data-index="${index}" data-side="a" data-step="1">+</button>
+                    </div>
+                  </div>
+                  <div class="preset-set-score">
+                    <span class="preset-side-name">${escapeHtml(awayTeamLabel)}</span>
+                    <div class="score-stepper compact">
+                      <button type="button" class="score-stepper-btn" data-preset-collection="sets" data-index="${index}" data-side="b" data-step="-1">−</button>
+                      <div class="score-stepper-value small">${escapeHtml(setRow?.b ?? 0)}</div>
+                      <button type="button" class="score-stepper-btn" data-preset-collection="sets" data-index="${index}" data-side="b" data-step="1">+</button>
+                    </div>
+                  </div>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="preset-sport-tag">Preset scoring not available for this sport. Using generic category score.</div>
+      <div class="category-scoring-grid">
+        <div class="score-mini-card">
+          <div class="score-mini-team">${escapeHtml(homeTeamLabel)}</div>
+          <div class="helper-text">${escapeHtml(category.homePlayer || "No lineup selected")}</div>
+          <div class="score-stepper">
+            <button type="button" class="score-stepper-btn" data-action="home-minus">−</button>
+            <div class="score-stepper-value">${escapeHtml(category.homeScore)}</div>
+            <button type="button" class="score-stepper-btn" data-action="home-plus">+</button>
+          </div>
+        </div>
+
+        <div class="score-mini-card">
+          <div class="score-mini-team">${escapeHtml(awayTeamLabel)}</div>
+          <div class="helper-text">${escapeHtml(category.awayPlayer || "No lineup selected")}</div>
+          <div class="score-stepper">
+            <button type="button" class="score-stepper-btn" data-action="away-minus">−</button>
+            <div class="score-stepper-value">${escapeHtml(category.awayScore)}</div>
+            <button type="button" class="score-stepper-btn" data-action="away-plus">+</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindPresetHandlers(card, category, rerender) {
+    const sportKey = category?.sportKey || "";
+
+    if (sportKey === "cricket" || sportKey === "football") {
+      card.querySelectorAll("[data-preset-field]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const field = btn.dataset.presetField;
+          const step = Number(btn.dataset.step || 0);
+          category.sportData[field] = Math.max(0, Number(category.sportData?.[field] || 0) + step);
+          rerender();
+        });
+      });
+
+      card.querySelectorAll("[data-preset-input]").forEach((input) => {
+        input.addEventListener("input", (event) => {
+          const field = event.target.dataset.presetInput;
+          category.sportData[field] = event.target.value;
+          saveTeamTieState(teamTieState);
+        });
+      });
+
+      return;
+    }
+
+    if (sportKey === "badminton" || sportKey === "pickleball" || sportKey === "tennis") {
+      card.querySelectorAll("[data-preset-collection]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const collection = btn.dataset.presetCollection;
+          const index = Number(btn.dataset.index);
+          const side = btn.dataset.side;
+          const step = Number(btn.dataset.step || 0);
+
+          if (!Array.isArray(category.sportData?.[collection])) return;
+          const row = category.sportData[collection][index];
+          if (!row) return;
+
+          row[side] = Math.max(0, Number(row[side] || 0) + step);
+          rerender();
+        });
+      });
+
+      return;
+    }
+
+    card.querySelector('[data-action="home-minus"]')?.addEventListener("click", () => {
+      category.homeScore = Math.max(0, Number(category.homeScore || 0) - 1);
+      rerender();
+    });
+
+    card.querySelector('[data-action="home-plus"]')?.addEventListener("click", () => {
+      category.homeScore = Number(category.homeScore || 0) + 1;
+      rerender();
+    });
+
+    card.querySelector('[data-action="away-minus"]')?.addEventListener("click", () => {
+      category.awayScore = Math.max(0, Number(category.awayScore || 0) - 1);
+      rerender();
+    });
+
+    card.querySelector('[data-action="away-plus"]')?.addEventListener("click", () => {
+      category.awayScore = Number(category.awayScore || 0) + 1;
+      rerender();
+    });
+  }
+
   function inferCategoryDefinitions(rawFixtures) {
     const sources = [
       rawFixtures?.teamCategories,
@@ -302,10 +740,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const categories = inferCategoryDefinitions(rawFixtures);
     const homeRoster = inferTeamRoster(matchObj, "A");
     const awayRoster = inferTeamRoster(matchObj, "B");
+    const tournamentSportKey = normalizeSportKey(getTournamentSportName(rawFixtures));
 
     return {
       homeRoster,
       awayRoster,
+      tournamentSportKey,
       categories: categories.map((category, index) => ({
         id: category.id,
         name: category.name,
@@ -317,24 +757,39 @@ document.addEventListener("DOMContentLoaded", async () => {
         awayScore: 0,
         winnerSide: null,
         isScoringOpen: false,
+        sportKey: tournamentSportKey,
+        sportData: hasPresetSportSchema(tournamentSportKey)
+          ? cloneDefaultPresetSportData(tournamentSportKey)
+          : null,
       })),
     };
   }
 
   function loadTeamTieState(matchObj, rawFixtures) {
     const key = getTeamStorageKey();
+    const fresh = buildInitialTeamState(matchObj, rawFixtures);
     try {
       const saved = JSON.parse(localStorage.getItem(key) || "null");
       if (saved && Array.isArray(saved.categories)) {
+        saved.homeRoster = Array.isArray(saved.homeRoster) ? saved.homeRoster : fresh.homeRoster;
+        saved.awayRoster = Array.isArray(saved.awayRoster) ? saved.awayRoster : fresh.awayRoster;
+        saved.tournamentSportKey = saved.tournamentSportKey || fresh.tournamentSportKey;
+        saved.categories = saved.categories.map((category, index) => ({
+          ...fresh.categories[index],
+          ...category,
+          sportKey: category?.sportKey || fresh.categories[index]?.sportKey || saved.tournamentSportKey,
+          sportData:
+            category?.sportData ??
+            fresh.categories[index]?.sportData ??
+            (hasPresetSportSchema(category?.sportKey || saved.tournamentSportKey)
+              ? cloneDefaultPresetSportData(category?.sportKey || saved.tournamentSportKey)
+              : null),
+        }));
         return saved;
       }
     } catch {}
 
-    return buildInitialTeamState(matchObj, rawFixtures);
-  }
-
-  function saveTeamTieState(teamState) {
-    localStorage.setItem(getTeamStorageKey(), JSON.stringify(teamState));
+    return fresh;
   }
 
   function computeTeamTieSummary(teamState) {
@@ -585,14 +1040,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const card = document.createElement("div");
         card.className = `category-card${category.isScoringOpen ? " open" : ""}`;
 
-        const winnerText =
-          category.winnerSide === "A"
-            ? `${homeLabel} won`
-            : category.winnerSide === "B"
-              ? `${awayLabel} won`
-              : "Result pending";
-
-        const resultClass = category.winnerSide ? "category-result-chip completed" : "category-result-chip pending";
+        const resultInfo = getCategoryResultInfo(category, homeLabel, awayLabel);
 
         card.innerHTML = `
           <div class="category-card-head">
@@ -601,36 +1049,16 @@ document.addEventListener("DOMContentLoaded", async () => {
               <div class="category-matchup">${escapeHtml(category.homePlayer || "TBD")} vs ${escapeHtml(category.awayPlayer || "TBD")}</div>
             </div>
             <div class="category-actions">
-              <div class="status-chip ${resultClass}">${escapeHtml(winnerText)}</div>
+              <div class="status-chip ${resultInfo.chipClass}">${escapeHtml(resultInfo.text)}</div>
               <button type="button" class="lineup-action-btn primary" data-action="toggle-scoring">
                 ${category.isScoringOpen ? "Hide scoring" : "Start scoring"}
               </button>
             </div>
           </div>
           <div class="category-card-body">
-            <div class="category-scoring-grid">
-              <div class="score-mini-card">
-                <div class="score-mini-team">${escapeHtml(homeLabel)}</div>
-                <div class="helper-text">${escapeHtml(category.homePlayer || "No lineup selected")}</div>
-                <div class="score-stepper">
-                  <button type="button" class="score-stepper-btn" data-action="home-minus">−</button>
-                  <div class="score-stepper-value">${escapeHtml(category.homeScore)}</div>
-                  <button type="button" class="score-stepper-btn" data-action="home-plus">+</button>
-                </div>
-              </div>
+            ${buildPresetScoringMarkup(category, homeLabel, awayLabel)}
 
-              <div class="score-mini-card">
-                <div class="score-mini-team">${escapeHtml(awayLabel)}</div>
-                <div class="helper-text">${escapeHtml(category.awayPlayer || "No lineup selected")}</div>
-                <div class="score-stepper">
-                  <button type="button" class="score-stepper-btn" data-action="away-minus">−</button>
-                  <div class="score-stepper-value">${escapeHtml(category.awayScore)}</div>
-                  <button type="button" class="score-stepper-btn" data-action="away-plus">+</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="category-winner-actions">
+            <div class="category-winner-actions" style="margin-top: 14px;">
               <button type="button" class="category-winner-btn primary" data-action="home-winner">Mark ${escapeHtml(homeLabel)} winner</button>
               <button type="button" class="category-winner-btn primary" data-action="away-winner">Mark ${escapeHtml(awayLabel)} winner</button>
               <button type="button" class="category-winner-btn" data-action="clear-winner">Clear result</button>
@@ -654,25 +1082,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           rerender();
         });
 
-        card.querySelector('[data-action="home-minus"]')?.addEventListener("click", () => {
-          category.homeScore = Math.max(0, Number(category.homeScore || 0) - 1);
-          rerender();
-        });
-
-        card.querySelector('[data-action="home-plus"]')?.addEventListener("click", () => {
-          category.homeScore = Number(category.homeScore || 0) + 1;
-          rerender();
-        });
-
-        card.querySelector('[data-action="away-minus"]')?.addEventListener("click", () => {
-          category.awayScore = Math.max(0, Number(category.awayScore || 0) - 1);
-          rerender();
-        });
-
-        card.querySelector('[data-action="away-plus"]')?.addEventListener("click", () => {
-          category.awayScore = Number(category.awayScore || 0) + 1;
-          rerender();
-        });
+        bindPresetHandlers(card, category, rerender);
 
         card.querySelector('[data-action="home-winner"]')?.addEventListener("click", () => {
           category.winnerSide = "A";

@@ -835,3 +835,80 @@ body.drawer-lock {
     grid-template-columns: 1fr;
   }
 }
+
+.preset-sport-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 208, 225, 0.25);
+  background: rgba(77, 208, 225, 0.08);
+  color: rgba(191, 240, 247, 0.95);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.preset-metric-row {
+  display: grid;
+  gap: 8px;
+}
+
+.preset-metric-row > span {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.preset-sets-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.preset-set-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(5, 11, 24, 0.7);
+}
+
+.preset-set-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(169, 182, 204, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.preset-set-score {
+  display: grid;
+  gap: 6px;
+}
+
+.preset-side-name {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.score-stepper.compact {
+  justify-content: flex-start;
+}
+
+.score-stepper-value.small {
+  min-width: 32px;
+  font-size: 30px;
+}
+
+@media (max-width: 700px) {
+  .preset-set-row {
+    grid-template-columns: 1fr;
+  }
+}
