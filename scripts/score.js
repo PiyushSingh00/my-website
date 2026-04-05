@@ -631,7 +631,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
-  function bindPresetHandlers(card, category, rerender) {
+  function bindPresetHandlers(card, category, rerender, teamTieState) {
     const sportKey = category?.sportKey || "";
 
     if (sportKey === "cricket" || sportKey === "football") {
@@ -1082,7 +1082,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           rerender();
         });
 
-        bindPresetHandlers(card, category, rerender);
+        bindPresetHandlers(card, category, rerender, teamTieState);
 
         card.querySelector('[data-action="home-winner"]')?.addEventListener("click", () => {
           category.winnerSide = "A";
