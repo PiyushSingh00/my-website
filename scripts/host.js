@@ -176,13 +176,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const groupCountWrap = document.getElementById("wiz-group-count-wrap");
   const groupCountInput = document.getElementById("w-group-count");
   const eventCountInput = document.getElementById("w-event-count");
+  const stageFormatNoteWrap = document.getElementById("w-stage-format-note");
+  const stageFormatNoteText = document.getElementById("w-stage-format-note-text");
+  const advancedFormatNoteWrap = document.getElementById("w-advanced-format-note");
+  const advancedFormatNoteText = document.getElementById("w-advanced-format-note-text");
   const reviewBody = document.getElementById("wiz-review-body");
+  const leaguePointsInputsWrap = document.getElementById("wiz-league-points-inputs");
+  const leaguePointsNoteWrap = document.getElementById("wiz-league-points-note-wrap");
 
   // Advanced settings inputs
   const advancedModeInput = document.getElementById("w-advanced-mode");
   const rrRoundsInput = document.getElementById("w-rr-rounds");
-  const fixedTeamCountInput = document.getElementById("w-fixed-team-count");
-  const qualifierCountInput = document.getElementById("w-qualifier-count");
+    const qualifierCountInput = document.getElementById("w-qualifier-count");
   const tieSubmatchCountInput = document.getElementById("w-tie-submatch-count");
   const lineupLockRuleInput = document.getElementById("w-lineup-lock-rule");
   const participationRuleInput = document.getElementById("w-participation-rule");
@@ -217,7 +222,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     advancedSettings: {
       advancedMode: "",
       roundRobinMatches: "",
-      fixedTeamCount: "",
       qualifierCount: "",
       tieSubmatchCount: "",
       lineupLockRule: "",
@@ -453,18 +457,54 @@ document.addEventListener("DOMContentLoaded", async () => {
     return num > 0 && (num & (num - 1)) === 0;
   }
 
-  function shouldShowLeaguePoints() {
+  function shouldShowLeaguePointsBlock() {
     return (
       wiz.stageFormat === "round_robin" ||
       wiz.stageFormat === "group_knockout" ||
-      wiz.stageFormat === "number_draw_league_knockout"
+      wiz.stageFormat === "round_robin_knockout"
     );
+  }
+
+  function shouldUseMatchPointStandings() {
+    return wiz.stageFormat === "round_robin_knockout";
+  }
+
+  function updateFormatNotes() {
+    const stageNote = {
+      knockout: "Straight elimination bracket. Lose once and the team or player is out.",
+      round_robin: "Everyone plays everyone in one league table.",
+      group_knockout: "Teams are divided into groups first, then top teams move to knockout.",
+      round_robin_knockout: "All teams play in one common league table. No groups are created. Standings are based on total match points. Top teams qualify for knockout.",
+    }[wiz.stageFormat] || "";
+
+    if (stageFormatNoteWrap && stageFormatNoteText) {
+      stageFormatNoteText.textContent = stageNote;
+      stageFormatNoteWrap.classList.toggle("hidden", !stageNote);
+    }
+
+    const advancedNote = wiz.advancedSettings.advancedMode === "pickleball_team_league"
+      ? "Pickleball team league defaults: 5 league ties per team, 5 submatches per tie, standings on total match points, top 4 to semifinals, tiebreak: head-to-head → ties won → decider tie, semifinals 1 vs 4 and 2 vs 3."
+      : "";
+
+    if (advancedFormatNoteWrap && advancedFormatNoteText) {
+      advancedFormatNoteText.textContent = advancedNote;
+      advancedFormatNoteWrap.classList.toggle("hidden", !advancedNote);
+    }
   }
 
   function toggleLeaguePointsSection() {
     const wrap = document.getElementById("wiz-league-points-wrap");
     if (!wrap) return;
-    wrap.classList.toggle("hidden", !shouldShowLeaguePoints());
+
+    const showBlock = shouldShowLeaguePointsBlock();
+    wrap.classList.toggle("hidden", !showBlock);
+
+    if (leaguePointsInputsWrap) {
+      leaguePointsInputsWrap.classList.toggle("hidden", shouldUseMatchPointStandings());
+    }
+    if (leaguePointsNoteWrap) {
+      leaguePointsNoteWrap.classList.toggle("hidden", !shouldUseMatchPointStandings());
+    }
   }
 
   function toggleTeamPlayerLimitsSection() {
@@ -704,7 +744,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     setVal("w-advanced-mode", wiz.advancedSettings.advancedMode);
     setVal("w-rr-rounds", wiz.advancedSettings.roundRobinMatches);
-    setVal("w-fixed-team-count", wiz.advancedSettings.fixedTeamCount);
     setVal("w-qualifier-count", wiz.advancedSettings.qualifierCount);
     setVal("w-tie-submatch-count", wiz.advancedSettings.tieSubmatchCount);
     setVal("w-lineup-lock-rule", wiz.advancedSettings.lineupLockRule);
@@ -725,6 +764,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     toggleLeaguePointsSection();
     toggleTeamPlayerLimitsSection();
     toggleAmountSection();
+    updateFormatNotes();
   }
 
   function resetWizardState() {
@@ -747,7 +787,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     wiz.advancedSettings = {
       advancedMode: "",
       roundRobinMatches: "",
-      fixedTeamCount: "",
       qualifierCount: "",
       tieSubmatchCount: "",
       lineupLockRule: "",
@@ -803,7 +842,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       wiz.advancedSettings.advancedMode = advancedModeInput?.value || "";
       wiz.advancedSettings.roundRobinMatches = rrRoundsInput?.value || "";
-      wiz.advancedSettings.fixedTeamCount = fixedTeamCountInput?.value || "";
       wiz.advancedSettings.qualifierCount = qualifierCountInput?.value || "";
       wiz.advancedSettings.tieSubmatchCount = tieSubmatchCountInput?.value || "";
       wiz.advancedSettings.lineupLockRule = lineupLockRuleInput?.value || "";
@@ -824,9 +862,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       wiz.tournamentRules.maxPlayersPerTeam =
         document.getElementById("w-max-players-per-team")?.value || "";
 
-      wiz.leaguePoints.win = document.getElementById("w-points-win")?.value || "";
-      wiz.leaguePoints.loss = document.getElementById("w-points-loss")?.value || "";
-      wiz.leaguePoints.draw = document.getElementById("w-points-draw")?.value || "";
     }
 
     if (n === 4) {
@@ -884,16 +919,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const advancedMode = advancedModeInput?.value || "";
-      if (advancedMode === "pickleball_team_league") {
-        const fixedTeams = Number(fixedTeamCountInput?.value || 0);
+      if (advancedMode === "pickleball_team_league" || stageFormat === "round_robin_knockout") {
         const rrRounds = Number(rrRoundsInput?.value || 0);
         const qualifiers = Number(qualifierCountInput?.value || 0);
         const submatches = Number(tieSubmatchCountInput?.value || 0);
 
-        if (!fixedTeams || fixedTeams < 2) {
-          alert("Please enter a valid fixed number of teams.");
-          return false;
-        }
         if (!rrRounds || rrRounds < 1) {
           alert("Please enter the number of league rounds.");
           return false;
@@ -980,8 +1010,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <h3>Advanced settings</h3>
         <p><strong>Advanced mode:</strong> ${escapeHtml(wiz.advancedSettings.advancedMode || "—")}</p>
         <p><strong>League rounds:</strong> ${escapeHtml(wiz.advancedSettings.roundRobinMatches || "—")}</p>
-        <p><strong>Fixed team count:</strong> ${escapeHtml(wiz.advancedSettings.fixedTeamCount || "—")}</p>
-        <p><strong>Qualifier count:</strong> ${escapeHtml(wiz.advancedSettings.qualifierCount || "—")}</p>
+                <p><strong>Qualifier count:</strong> ${escapeHtml(wiz.advancedSettings.qualifierCount || "—")}</p>
         <p><strong>Submatches per tie:</strong> ${escapeHtml(wiz.advancedSettings.tieSubmatchCount || "—")}</p>
         <p><strong>Lineup lock rule:</strong> ${escapeHtml(wiz.advancedSettings.lineupLockRule || "—")}</p>
         <p><strong>Participation rule:</strong> ${escapeHtml(wiz.advancedSettings.participationRule || "—")}</p>
@@ -1001,7 +1030,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <p><strong>Points per set:</strong> ${escapeHtml(wiz.tournamentRules.pointsPerSet || "—")}</p>
         <p><strong>Min players per team:</strong> ${escapeHtml(wiz.tournamentRules.minPlayersPerTeam || "—")}</p>
         <p><strong>Max players per team:</strong> ${escapeHtml(wiz.tournamentRules.maxPlayersPerTeam || "—")}</p>
-        <p><strong>League points:</strong> Win ${escapeHtml(wiz.leaguePoints.win || "—")}, Loss ${escapeHtml(wiz.leaguePoints.loss || "—")}, Draw ${escapeHtml(wiz.leaguePoints.draw || "—")}</p>
+        <p><strong>Standings rule:</strong> ${shouldUseMatchPointStandings() ? "Total match points only" : `Win ${escapeHtml(wiz.leaguePoints.win || "—")}, Loss ${escapeHtml(wiz.leaguePoints.loss || "—")}, Draw ${escapeHtml(wiz.leaguePoints.draw || "—")}`}</p>
       </div>
 
       <div class="review-section">
@@ -1033,9 +1062,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         advancedMode: wiz.advancedSettings.advancedMode || null,
         roundRobinMatches: wiz.advancedSettings.roundRobinMatches
           ? Number(wiz.advancedSettings.roundRobinMatches)
-          : null,
-        fixedTeamCount: wiz.advancedSettings.fixedTeamCount
-          ? Number(wiz.advancedSettings.fixedTeamCount)
           : null,
         qualifierCount: wiz.advancedSettings.qualifierCount
           ? Number(wiz.advancedSettings.qualifierCount)
@@ -1077,16 +1103,20 @@ document.addEventListener("DOMContentLoaded", async () => {
           : null,
       },
 
-      leaguePoints: {
-        win: wiz.leaguePoints.win ? Number(wiz.leaguePoints.win) : null,
-        loss: wiz.leaguePoints.loss ? Number(wiz.leaguePoints.loss) : null,
-        draw: wiz.leaguePoints.draw ? Number(wiz.leaguePoints.draw) : null,
-      },
+      leaguePoints: shouldUseMatchPointStandings()
+        ? null
+        : shouldShowLeaguePointsBlock()
+          ? {
+              win: wiz.leaguePoints.win ? Number(wiz.leaguePoints.win) : null,
+              loss: wiz.leaguePoints.loss ? Number(wiz.leaguePoints.loss) : null,
+              draw: wiz.leaguePoints.draw ? Number(wiz.leaguePoints.draw) : null,
+            }
+          : null,
 
       courtCount: Number(wiz.courtCount || 1),
       courtNames: wiz.courtNames.filter(Boolean),
       requirePayment: !!wiz.requirePayment,
-      amount: wiz.amount ? Number(wiz.amount) : null,
+      entryFee: wiz.amount ? Number(wiz.amount) : 0,
     };
   }
 
@@ -1192,7 +1222,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     wiz.stageFormat = tournament.stageFormat || "";
     wiz.groupCount = tournament.groupCount != null ? String(tournament.groupCount) : "";
     wiz.requirePayment = !!tournament.requirePayment;
-    wiz.amount = numberOrBlank(tournament.amount);
+    wiz.amount = numberOrBlank(tournament.entryFee ?? tournament.amount);
     wiz.courtCount = Number(tournament.courtCount || 1);
     wiz.courtNames = Array.isArray(tournament.courtNames) ? [...tournament.courtNames] : [];
 
@@ -1200,7 +1230,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     wiz.advancedSettings = {
       advancedMode: advanced.advancedMode || "",
       roundRobinMatches: numberOrBlank(advanced.roundRobinMatches),
-      fixedTeamCount: numberOrBlank(advanced.fixedTeamCount),
       qualifierCount: numberOrBlank(advanced.qualifierCount),
       tieSubmatchCount: numberOrBlank(advanced.tieSubmatchCount),
       lineupLockRule: advanced.lineupLockRule || "",
@@ -1933,6 +1962,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       wiz.stageFormat = stageFormatSelect.value;
       toggleGroupCountSection();
       toggleLeaguePointsSection();
+      updateFormatNotes();
     });
 
     eventCountInput?.addEventListener("input", () => {
@@ -1981,15 +2011,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Soft defaults for pickleball advanced mode
     advancedModeInput?.addEventListener("change", () => {
       const val = advancedModeInput.value;
+      wiz.advancedSettings.advancedMode = val;
       if (val === "pickleball_team_league") {
-        if (!stageFormatSelect.value) stageFormatSelect.value = "number_draw_league_knockout";
+        stageFormatSelect.value = "round_robin_knockout";
         wiz.stageFormat = stageFormatSelect.value;
 
         if (!rrRoundsInput.value) rrRoundsInput.value = "5";
-        if (!fixedTeamCountInput.value) fixedTeamCountInput.value = "8";
         if (!qualifierCountInput.value) qualifierCountInput.value = "4";
         if (!tieSubmatchCountInput.value) tieSubmatchCountInput.value = "5";
         if (!lineupLockRuleInput.value) lineupLockRuleInput.value = "captain_submit_host_lock";
+        if (!participationRuleInput.value) participationRuleInput.value = "all_bench_must_play_once";
         if (!tiebreakRuleInput.value) {
           tiebreakRuleInput.value = "points_head_to_head_ties_won_decider";
         }
@@ -1997,6 +2028,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       toggleGroupCountSection();
       toggleLeaguePointsSection();
+      updateFormatNotes();
     });
   }
 

@@ -378,7 +378,7 @@
                         <option value="knockout">Knockout</option>
                         <option value="round_robin">Round Robin</option>
                         <option value="group_knockout">Group + Knockout</option>
-                        <option value="number_draw_league_knockout">Number Draw League + Knockout</option>
+                        <option value="round_robin_knockout">Round Robin + Knockout</option>
                       </select>
                     </div>
 
@@ -391,6 +391,10 @@
                         step="1"
                         placeholder="Enter power of 2, e.g. 2, 4, 8"
                       />
+                    </div>
+
+                    <div class="helper-card hidden" id="w-stage-format-note">
+                      <p class="helper-text" id="w-stage-format-note-text"></p>
                     </div>
 
                     <div class="field-group">
@@ -429,12 +433,7 @@
                         </div>
 
                         <div class="field-group">
-                          <label for="w-fixed-team-count">Fixed no. of teams</label>
-                          <input type="number" id="w-fixed-team-count" min="2" step="1" placeholder="e.g. 8" />
-                        </div>
-
-                        <div class="field-group">
-                          <label for="w-qualifier-count">Teams qualifying to semis</label>
+                          <label for="w-qualifier-count">Teams qualifying to knockout</label>
                           <input type="number" id="w-qualifier-count" min="2" step="1" placeholder="e.g. 4" />
                         </div>
 
@@ -477,6 +476,10 @@
                             <option value="1v4_2v3">1 vs 4 and 2 vs 3</option>
                           </select>
                         </div>
+                      </div>
+
+                      <div class="helper-card hidden" id="w-advanced-format-note">
+                        <p class="helper-text" id="w-advanced-format-note-text"></p>
                       </div>
                     </section>
                   </div>
@@ -562,7 +565,7 @@
                         </div>
                       </div>
 
-                      <div class="rules-grid">
+                      <div class="rules-grid" id="wiz-league-points-inputs">
                         <div class="field-group">
                           <label for="w-points-win">Points for win</label>
                           <input type="number" id="w-points-win" step="1" placeholder="e.g. 2" />
@@ -577,6 +580,12 @@
                           <label for="w-points-draw">Points for draw</label>
                           <input type="number" id="w-points-draw" step="1" placeholder="e.g. 1" />
                         </div>
+                      </div>
+
+                      <div class="helper-card hidden" id="wiz-league-points-note-wrap">
+                        <p class="helper-text" id="wiz-league-points-note">
+                          Standings will be based on total match points only. No win points, loss points, or draw points are used in this format.
+                        </p>
                       </div>
                     </section>
                   </div>
