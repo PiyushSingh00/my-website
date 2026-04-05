@@ -1,179 +1,1294 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>ScheduleIt – Score match</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+<head>
+  <meta charset="UTF-8" />
+  <title>ScheduleIt – Score Match</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&family=Bebas+Neue&family=JetBrains+Mono:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080c14;
+      --surface: #0d1322;
+      --surface2: #111827;
+      --border: rgba(148,163,184,.18);
+      --border-glow: rgba(99,215,190,.35);
+      --text: #e8edf5;
+      --muted: #6b7894;
+      --accent: #3de8b8;
+      --accent2: #5b8fff;
+      --danger: #ff5f7e;
+      --warn: #ffb237;
+      --success: #44d98e;
+      --font-head: 'Syne', sans-serif;
+      --font-body: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius: 14px;
+      --radius-sm: 9px;
+      --radius-lg: 22px;
+    }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; overflow-x: hidden; }
+    body.drawer-lock { overflow: hidden; }
+    button { cursor: pointer; font-family: var(--font-body); border: none; background: none; color: inherit; }
+    .hidden { display: none !important; }
 
-    <link rel="stylesheet" href="styles/score.css" />
-  </head>
-  <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
+    /* TOPBAR */
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 14px; height: 50px;
+      background: rgba(8,12,20,.93); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand { font-family: var(--font-head); font-size: 17px; font-weight: 800; color: var(--accent); text-decoration: none; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
+    .user-avatar-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #080c14; font-weight: 700; font-size: 12px; border: none;
+    }
+    .user-menu { position: relative; }
+    .user-menu-dropdown {
+      display: none; position: absolute; top: calc(100% + 8px); right: 0;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 4px; min-width: 120px; z-index: 200;
+    }
+    .user-menu-dropdown.open { display: block; }
+    .dropdown-item { display: block; width: 100%; padding: 8px 12px; border-radius: 7px; font-size: 13px; text-align: left; transition: background .15s; }
+    .dropdown-item:hover { background: rgba(255,255,255,.06); }
+    .mode-toggle { display: flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+    .mode-btn { padding: 4px 11px; font-size: 11px; font-weight: 600; color: var(--muted); transition: background .15s, color .15s; }
+    .mode-btn.is-active { background: var(--accent); color: #080c14; }
 
-        <div class="topbar-right">
-          <div class="user-menu">
-            <button
-              type="button"
-              class="user-avatar-btn"
-              id="score-user-menu-trigger"
-              aria-label="User menu"
-            >
-              U
-            </button>
+    /* LAYOUT */
+    .main { max-width: 680px; margin: 0 auto; padding: 12px 12px 80px; display: flex; flex-direction: column; gap: 10px; }
 
-            <div class="user-menu-dropdown" id="score-user-menu-dropdown">
-              <button type="button" class="dropdown-item" id="dropdown-signout">
-                Sign out
-              </button>
-            </div>
-          </div>
+    /* ACTION BAR */
+    .action-bar { display: flex; align-items: center; gap: 8px; }
+    .ab-center { flex: 1; text-align: center; min-width: 0; }
+    #score-title { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .match-meta { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+    .ab-btn {
+      display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px;
+      border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); font-size: 12px; font-weight: 500; white-space: nowrap;
+      transition: background .15s, border-color .15s;
+    }
+    .ab-btn:hover { border-color: var(--accent); background: rgba(61,232,184,.07); }
+    .ab-save { background: linear-gradient(135deg, var(--accent) 0%, #1fb896 100%); border-color: transparent; color: #080c14; font-weight: 700; }
+    .ab-save:hover { filter: brightness(1.1); }
+    .ab-save:disabled { opacity: .45; cursor: not-allowed; }
 
-          <div class="mode-toggle" role="group" aria-label="Mode toggle">
-            <button class="mode-btn" id="mode-player-btn" type="button">Join mode</button>
-            <button class="mode-btn is-active" id="mode-host-btn" type="button">Host mode</button>
-          </div>
-        </div>
-      </header>
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 18px; border-radius: var(--radius); font-size: 14px; font-weight: 600; transition: all .15s; border: 1px solid transparent; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), #1fb896); color: #080c14; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-secondary { background: var(--surface2); border-color: var(--border); color: var(--text); }
+    .btn-secondary:hover { border-color: var(--accent); background: rgba(61,232,184,.06); }
+    .btn-lg { padding: 13px 26px; font-size: 15px; }
+    .btn-sm { padding: 5px 11px; font-size: 12px; border-radius: var(--radius-sm); }
 
-      <main class="main">
-        <div class="action-bar">
-          <button type="button" class="ab-btn" id="back-to-fixtures">← Back</button>
+    /* CHIPS */
+    .chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .chip strong { color: #fff; }
+    .chip.success { color: var(--success); border-color: rgba(68,217,142,.4); background: rgba(68,217,142,.08); }
+    .chip.warn    { color: var(--warn);    border-color: rgba(255,178,55,.4);  background: rgba(255,178,55,.08); }
+    .chip.error   { color: var(--danger);  border-color: rgba(255,95,126,.4);  background: rgba(255,95,126,.08); }
+    .chip.info    { color: var(--accent2); border-color: rgba(91,143,255,.4);  background: rgba(91,143,255,.08); }
+    .chip.accent  { color: var(--accent);  border-color: rgba(61,232,184,.4);  background: rgba(61,232,184,.08); }
+    .chip-clickable { cursor: pointer; transition: background .15s; }
+    .chip-clickable:hover { background: rgba(61,232,184,.12); }
 
-          <div class="ab-center">
-            <div id="score-title">Match scoring</div>
-            <div class="match-meta" id="score-sub">Loading match...</div>
-          </div>
+    .status-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
-          <button type="button" class="ab-btn ab-save" id="save-score">Save</button>
-        </div>
+    /* CARD */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; flex-wrap: wrap; }
+    .card-body { padding: 14px; }
+    .card-body.pt0 { padding-top: 0; }
+    .panel-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin: 0 0 4px; }
+    .section-title { font-family: var(--font-head); font-size: 15px; font-weight: 700; color: var(--text); }
+    .helper-text { font-size: 11px; color: var(--muted); line-height: 1.5; }
 
-        <section class="team-event-shell hidden" id="team-event-shell">
-          <div class="lineup-toolbar">
-            <div class="lineup-toolbar-left">
-              <button type="button" class="ab-btn ab-save" id="receive-lineup-btn">Receive lineup</button>
-              <button type="button" class="ab-btn" id="manual-lineup-btn">Add lineup manually</button>
-            </div>
-            <div class="status-chip" id="lineup-state-pill">Waiting for both team lineups</div>
-          </div>
+    /* TEAM EVENT */
+    .team-event-shell, .individual-score-shell { display: flex; flex-direction: column; gap: 10px; }
+    .lineup-toolbar { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .lineup-toolbar-left { display: flex; gap: 8px; flex-wrap: wrap; }
 
-          <section class="team-overall-board">
-            <div class="tob-head">
-              <div>
-                <div class="panel-label team-label-top">Overall match score</div>
-                <div class="helper-text" id="team-overall-sub">Category wins between the two teams</div>
-              </div>
-            </div>
+    /* OVERALL SCORE */
+    .team-overall-score-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+    .overall-team-card {
+      min-height: 100px; border-radius: 16px; border: 1px solid rgba(61,232,184,.12);
+      background: rgba(8,12,20,.9); display: flex; flex-direction: column;
+      justify-content: center; align-items: center; padding: 12px;
+      transition: border-color .3s, background .3s;
+    }
+    .overall-team-card.leading { border-color: rgba(61,232,184,.5); background: rgba(61,232,184,.05); }
+    .overall-team-name { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: center; margin-bottom: 4px; }
+    .overall-team-score { font-family: var(--font-head); font-size: clamp(38px, 8vw, 64px); font-weight: 800; line-height: 1; color: #fff; }
+    .overall-vs { font-family: var(--font-head); font-size: 13px; color: var(--muted); letter-spacing: .12em; }
 
-            <div class="team-overall-score-grid">
-              <div class="overall-team-card">
-                <div class="overall-team-name" id="team-overall-home-name">Home</div>
-                <div class="overall-team-score" id="team-overall-home-score">0</div>
-              </div>
+    /* COLLAPSE */
+    .lineup-collapse-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; user-select: none; gap: 10px; }
+    .lineup-collapse-toggle:hover { background: rgba(255,255,255,.02); }
+    .collapse-arrow { font-size: 11px; color: var(--muted); transition: transform .25s; display: inline-block; }
+    .is-collapsed-toggle .collapse-arrow { transform: rotate(-90deg); }
+    .collapse-body { overflow: hidden; max-height: 9999px; transition: max-height .35s ease; }
+    .collapse-body.is-collapsed { max-height: 0 !important; }
 
-              <div class="overall-vs">VS</div>
+    /* LINEUP REVIEW */
+    .lineup-review-list { padding: 0 14px 14px; }
+    .lineup-row { border: 1px solid var(--border); border-radius: var(--radius); background: rgba(8,12,20,.6); overflow: hidden; margin-bottom: 8px; }
+    .lineup-row-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
+    .lineup-row-title { font-family: var(--font-head); font-size: 13px; font-weight: 700; color: var(--text); }
+    .lineup-row-body { padding: 0 12px 12px; }
+    .lineup-entry-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: end; }
+    .lineup-vs { font-family: var(--font-head); font-size: 13px; color: var(--muted); padding-bottom: 6px; }
+    .field-stack { display: grid; gap: 4px; }
+    .field-stack label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .lineup-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .lineup-action-btn { border: 1px solid var(--border); background: var(--surface2); color: var(--text); border-radius: var(--radius-sm); padding: 6px 11px; font-size: 12px; font-weight: 600; transition: all .15s; }
+    .lineup-action-btn.primary { background: linear-gradient(135deg, var(--accent), #1fb896); color: #080c14; border-color: transparent; }
+    .lineup-action-btn:hover { border-color: var(--accent); }
+    .lineup-action-btn.primary:hover { filter: brightness(1.1); }
 
-              <div class="overall-team-card">
-                <div class="overall-team-name" id="team-overall-away-name">Away</div>
-                <div class="overall-team-score" id="team-overall-away-score">0</div>
-              </div>
-            </div>
-          </section>
+    /* CATEGORY */
+    #team-category-bars { display: grid; gap: 8px; }
+    .category-card { border: 1px solid var(--border); border-radius: var(--radius); background: rgba(8,12,20,.6); overflow: hidden; }
+    .category-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 11px 13px; cursor: pointer; user-select: none; flex-wrap: wrap; }
+    .category-card-head:hover { background: rgba(255,255,255,.02); }
+    .category-title { font-family: var(--font-head); font-size: 13px; font-weight: 700; color: var(--text); }
+    .category-meta { display: flex; flex-direction: column; gap: 2px; }
+    .category-matchup { font-size: 11px; color: var(--muted); }
+    .category-card-body { display: none; border-top: 1px solid var(--border); padding: 12px; }
+    .category-card.open .category-card-body { display: block; }
+    .category-scoring-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .score-mini-card { border: 1px solid var(--border); background: var(--surface2); border-radius: var(--radius); padding: 10px; display: grid; gap: 8px; }
+    .score-mini-team { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .score-stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .score-stepper-value { min-width: 40px; text-align: center; font-family: var(--font-head); font-size: 34px; font-weight: 800; color: #fff; }
+    .score-stepper-btn { min-width: 36px; min-height: 36px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: var(--radius-sm); font-size: 17px; transition: all .15s; }
+    .score-stepper-btn:hover { border-color: var(--accent); background: rgba(61,232,184,.08); }
+    .category-winner-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .category-winner-btn { border: 1px solid var(--border); background: var(--surface2); color: var(--text); border-radius: var(--radius-sm); padding: 6px 11px; font-size: 12px; font-weight: 600; transition: all .15s; }
+    .category-winner-btn.primary { background: linear-gradient(135deg, var(--accent), #1fb896); color: #080c14; border-color: transparent; }
+    .category-winner-btn:hover { border-color: var(--accent); }
 
-          <section class="lineup-review-panel hidden" id="lineup-review-panel">
-            <div class="lineup-review-head">
-              <div>
-                <p class="panel-label">Review team lineups</p>
-                <div class="helper-text">
-                  Accept, reject, edit, or manually fill category-wise player lineups before scoring.
-                </div>
-              </div>
-            </div>
-            <div id="lineup-review-list"></div>
-          </section>
+    /* SCOREBOARD */
+    .scoreboard {
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+    }
+    .team-block {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 22px 10px 14px; cursor: pointer; user-select: none;
+      transition: background .15s; border: none; background: transparent; color: inherit;
+      position: relative; min-height: 130px;
+    }
+    .team-block:hover { background: rgba(61,232,184,.04); }
+    .team-block:active { background: rgba(61,232,184,.09); }
+    .team-block.serving::after {
+      content: '🏸 SERVING'; position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%);
+      font-size: 8px; font-weight: 700; letter-spacing: .12em; color: var(--accent); white-space: nowrap;
+    }
+    .team-name { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); text-align: center; word-break: break-word; max-width: 120px; }
+    .team-score { font-family: var(--font-head); font-size: clamp(52px, 11vw, 80px); font-weight: 800; line-height: 1; color: #fff; transition: transform .12s, color .2s; }
+    .team-score.bump { transform: scale(1.18); color: var(--accent); }
+    .team-tap-hint { font-size: 8px; color: rgba(169,182,204,.3); letter-spacing: .06em; text-transform: uppercase; margin-top: 1px; }
+    .scoreboard-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 14px 7px; }
+    .vs-badge { font-family: var(--font-head); font-size: 12px; letter-spacing: .12em; color: var(--muted); }
+    .timer-display { font-family: var(--font-mono); font-size: clamp(14px, 3vw, 19px); font-weight: 700; color: var(--text); letter-spacing: .08em; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 9px; white-space: nowrap; }
+    .timer-controls { display: flex; gap: 4px; }
+    .tc-btn { width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; display: flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s; }
+    .tc-btn:hover { background: rgba(61,232,184,.14); border-color: rgba(61,232,184,.38); }
 
-          <section class="category-bars-wrap">
-            <div class="category-bars-head">
-              <div>
-                <p class="panel-label">Category matches</p>
-                <div class="helper-text" id="team-category-help">
-                  Category bars will unlock after all lineups are accepted.
-                </div>
-              </div>
-            </div>
-            <div id="team-category-bars"></div>
-          </section>
-        </section>
+    /* SERVE INDICATOR */
+    .serve-indicator-bar {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 9px 14px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); flex-wrap: wrap; text-align: center;
+    }
+    .serve-indicator-bar .serve-team-name { font-size: 13px; font-weight: 700; color: var(--accent); }
+    .serve-indicator-bar .serve-label { font-size: 11px; color: var(--muted); }
+    .serve-indicator-bar .serve-score { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--text); }
 
-        <section class="individual-score-shell" id="individual-score-shell">
-          <section class="scoreboard">
-            <button type="button" class="team-block" id="team-home">
-              <div class="team-name" id="home-name">Home</div>
-              <div class="team-score" id="home-score">0</div>
-              <div class="team-tap-hint">tap to edit</div>
-            </button>
+    /* PRE-MATCH WIZARD */
+    .prematch-overlay {
+      position: fixed; inset: 0; background: rgba(8,12,20,.97); z-index: 300;
+      display: flex; align-items: center; justify-content: center; padding: 18px; overflow-y: auto;
+    }
+    .prematch-card { background: var(--surface); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px 20px; max-width: 400px; width: 100%; animation: slideUp .3s ease; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+    .prematch-step { display: none; }
+    .prematch-step.active { display: block; }
+    .prematch-sport-icon { font-size: 46px; text-align: center; margin-bottom: 14px; }
+    .prematch-title { font-family: var(--font-head); font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 5px; }
+    .prematch-sub { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 20px; line-height: 1.5; }
+    .prematch-rule-note { font-size: 11px; color: var(--muted); background: rgba(61,232,184,.06); border: 1px solid rgba(61,232,184,.15); border-radius: var(--radius-sm); padding: 8px 11px; margin-bottom: 16px; line-height: 1.5; }
+    .big-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .big-choice-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 16px 8px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; font-weight: 700; transition: all .18s; text-align: center; }
+    .big-choice-btn:hover { border-color: var(--accent); background: rgba(61,232,184,.07); color: var(--accent); }
+    .big-choice-btn.selected { border-color: var(--accent); background: rgba(61,232,184,.12); color: var(--accent); }
+    .big-choice-btn .choice-icon { font-size: 22px; }
+    .prematch-progress { display: flex; gap: 5px; justify-content: center; margin-bottom: 18px; }
+    .progress-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); transition: background .2s, width .2s; }
+    .progress-dot.done { background: var(--accent); }
+    .progress-dot.active { background: var(--accent); width: 16px; border-radius: 3px; }
+    .prematch-nav { display: flex; gap: 8px; }
+    .prematch-nav .btn { flex: 1; }
 
-            <div class="scoreboard-center">
-              <div class="vs-badge">VS</div>
+    /* RALLY CONTROLS */
+    .rally-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .rally-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 18px 10px; border-radius: var(--radius-lg); border: 2px solid var(--border);
+      background: var(--surface2); color: var(--text); font-size: 14px; font-weight: 700;
+      transition: all .15s; min-height: 82px; position: relative; overflow: hidden;
+    }
+    .rally-btn::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .15s; border-radius: inherit; }
+    .rally-btn.home-btn::before { background: linear-gradient(135deg, rgba(61,232,184,.13), transparent); }
+    .rally-btn.away-btn::before { background: linear-gradient(225deg, rgba(91,143,255,.13), transparent); }
+    .rally-btn:hover::before { opacity: 1; }
+    .rally-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .rally-btn.away-btn:hover { border-color: var(--accent2); }
+    .rally-btn:active { transform: scale(.97); }
+    .rally-btn .btn-team-name { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+    .rally-btn .btn-action { font-size: 15px; font-weight: 800; }
+    .rally-btn .btn-sub { font-size: 9px; color: var(--muted); }
+    .rally-btn.serving-side { border-color: rgba(61,232,184,.38); }
+    .rally-btn.serving-side .btn-team-name { color: var(--accent); }
 
-              <div class="timer-display" id="timer-display">00:00</div>
+    /* EVENT LOG */
+    .event-log-wrap { max-height: 160px; overflow-y: auto; }
+    .event-log { display: flex; flex-direction: column; gap: 3px; }
+    .event-log-item { display: flex; align-items: center; gap: 7px; padding: 6px 9px; border-radius: var(--radius-sm); background: rgba(8,12,20,.5); border: 1px solid var(--border); animation: fadeIn .18s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+    .event-log-item .ev-icon { font-size: 13px; }
+    .event-log-item .ev-text { font-size: 11px; color: var(--muted); flex: 1; }
+    .event-log-item .ev-score { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text); }
+    .event-log-item.point { background: rgba(61,232,184,.05); border-color: rgba(61,232,184,.18); }
+    .event-log-item.serve-change { background: rgba(91,143,255,.05); border-color: rgba(91,143,255,.14); }
 
-              <div class="timer-controls">
-                <button type="button" class="tc-btn" id="timer-start" aria-label="Start timer">▶</button>
-                <button type="button" class="tc-btn" id="timer-pause" aria-label="Pause timer">⏸</button>
-                <button type="button" class="tc-btn" id="timer-reset" aria-label="Reset timer">↺</button>
-              </div>
-            </div>
+    /* SETTINGS */
+    .settings-panel { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+    .settings-panel.open { max-height: 600px; }
+    .settings-inner { padding: 14px; }
+    .settings-inner .field { display: grid; gap: 4px; margin-bottom: 10px; }
+    .settings-inner .field label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 
-            <button type="button" class="team-block" id="team-away">
-              <div class="team-name" id="away-name">Away</div>
-              <div class="team-score" id="away-score">0</div>
-              <div class="team-tap-hint">tap to edit</div>
-            </button>
-          </section>
+    /* INPUTS */
+    input, select, textarea { width: 100%; min-height: 36px; padding: 7px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: var(--font-body); font-size: 13px; outline: none; transition: border-color .15s; }
+    input:focus, select:focus, textarea:focus { border-color: rgba(61,232,184,.6); box-shadow: 0 0 0 2px rgba(61,232,184,.09); }
+    textarea { min-height: 64px; resize: vertical; }
+    select option { background: var(--surface2); }
 
-          <div class="status-row">
-            <div class="status-chip" id="status-pill">Status: <strong>pending</strong></div>
-            <div class="status-chip" id="winner-pill">Winner: <strong>-</strong></div>
-            <div class="status-chip" id="reason-pill">Reason: <strong>-</strong></div>
-            <button type="button" class="status-chip chip-btn" id="toggle-settings">⚙ Settings</button>
-            <div class="status-chip" id="save-msg">Not saved yet</div>
-          </div>
+    /* ROSTER */
+    .roster-area { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .roster-panel { display: none; flex-direction: column; gap: 5px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 11px; animation: rp-in .2s ease; }
+    .roster-panel.active { display: flex; }
+    @keyframes rp-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .roster-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+    .rp-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+    .rp-close { font-size: 11px; color: var(--muted); cursor: pointer; padding: 2px 4px; border-radius: 5px; }
+    .rp-close:hover { color: #fff; }
+    .rp-empty { font-size: 11px; color: var(--muted); }
+    .player-chip { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; text-align: left; transition: background .15s, border-color .15s, transform .1s; }
+    .player-chip:hover { background: rgba(61,232,184,.07); border-color: rgba(61,232,184,.3); }
+    .player-chip:active { transform: scale(.97); }
+    .pc-name { font-size: 11px; font-weight: 500; }
+    .pc-stat { font-family: var(--font-head); font-size: 16px; color: var(--accent); font-weight: 700; line-height: 1; min-width: 22px; text-align: right; }
 
-          <section class="settings-panel" id="settings-panel">
-            <div class="settings-inner">
-              <p class="panel-label">Match settings</p>
-              <div id="config-fields"></div>
-            </div>
-          </section>
+    /* DRAWER */
+    .stat-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); z-index: 200; opacity: 0; pointer-events: none; transition: opacity .25s; }
+    .stat-drawer-overlay.show { opacity: 1; pointer-events: all; }
+    .stat-drawer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 201; background: rgba(8,12,20,.98); border-top-left-radius: 20px; border-top-right-radius: 20px; border: 1px solid var(--border); box-shadow: 0 -18px 48px rgba(0,0,0,.4); transform: translateY(102%); transition: transform .26s ease; max-height: 78vh; overflow-y: auto; }
+    .stat-drawer.open { transform: translateY(0); }
+    .drawer-head { position: sticky; top: 0; background: rgba(8,12,20,.96); border-bottom: 1px solid var(--border); padding: 13px 15px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .drawer-head h3 { margin: 0 0 2px; font-family: var(--font-head); font-size: 17px; font-weight: 700; }
+    .drawer-close { border: 1px solid var(--border); background: var(--surface2); color: var(--text); width: 30px; height: 30px; border-radius: 999px; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .drawer-body { padding: 12px 14px 22px; display: grid; gap: 10px; }
+    .df-row { padding: 11px; border-radius: var(--radius); border: 1px solid var(--border); background: rgba(8,12,20,.8); display: grid; gap: 7px; }
+    .df-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+    .df-counter { display: flex; align-items: center; gap: 7px; }
+    .df-counter-btn { width: 34px; height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 17px; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    .df-counter-btn:hover { border-color: var(--accent); background: rgba(61,232,184,.08); }
+    .df-counter-val { min-width: 34px; text-align: center; font-size: 16px; font-weight: 700; }
+    .df-help { font-size: 10px; color: var(--muted); }
 
-          <section class="roster-area" id="roster-area"></section>
-        </section>
-      </main>
+    /* SCORE INPUT MODAL */
+    .score-input-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(6px); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 18px; }
+    .score-input-modal { background: var(--surface); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 20px; max-width: 300px; width: 100%; animation: slideUp .2s ease; }
+    .score-input-modal h3 { font-family: var(--font-head); font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+    .score-input-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+    .kp-btn { height: 50px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: var(--font-head); font-size: 20px; font-weight: 700; transition: all .12s; }
+    .kp-btn:hover { border-color: var(--accent); background: rgba(61,232,184,.09); }
+    .kp-btn:active { transform: scale(.94); }
+    .kp-display { font-family: var(--font-head); font-size: 38px; font-weight: 800; text-align: center; color: #fff; margin-bottom: 8px; min-height: 48px; }
+    .score-input-nav { display: flex; gap: 7px; }
+
+    /* UNDO */
+    .undo-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 11px; font-weight: 600; transition: all .15s; }
+    .undo-btn:hover { border-color: var(--warn); color: var(--warn); }
+
+    /* RESPONSIVE */
+    @media (max-width: 500px) {
+      .action-bar { flex-wrap: wrap; }
+      .ab-center { order: -1; width: 100%; }
+      .lineup-entry-grid { grid-template-columns: 1fr; }
+      .roster-area { grid-template-columns: 1fr; }
+      .category-scoring-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 340px) {
+      .rally-controls { grid-template-columns: 1fr; }
+      .big-choice-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- PRE-MATCH WIZARD -->
+<div class="prematch-overlay hidden" id="prematch-overlay">
+  <div class="prematch-card">
+    <div class="prematch-progress" id="prematch-progress"></div>
+
+    <!-- Step 0: Sport intro -->
+    <div class="prematch-step active" id="pmstep-0">
+      <div class="prematch-sport-icon" id="pm-sport-icon">🏸</div>
+      <div class="prematch-title" id="pm-sport-name">Pickleball</div>
+      <div class="prematch-sub">Let's set up pre-match details before scoring begins.</div>
+      <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px" onclick="pmNext()">Get Started →</button>
     </div>
 
-    <div class="stat-drawer-overlay" id="stat-overlay"></div>
+    <!-- Step 1: Toss winner -->
+    <div class="prematch-step" id="pmstep-1">
+      <div class="prematch-title">Who won the toss?</div>
+      <div class="prematch-sub">Winning team gets to choose their preference.</div>
+      <div class="prematch-rule-note" id="pm-toss-rule"></div>
+      <div class="big-choice-grid" id="pm-toss-grid"></div>
+      <div class="prematch-nav">
+        <button class="btn btn-secondary" onclick="pmBack()">← Back</button>
+      </div>
+    </div>
 
-    <aside class="stat-drawer" id="stat-drawer" aria-label="Player stats drawer">
-      <div class="drawer-head">
-        <div>
-          <h3 id="drawer-player-name">Player</h3>
-          <p id="drawer-team-name" class="helper-text">Team</p>
+    <!-- Step 2: Toss winner's choice -->
+    <div class="prematch-step" id="pmstep-2">
+      <div class="prematch-title" id="pm-choice-title">Choose to serve or receive?</div>
+      <div class="prematch-sub" id="pm-choice-sub">The toss winner decides.</div>
+      <div class="big-choice-grid" id="pm-serve-choice-grid"></div>
+      <div class="prematch-nav">
+        <button class="btn btn-secondary" onclick="pmBack()">← Back</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Doubles – first server on serving team (pickleball) -->
+    <div class="prematch-step" id="pmstep-3">
+      <div class="prematch-title" id="pm-server-title">Who serves first?</div>
+      <div class="prematch-sub" id="pm-server-sub">Select from the serving team.</div>
+      <div class="prematch-rule-note" id="pm-server-rule"></div>
+      <div class="big-choice-grid" id="pm-server-grid"></div>
+      <div class="prematch-nav">
+        <button class="btn btn-secondary" onclick="pmBack()">← Back</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Scoring type -->
+    <div class="prematch-step" id="pmstep-4">
+      <div class="prematch-title">Scoring format?</div>
+      <div class="prematch-sub">Choose how points are awarded this match.</div>
+      <div class="prematch-rule-note" id="pm-scoring-rule"></div>
+      <div class="big-choice-grid" id="pm-scoring-grid"></div>
+      <div class="prematch-nav">
+        <button class="btn btn-secondary" onclick="pmBack()">← Back</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Points target -->
+    <div class="prematch-step" id="pmstep-5">
+      <div class="prematch-title">Points to win?</div>
+      <div class="prematch-sub" id="pm-points-sub">Must win by 2 points.</div>
+      <div class="big-choice-grid" id="pm-points-grid" style="grid-template-columns:1fr 1fr 1fr"></div>
+      <div class="prematch-nav">
+        <button class="btn btn-secondary" onclick="pmBack()">← Back</button>
+      </div>
+    </div>
+
+    <!-- Step 6: Summary / Start -->
+    <div class="prematch-step" id="pmstep-6">
+      <div class="prematch-sport-icon">🏁</div>
+      <div class="prematch-title">All set!</div>
+      <div class="prematch-sub" id="pm-summary" style="text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:16px"></div>
+      <button class="btn btn-primary btn-lg" style="width:100%" onclick="startMatch()">Start Match →</button>
+      <button class="btn btn-secondary" style="width:100%;margin-top:7px" onclick="pmBack()">← Edit</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCORE QUICK-EDIT MODAL -->
+<div class="score-input-overlay hidden" id="score-input-overlay">
+  <div class="score-input-modal">
+    <h3 id="score-input-title">Edit Score</h3>
+    <div class="kp-display" id="kp-display">0</div>
+    <div class="score-input-keypad" id="kp-grid"></div>
+    <div class="score-input-nav">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeScoreInput()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="confirmScoreInput()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div class="app-shell">
+  <header class="topbar">
+    <a class="brand" href="index.html">ScheduleIt</a>
+    <div class="topbar-right">
+      <div class="user-menu">
+        <button class="user-avatar-btn" id="score-user-menu-trigger">U</button>
+        <div class="user-menu-dropdown" id="score-user-menu-dropdown">
+          <button class="dropdown-item" id="dropdown-signout">Sign out</button>
         </div>
-        <button type="button" class="drawer-close" id="drawer-close">✕</button>
+      </div>
+      <div class="mode-toggle">
+        <button class="mode-btn" id="mode-player-btn">Join mode</button>
+        <button class="mode-btn is-active" id="mode-host-btn">Host mode</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- ACTION BAR -->
+    <div class="action-bar">
+      <button class="ab-btn" id="back-to-fixtures">← Back</button>
+      <div class="ab-center">
+        <div id="score-title">Match Scoring</div>
+        <div class="match-meta" id="score-sub">Loading match…</div>
+      </div>
+      <button class="ab-btn ab-save" id="save-score">Save</button>
+    </div>
+
+    <!-- ══ TEAM EVENT SHELL ══ -->
+    <section class="team-event-shell hidden" id="team-event-shell">
+
+      <div class="lineup-toolbar">
+        <div class="lineup-toolbar-left">
+          <button class="ab-btn ab-save" id="receive-lineup-btn">Receive lineup</button>
+          <button class="ab-btn" id="manual-lineup-btn">Add manually</button>
+        </div>
+        <div class="chip warn" id="lineup-state-pill">Waiting for lineups</div>
       </div>
 
-      <div class="drawer-body" id="drawer-fields"></div>
-    </aside>
+      <!-- Overall score -->
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="panel-label">Overall Match Score</div>
+            <div class="helper-text" id="team-overall-sub">Category wins between the two teams</div>
+          </div>
+        </div>
+        <div class="card-body pt0">
+          <div class="team-overall-score-grid">
+            <div class="overall-team-card" id="overall-home-card">
+              <div class="overall-team-name" id="team-overall-home-name">Home</div>
+              <div class="overall-team-score" id="team-overall-home-score">0</div>
+            </div>
+            <div class="overall-vs">VS</div>
+            <div class="overall-team-card" id="overall-away-card">
+              <div class="overall-team-name" id="team-overall-away-name">Away</div>
+              <div class="overall-team-score" id="team-overall-away-score">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    <script type="module" src="scripts/score.js"></script>
-  </body>
+      <!-- Lineup review – collapsible -->
+      <div class="card hidden" id="lineup-review-panel">
+        <div class="lineup-collapse-toggle" id="lineup-collapse-toggle" onclick="toggleLineupCollapse()">
+          <div>
+            <div class="panel-label" style="margin-bottom:0">Team Lineups</div>
+            <div class="helper-text" id="lineup-collapse-status">Review &amp; approve lineups before scoring</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="chip success hidden" id="lineup-done-badge">✓ All accepted</div>
+            <span class="collapse-arrow" id="lineup-collapse-arrow">▼</span>
+          </div>
+        </div>
+        <div class="collapse-body" id="lineup-collapse-body">
+          <div class="lineup-review-list" id="lineup-review-list"></div>
+        </div>
+      </div>
+
+      <!-- Category matches – collapsible -->
+      <div class="card">
+        <div class="lineup-collapse-toggle" id="cat-collapse-toggle" onclick="toggleCategoryCollapse()">
+          <div>
+            <div class="panel-label" style="margin-bottom:0">Category Matches</div>
+            <div class="helper-text" id="team-category-help">Unlocks after all lineups are accepted.</div>
+          </div>
+          <span class="collapse-arrow" id="cat-collapse-arrow">▼</span>
+        </div>
+        <div class="collapse-body" id="cat-collapse-body">
+          <div style="padding:0 14px 14px" id="team-category-bars"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ INDIVIDUAL SCORE SHELL ══ -->
+    <section class="individual-score-shell" id="individual-score-shell">
+
+      <!-- Scoreboard -->
+      <div class="scoreboard">
+        <button class="team-block" id="team-home" onclick="openScoreInput('home')">
+          <div class="team-name" id="home-name">Home</div>
+          <div class="team-score" id="home-score">0</div>
+          <div class="team-tap-hint">tap to edit</div>
+        </button>
+        <div class="scoreboard-center">
+          <div class="vs-badge">VS</div>
+          <div class="timer-display" id="timer-display">00:00</div>
+          <div class="timer-controls">
+            <button class="tc-btn" id="timer-start">▶</button>
+            <button class="tc-btn" id="timer-pause">⏸</button>
+            <button class="tc-btn" id="timer-reset">↺</button>
+          </div>
+        </div>
+        <button class="team-block" id="team-away" onclick="openScoreInput('away')">
+          <div class="team-name" id="away-name">Away</div>
+          <div class="team-score" id="away-score">0</div>
+          <div class="team-tap-hint">tap to edit</div>
+        </button>
+      </div>
+
+      <!-- Status row -->
+      <div class="status-row">
+        <div class="chip" id="status-pill">Status: <strong>pending</strong></div>
+        <div class="chip" id="winner-pill">Winner: <strong>–</strong></div>
+        <button class="chip chip-clickable" id="toggle-settings">⚙ Settings</button>
+        <div class="chip" id="save-msg">Not saved yet</div>
+        <button class="undo-btn hidden" id="undo-btn" onclick="undoLastRally()">↩ Undo</button>
+      </div>
+
+      <!-- Serve indicator (sport-specific) -->
+      <div class="serve-indicator-bar hidden" id="serve-indicator-bar">
+        <div class="serve-label">Serving:</div>
+        <div class="serve-team-name" id="serve-team-name">–</div>
+        <div class="serve-score" id="serve-score-display">0–0</div>
+        <div class="serve-label" id="serve-player-label"></div>
+      </div>
+
+      <!-- Rally controls (sport-specific) -->
+      <div class="rally-controls hidden" id="rally-controls">
+        <button class="rally-btn home-btn" id="rally-home-btn" onclick="recordRally('home')">
+          <div class="btn-team-name" id="rally-home-name">Home</div>
+          <div class="btn-action">Won Rally</div>
+          <div class="btn-sub" id="rally-home-sub"></div>
+        </button>
+        <button class="rally-btn away-btn" id="rally-away-btn" onclick="recordRally('away')">
+          <div class="btn-team-name" id="rally-away-name">Away</div>
+          <div class="btn-action">Won Rally</div>
+          <div class="btn-sub" id="rally-away-sub"></div>
+        </button>
+      </div>
+
+      <!-- Rally log -->
+      <div class="card hidden" id="event-log-card">
+        <div class="card-head">
+          <div class="panel-label" style="margin-bottom:0">Rally Log</div>
+          <button class="btn btn-secondary btn-sm" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="card-body pt0">
+          <div class="event-log-wrap"><div class="event-log" id="event-log"></div></div>
+        </div>
+      </div>
+
+      <!-- Settings panel -->
+      <div class="settings-panel" id="settings-panel">
+        <div class="card settings-inner">
+          <p class="panel-label">Match Settings</p>
+          <div id="config-fields"></div>
+        </div>
+      </div>
+
+      <!-- Roster -->
+      <div class="roster-area" id="roster-area"></div>
+    </section>
+  </main>
+</div>
+
+<div class="stat-drawer-overlay" id="stat-overlay"></div>
+<aside class="stat-drawer" id="stat-drawer">
+  <div class="drawer-head">
+    <div>
+      <h3 id="drawer-player-name">Player</h3>
+      <p id="drawer-team-name" class="helper-text">Team</p>
+    </div>
+    <button class="drawer-close" id="drawer-close">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-fields"></div>
+</aside>
+
+<script>
+/* ── SPORT CONFIGS ─────────────────────────────────────────────── */
+const SPORTS = {
+  pickleball: {
+    name: 'Pickleball', icon: '🏸', hasRallyMode: true,
+    scoringTypes: [
+      { id: 'sideout', label: 'Side-Out',  sub: 'Traditional – only server scores', icon: '🏆' },
+      { id: 'rally',   label: 'Rally',     sub: 'Point every rally (MLP / rec)',     icon: '⚡' },
+    ],
+    pointOptions: { sideout: [11, 15, 21], rally: [15, 21, 25] },
+    winBy: 2,
+    rules: {
+      sideout: 'USA Pickleball standard: only the serving team scores. Win by 2 (e.g. 11-9). Server keeps serving until fault/error.',
+      rally:   'Rally scoring: every rally scores a point regardless of who serves. Win by 2.',
+    },
+    tossRule: 'Toss winner may choose to serve/receive first, or pick a side of the court.',
+    servePlayerRule: 'In doubles, both partners serve before a side-out occurs — except at the very start of the game, where only one server serves before yielding.',
+    hasTossChoice: true, tossChoices: ['Serve first', 'Receive first'],
+    hasServerChoice: true,
+  },
+  badminton: {
+    name: 'Badminton', icon: '🏸', hasRallyMode: true,
+    scoringTypes: [{ id: 'rally', label: 'Rally Point', sub: 'BWF standard', icon: '⚡' }],
+    pointOptions: { rally: [21, 15, 11] }, winBy: 2,
+    rules: { rally: 'BWF standard: rally scoring, win by 2, cap at 30 (30-29 wins). Service goes to winner of each rally.' },
+    tossRule: 'Toss winner may choose to serve, receive, or side.',
+    hasTossChoice: true, tossChoices: ['Serve first', 'Receive first'], hasServerChoice: false,
+  },
+  tabletennis: {
+    name: 'Table Tennis', icon: '🏓', hasRallyMode: true,
+    scoringTypes: [{ id: 'rally', label: 'Rally Point', sub: 'ITTF standard', icon: '⚡' }],
+    pointOptions: { rally: [11, 21, 7] }, winBy: 2,
+    rules: { rally: 'ITTF: rally scoring, serve alternates every 2 points (every 1 at deuce). Win by 2.' },
+    tossRule: 'Toss winner chooses serve, receive, or side.',
+    hasTossChoice: true, tossChoices: ['Serve first', 'Receive first'],
+    hasServerChoice: false, serveAlternates: 2,
+  },
+  volleyball: {
+    name: 'Volleyball', icon: '🏐', hasRallyMode: true,
+    scoringTypes: [{ id: 'rally', label: 'Rally Point', sub: 'FIVB standard', icon: '⚡' }],
+    pointOptions: { rally: [25, 15, 21] }, winBy: 2,
+    rules: { rally: 'FIVB: rally scoring – winner of rally scores and earns the serve. Win by 2.' },
+    tossRule: 'Coin toss winner chooses serve or side.',
+    hasTossChoice: true, tossChoices: ['Serve first', 'Receive first'], hasServerChoice: false,
+  },
+  basketball: {
+    name: 'Basketball', icon: '🏀', hasRallyMode: false, rules: {},
+    hasTossChoice: true, tossChoices: ['First possession'], hasServerChoice: false,
+  },
+  football: {
+    name: 'Football / Soccer', icon: '⚽', hasRallyMode: false, rules: {},
+    hasTossChoice: true, tossChoices: ['Kick off', 'Choose end'], hasServerChoice: false,
+  },
+  cricket: {
+    name: 'Cricket', icon: '🏏', hasRallyMode: false, rules: {},
+    hasTossChoice: true, tossChoices: ['Bat first', 'Bowl first'], hasServerChoice: false,
+  },
+  generic: {
+    name: 'Match', icon: '🏆', hasRallyMode: false, rules: {}, hasTossChoice: false, hasServerChoice: false,
+  },
+};
+
+/* ── STATE ─────────────────────────────────────────────────────── */
+let matchState = {
+  sport: 'pickleball', homeTeam: 'Home', awayTeam: 'Away',
+  homeScore: 0, awayScore: 0, status: 'pending', winner: null,
+  tossWinner: null, tossChoice: null, servingTeam: null,
+  scoringType: 'sideout', pointsToWin: 11, winBy: 2,
+  homeServer: 1, awayServer: 1, isFirstServe: true,
+  serveCount: 0, matchStarted: false, prematchComplete: false,
+  history: [],
+};
+let rallyLog = [];
+let pmStepList = []; let pmStepIdx = 0;
+
+/* ── PM STEP MAPS ──────────────────────────────────────────────── */
+const PM_STEPS = {
+  pickleball:  [0,1,2,3,4,5,6],
+  badminton:   [0,1,2,4,5,6],
+  tabletennis: [0,1,2,4,5,6],
+  volleyball:  [0,1,2,4,5,6],
+  basketball:  [0,1,2,6],
+  football:    [0,1,2,6],
+  cricket:     [0,1,2,6],
+  generic:     [0,6],
+};
+
+/* ── INIT ──────────────────────────────────────────────────────── */
+function initPage() {
+  const params = new URLSearchParams(location.search);
+  matchState.sport    = params.get('sport') || 'pickleball';
+  matchState.homeTeam = params.get('home')  || 'Home Team';
+  matchState.awayTeam = params.get('away')  || 'Away Team';
+  const isTeam = params.get('team') === '1';
+
+  document.getElementById('score-title').textContent = 'Match Scoring';
+  document.getElementById('score-sub').textContent   = matchState.homeTeam + ' vs ' + matchState.awayTeam;
+  document.getElementById('home-name').textContent   = matchState.homeTeam;
+  document.getElementById('away-name').textContent   = matchState.awayTeam;
+
+  if (isTeam) {
+    document.getElementById('team-event-shell').classList.remove('hidden');
+    document.getElementById('individual-score-shell').classList.add('hidden');
+    initTeamEventShell();
+  } else {
+    const sport = SPORTS[matchState.sport] || SPORTS.generic;
+    if (sport.hasRallyMode || sport.hasTossChoice) showPreMatch();
+  }
+  bindUIEvents();
+}
+
+/* ── PRE-MATCH WIZARD ──────────────────────────────────────────── */
+function showPreMatch() {
+  const sport = SPORTS[matchState.sport] || SPORTS.generic;
+  pmStepList  = PM_STEPS[matchState.sport] || [0,6];
+  pmStepIdx   = 0;
+  document.getElementById('pm-sport-icon').textContent = sport.icon;
+  document.getElementById('pm-sport-name').textContent = sport.name;
+  buildProgress();
+  activatePmStep(pmStepList[0]);
+  document.getElementById('prematch-overlay').classList.remove('hidden');
+}
+
+function buildProgress() {
+  document.getElementById('prematch-progress').innerHTML =
+    pmStepList.map((_,i) => `<div class="progress-dot ${i===0?'active':''}" id="pdot-${i}"></div>`).join('');
+}
+
+function updateProgress() {
+  pmStepList.forEach((_,i) => {
+    const d = document.getElementById('pdot-'+i);
+    if (d) d.className = 'progress-dot ' + (i < pmStepIdx ? 'done' : i === pmStepIdx ? 'active' : '');
+  });
+}
+
+function activatePmStep(step) {
+  document.querySelectorAll('.prematch-step').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('pmstep-'+step);
+  if (el) el.classList.add('active');
+  const sport = SPORTS[matchState.sport] || SPORTS.generic;
+
+  if (step === 1) {
+    document.getElementById('pm-toss-rule').textContent = sport.tossRule || '';
+    document.getElementById('pm-toss-rule').style.display = sport.tossRule ? '' : 'none';
+    document.getElementById('pm-toss-grid').innerHTML =
+      [matchState.homeTeam, matchState.awayTeam].map(n =>
+        `<button class="big-choice-btn" onclick="selectTossWinner('${n}')"><div class="choice-icon">🪙</div>${n}</button>`
+      ).join('');
+  }
+
+  if (step === 2) {
+    const choices = sport.tossChoices || ['Serve first','Receive first'];
+    document.getElementById('pm-choice-title').textContent = (matchState.tossWinner||'Toss winner') + ' chose to…';
+    document.getElementById('pm-choice-sub').textContent = 'Confirm their choice below.';
+    document.getElementById('pm-serve-choice-grid').innerHTML =
+      choices.map((c,i) =>
+        `<button class="big-choice-btn" onclick="selectTossChoice('${c}',${i})">
+          <div class="choice-icon">${i===0?'🎯':'🛡️'}</div>${c}
+        </button>`
+      ).join('');
+  }
+
+  if (step === 3) {
+    const sn = matchState.servingTeam === 'home' ? matchState.homeTeam : matchState.awayTeam;
+    document.getElementById('pm-server-title').textContent = sn + ' – Who serves?';
+    document.getElementById('pm-server-rule').textContent = sport.servePlayerRule || '';
+    document.getElementById('pm-server-grid').innerHTML =
+      ['Player 1','Player 2'].map((p,i) =>
+        `<button class="big-choice-btn" onclick="selectFirstServer(${i+1})"><div class="choice-icon">${i===0?'①':'②'}</div>${p}</button>`
+      ).join('');
+  }
+
+  if (step === 4) {
+    const types = sport.scoringTypes || [];
+    if (types.length === 1) { matchState.scoringType = types[0].id; pmNext(); return; }
+    document.getElementById('pm-scoring-rule').textContent = sport.rules?.[matchState.scoringType] || '';
+    document.getElementById('pm-scoring-grid').innerHTML = types.map(t =>
+      `<button class="big-choice-btn" onclick="selectScoringType('${t.id}')">
+        <div class="choice-icon">${t.icon}</div>
+        <div>${t.label}</div>
+        <div style="font-size:9px;color:var(--muted);font-weight:400;margin-top:2px">${t.sub}</div>
+      </button>`
+    ).join('');
+  }
+
+  if (step === 5) {
+    const sport2 = SPORTS[matchState.sport] || SPORTS.generic;
+    const opts = sport2.pointOptions?.[matchState.scoringType] || [11,15,21];
+    matchState.pointsToWin = matchState.pointsToWin || opts[0];
+    document.getElementById('pm-points-sub').textContent =
+      'Win by ' + (sport2.winBy||2) + '. ' + (matchState.scoringType==='sideout'?'Side-out scoring.':'Rally scoring.');
+    document.getElementById('pm-points-grid').innerHTML = opts.map(p =>
+      `<button class="big-choice-btn ${matchState.pointsToWin===p?'selected':''}" onclick="selectPoints(${p})" style="padding:14px 6px">
+        <div style="font-family:var(--font-head);font-size:26px;font-weight:800">${p}</div>
+        <div style="font-size:9px;color:var(--muted)">pts</div>
+      </button>`
+    ).join('');
+  }
+
+  if (step === 6) {
+    const sn = matchState.servingTeam === 'home' ? matchState.homeTeam : matchState.awayTeam;
+    const lines = [
+      `🪙 Toss won by: <strong>${matchState.tossWinner||'–'}</strong>`,
+      `🎯 Serving first: <strong>${sn||'–'}</strong>`,
+    ];
+    if (matchState.scoringType) lines.push(`📊 Scoring: <strong>${matchState.scoringType==='sideout'?'Side-out (traditional)':'Rally point'}</strong>`);
+    if (matchState.pointsToWin) lines.push(`🏆 Points to win: <strong>${matchState.pointsToWin}</strong>`);
+    document.getElementById('pm-summary').innerHTML = lines.join('<br style="margin-bottom:5px">');
+  }
+}
+
+function pmNext() {
+  pmStepIdx = Math.min(pmStepIdx+1, pmStepList.length-1);
+  updateProgress(); activatePmStep(pmStepList[pmStepIdx]);
+}
+function pmBack() {
+  pmStepIdx = Math.max(pmStepIdx-1, 0);
+  updateProgress(); activatePmStep(pmStepList[pmStepIdx]);
+}
+function selectTossWinner(n) { matchState.tossWinner = n; pmNext(); }
+function selectTossChoice(c, idx) {
+  matchState.tossChoice = c;
+  const sport = SPORTS[matchState.sport] || SPORTS.generic;
+  if ((sport.tossChoices||[]).length >= 2) {
+    if (idx === 0) matchState.servingTeam = matchState.tossWinner === matchState.homeTeam ? 'home' : 'away';
+    else           matchState.servingTeam = matchState.tossWinner === matchState.homeTeam ? 'away' : 'home';
+  } else {
+    matchState.servingTeam = matchState.tossWinner === matchState.homeTeam ? 'home' : 'away';
+  }
+  pmNext();
+}
+function selectFirstServer(num) {
+  if (matchState.servingTeam === 'home') matchState.homeServer = num;
+  else matchState.awayServer = num;
+  pmNext();
+}
+function selectScoringType(id) {
+  matchState.scoringType = id;
+  const sport = SPORTS[matchState.sport]||SPORTS.generic;
+  matchState.pointsToWin = (sport.pointOptions?.[id]||[11])[0];
+  document.getElementById('pm-scoring-rule').textContent = sport.rules?.[id]||'';
+  pmNext();
+}
+function selectPoints(p) {
+  matchState.pointsToWin = p;
+  document.querySelectorAll('#pm-points-grid .big-choice-btn').forEach(b => {
+    b.classList.toggle('selected', parseInt(b.textContent) === p);
+  });
+  setTimeout(pmNext, 200);
+}
+function startMatch() {
+  matchState.matchStarted = true; matchState.prematchComplete = true; matchState.isFirstServe = true;
+  document.getElementById('prematch-overlay').classList.add('hidden');
+  updateServeUI(); updateRallyUI();
+  document.getElementById('serve-indicator-bar').classList.remove('hidden');
+  document.getElementById('rally-controls').classList.remove('hidden');
+  document.getElementById('event-log-card').classList.remove('hidden');
+  document.getElementById('undo-btn').classList.remove('hidden');
+}
+
+/* ── SERVE / RALLY LOGIC ───────────────────────────────────────── */
+function updateServeUI() {
+  const sport = SPORTS[matchState.sport]||SPORTS.generic;
+  if (!sport.hasRallyMode) return;
+  document.getElementById('serve-team-name').textContent =
+    matchState.servingTeam === 'home' ? matchState.homeTeam : matchState.awayTeam;
+  document.getElementById('serve-score-display').textContent =
+    matchState.homeScore + '–' + matchState.awayScore;
+  const showNum = matchState.sport === 'pickleball' && matchState.scoringType === 'sideout';
+  const snum = matchState.servingTeam === 'home' ? matchState.homeServer : matchState.awayServer;
+  document.getElementById('serve-player-label').textContent = showNum ? 'Server '+snum : '';
+  document.getElementById('team-home').classList.toggle('serving', matchState.servingTeam==='home');
+  document.getElementById('team-away').classList.toggle('serving', matchState.servingTeam==='away');
+}
+
+function updateRallyUI() {
+  const sport = SPORTS[matchState.sport]||SPORTS.generic;
+  if (!sport.hasRallyMode) return;
+  const homeServing = matchState.servingTeam === 'home';
+  document.getElementById('rally-home-name').textContent = matchState.homeTeam;
+  document.getElementById('rally-away-name').textContent = matchState.awayTeam;
+  document.getElementById('rally-home-btn').classList.toggle('serving-side', homeServing);
+  document.getElementById('rally-away-btn').classList.toggle('serving-side', !homeServing);
+  if (matchState.scoringType === 'sideout') {
+    document.getElementById('rally-home-sub').textContent = homeServing ? '→ +1 point' : '→ service change';
+    document.getElementById('rally-away-sub').textContent = !homeServing ? '→ +1 point' : '→ service change';
+  } else {
+    document.getElementById('rally-home-sub').textContent = '→ +1 point + serve';
+    document.getElementById('rally-away-sub').textContent = '→ +1 point + serve';
+  }
+}
+
+function recordRally(winner) {
+  if (!matchState.matchStarted) return;
+  const sport = SPORTS[matchState.sport]||SPORTS.generic;
+  const serving = matchState.servingTeam;
+  const servingWon = serving === winner;
+  const homeWon = winner === 'home';
+
+  matchState.history.push({
+    homeScore: matchState.homeScore, awayScore: matchState.awayScore,
+    servingTeam: matchState.servingTeam, homeServer: matchState.homeServer,
+    awayServer: matchState.awayServer, isFirstServe: matchState.isFirstServe,
+    status: matchState.status, winner: matchState.winner, serveCount: matchState.serveCount,
+  });
+
+  let logType = 'serve-change', logText = '';
+
+  if (matchState.scoringType === 'sideout') {
+    if (servingWon) {
+      if (homeWon) matchState.homeScore++; else matchState.awayScore++;
+      logType = 'point';
+      logText = (homeWon ? matchState.homeTeam : matchState.awayTeam) + ' scored! (serving)';
+    } else {
+      sideOut();
+      logText = 'Service → ' + (matchState.servingTeam==='home' ? matchState.homeTeam : matchState.awayTeam);
+    }
+  } else {
+    if (homeWon) matchState.homeScore++; else matchState.awayScore++;
+    if (!servingWon) matchState.servingTeam = winner;
+    logType = 'point';
+    logText = (homeWon ? matchState.homeTeam : matchState.awayTeam) + ' scored!' +
+      (!servingWon ? ' (serve changes)' : '');
+  }
+
+  // Table tennis serve alternation
+  if (matchState.sport === 'tabletennis' && matchState.scoringType === 'rally') {
+    matchState.serveCount++;
+    const atDeuce = matchState.homeScore >= matchState.pointsToWin-1 && matchState.awayScore >= matchState.pointsToWin-1;
+    const alt = atDeuce ? 1 : (sport.serveAlternates||2);
+    if (matchState.serveCount >= alt) {
+      matchState.servingTeam = matchState.servingTeam === 'home' ? 'away' : 'home';
+      matchState.serveCount = 0;
+    }
+  }
+
+  addEventLog(logType, logText);
+  bumpScore(winner);
+  checkWin(sport);
+  updateScore(); updateServeUI(); updateRallyUI(); updateStatusChips();
+}
+
+function sideOut() {
+  if (matchState.sport === 'pickleball' && matchState.scoringType === 'sideout') {
+    const st = matchState.servingTeam;
+    const snum = st === 'home' ? matchState.homeServer : matchState.awayServer;
+    if (!matchState.isFirstServe && snum === 1) {
+      if (st === 'home') matchState.homeServer = 2; else matchState.awayServer = 2;
+      addEventLog('serve-change', 'Server 2 up – ' + (st==='home'?matchState.homeTeam:matchState.awayTeam));
+      return;
+    }
+    if (st === 'home') { matchState.homeServer = 1; matchState.servingTeam = 'away'; }
+    else               { matchState.awayServer = 1; matchState.servingTeam = 'home'; }
+    matchState.isFirstServe = false;
+  } else {
+    matchState.servingTeam = matchState.servingTeam === 'home' ? 'away' : 'home';
+  }
+}
+
+function checkWin(sport) {
+  const pts = matchState.pointsToWin, by = sport.winBy||2;
+  const h = matchState.homeScore, a = matchState.awayScore;
+  if ((h >= pts || a >= pts) && Math.abs(h-a) >= by) {
+    matchState.status = 'completed';
+    matchState.winner = h > a ? 'home' : 'away';
+  }
+}
+
+function undoLastRally() {
+  if (!matchState.history.length) return;
+  const prev = matchState.history.pop();
+  Object.assign(matchState, prev);
+  rallyLog.shift();
+  renderEventLog();
+  updateScore(); updateServeUI(); updateRallyUI(); updateStatusChips();
+}
+
+/* ── SCORE DISPLAY ─────────────────────────────────────────────── */
+function updateScore() {
+  document.getElementById('home-score').textContent = matchState.homeScore;
+  document.getElementById('away-score').textContent = matchState.awayScore;
+  document.getElementById('serve-score-display').textContent = matchState.homeScore+'–'+matchState.awayScore;
+}
+function bumpScore(side) {
+  const el = document.getElementById(side==='home'?'home-score':'away-score');
+  el.classList.add('bump');
+  setTimeout(() => el.classList.remove('bump'), 280);
+}
+function updateStatusChips() {
+  const sp = document.getElementById('status-pill');
+  const wp = document.getElementById('winner-pill');
+  sp.innerHTML = 'Status: <strong>'+matchState.status+'</strong>';
+  sp.className = 'chip '+(matchState.status==='completed'?'success':matchState.status==='in_progress'?'info':'');
+  if (matchState.winner) {
+    const wn = matchState.winner==='home' ? matchState.homeTeam : matchState.awayTeam;
+    wp.innerHTML = '🏆 Winner: <strong>'+wn+'</strong>';
+    wp.className = 'chip success';
+  }
+}
+
+/* ── EVENT LOG ─────────────────────────────────────────────────── */
+function addEventLog(type, text) {
+  rallyLog.unshift({ type, text, h: matchState.homeScore, a: matchState.awayScore });
+  renderEventLog();
+}
+function renderEventLog() {
+  const icons = { point: '🟢', fault: '🔴', 'serve-change': '🔵' };
+  document.getElementById('event-log').innerHTML = rallyLog.slice(0,30).map(e =>
+    `<div class="event-log-item ${e.type}">
+      <span class="ev-icon">${icons[e.type]||'⚪'}</span>
+      <span class="ev-text">${e.text}</span>
+      <span class="ev-score">${e.h}–${e.a}</span>
+    </div>`
+  ).join('');
+}
+function clearLog() { rallyLog = []; renderEventLog(); }
+
+/* ── SCORE INPUT MODAL ─────────────────────────────────────────── */
+let scoreInputTarget = null, scoreInputVal = '';
+function openScoreInput(side) {
+  scoreInputTarget = side;
+  scoreInputVal = String(matchState[side==='home'?'homeScore':'awayScore']);
+  document.getElementById('score-input-title').textContent =
+    'Edit '+(side==='home'?matchState.homeTeam:matchState.awayTeam)+' Score';
+  document.getElementById('kp-display').textContent = scoreInputVal;
+  document.getElementById('kp-grid').innerHTML =
+    [1,2,3,4,5,6,7,8,9,'⌫',0,'✓'].map(k =>
+      `<button class="kp-btn" onclick="kpPress('${k}')">${k}</button>`
+    ).join('');
+  document.getElementById('score-input-overlay').classList.remove('hidden');
+}
+function kpPress(k) {
+  if (k==='⌫') scoreInputVal = scoreInputVal.slice(0,-1)||'0';
+  else if (k==='✓') { confirmScoreInput(); return; }
+  else { scoreInputVal = scoreInputVal==='0' ? String(k) : scoreInputVal+String(k); if (parseInt(scoreInputVal)>999) scoreInputVal='99'; }
+  document.getElementById('kp-display').textContent = scoreInputVal||'0';
+}
+function confirmScoreInput() {
+  const v = parseInt(scoreInputVal)||0;
+  if (scoreInputTarget==='home') matchState.homeScore=v; else matchState.awayScore=v;
+  updateScore(); closeScoreInput();
+}
+function closeScoreInput() { document.getElementById('score-input-overlay').classList.add('hidden'); }
+
+/* ── TIMER ─────────────────────────────────────────────────────── */
+let timerInterval=null, timerSeconds=0, timerRunning=false;
+document.getElementById('timer-start').addEventListener('click', () => {
+  if (timerRunning) return; timerRunning=true;
+  matchState.status = 'in_progress'; updateStatusChips();
+  timerInterval = setInterval(() => {
+    timerSeconds++;
+    const m = String(Math.floor(timerSeconds/60)).padStart(2,'0');
+    const s = String(timerSeconds%60).padStart(2,'0');
+    document.getElementById('timer-display').textContent = m+':'+s;
+  }, 1000);
+});
+document.getElementById('timer-pause').addEventListener('click', () => { timerRunning=false; clearInterval(timerInterval); });
+document.getElementById('timer-reset').addEventListener('click', () => {
+  timerRunning=false; clearInterval(timerInterval); timerSeconds=0;
+  document.getElementById('timer-display').textContent='00:00';
+});
+
+/* ── SETTINGS ──────────────────────────────────────────────────── */
+document.getElementById('toggle-settings').addEventListener('click', () => {
+  document.getElementById('settings-panel').classList.toggle('open');
+});
+
+/* ── COLLAPSE HELPERS ──────────────────────────────────────────── */
+let lineupCollapsed=false, catCollapsed=false;
+function toggleLineupCollapse() {
+  lineupCollapsed = !lineupCollapsed;
+  document.getElementById('lineup-collapse-body').classList.toggle('is-collapsed', lineupCollapsed);
+  document.getElementById('lineup-collapse-toggle').classList.toggle('is-collapsed-toggle', lineupCollapsed);
+}
+function toggleCategoryCollapse() {
+  catCollapsed = !catCollapsed;
+  document.getElementById('cat-collapse-body').classList.toggle('is-collapsed', catCollapsed);
+  document.getElementById('cat-collapse-toggle').classList.toggle('is-collapsed-toggle', catCollapsed);
+}
+
+/* ── TEAM EVENT SHELL ──────────────────────────────────────────── */
+function initTeamEventShell() {
+  document.getElementById('team-overall-home-name').textContent = matchState.homeTeam;
+  document.getElementById('team-overall-away-name').textContent = matchState.awayTeam;
+  document.getElementById('receive-lineup-btn').addEventListener('click', () => {
+    document.getElementById('lineup-review-panel').classList.remove('hidden');
+    renderLineupReview();
+    if (lineupCollapsed) toggleLineupCollapse();
+  });
+  document.getElementById('manual-lineup-btn').addEventListener('click', () => {
+    document.getElementById('lineup-review-panel').classList.remove('hidden');
+    renderLineupReview();
+    if (lineupCollapsed) toggleLineupCollapse();
+  });
+}
+
+const demoCategories = [
+  { id:'ms', title:"Men's Singles",   homePlayer:'Arjun P.',  awayPlayer:'Ravi K.' },
+  { id:'ws', title:"Women's Singles", homePlayer:'Priya S.',  awayPlayer:'Meera T.' },
+  { id:'md', title:"Men's Doubles",   homePlayer:'A + B',     awayPlayer:'C + D' },
+  { id:'xd', title:"Mixed Doubles",   homePlayer:'E + F',     awayPlayer:'G + H' },
+];
+let lineupStatuses={}, categoryScores={};
+
+function renderLineupReview() {
+  document.getElementById('lineup-review-list').innerHTML = demoCategories.map(cat => {
+    const st = lineupStatuses[cat.id]||'pending';
+    return `<div class="lineup-row">
+      <div class="lineup-row-head">
+        <div class="lineup-row-title">${cat.title}</div>
+        <div class="chip ${st==='accepted'?'success':st==='rejected'?'error':'warn'}" id="lr-chip-${cat.id}">${st}</div>
+      </div>
+      <div class="lineup-row-body">
+        <div class="lineup-entry-grid">
+          <div class="field-stack"><label>${matchState.homeTeam}</label><input value="${cat.homePlayer}" /></div>
+          <div class="lineup-vs">VS</div>
+          <div class="field-stack"><label>${matchState.awayTeam}</label><input value="${cat.awayPlayer}" /></div>
+        </div>
+        <div class="lineup-actions">
+          <button class="lineup-action-btn primary" onclick="acceptLineup('${cat.id}')">✓ Accept</button>
+          <button class="lineup-action-btn" onclick="rejectLineup('${cat.id}')">✗ Reject</button>
+          <button class="lineup-action-btn" onclick="editLineup('${cat.id}')">✎ Edit</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function acceptLineup(id) {
+  lineupStatuses[id]='accepted';
+  const c = document.getElementById('lr-chip-'+id);
+  c.textContent='accepted'; c.className='chip success';
+  checkAllLineupsAccepted();
+}
+function rejectLineup(id) {
+  lineupStatuses[id]='rejected';
+  const c = document.getElementById('lr-chip-'+id);
+  c.textContent='rejected'; c.className='chip error';
+}
+function editLineup(id) {
+  lineupStatuses[id]='pending';
+  const c = document.getElementById('lr-chip-'+id);
+  c.textContent='pending'; c.className='chip warn';
+}
+function checkAllLineupsAccepted() {
+  const allDone = demoCategories.every(c => lineupStatuses[c.id]==='accepted');
+  if (!allDone) return;
+  document.getElementById('lineup-state-pill').textContent='✓ Lineups accepted';
+  document.getElementById('lineup-state-pill').className='chip success';
+  document.getElementById('lineup-done-badge').classList.remove('hidden');
+  document.getElementById('lineup-collapse-status').textContent='All lineups accepted – tap to review';
+  document.getElementById('team-category-help').textContent='Tap a category to score.';
+  if (!lineupCollapsed) setTimeout(toggleLineupCollapse, 700);
+  renderCategoryBars();
+}
+
+function renderCategoryBars() {
+  document.getElementById('team-category-bars').innerHTML = demoCategories.map(cat => {
+    const sc = categoryScores[cat.id]||{home:0,away:0,winner:null};
+    return `<div class="category-card" id="cc-${cat.id}">
+      <div class="category-card-head" onclick="toggleCategory('${cat.id}')">
+        <div class="category-meta">
+          <div class="category-title">${cat.title}</div>
+          <div class="category-matchup">${cat.homePlayer} vs ${cat.awayPlayer}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="chip ${sc.winner?'success':'warn'}" id="cr-chip-${cat.id}">
+            ${sc.winner ? (sc.winner==='home'?matchState.homeTeam:matchState.awayTeam)+' wins' : 'pending'}
+          </div>
+          <span style="color:var(--muted);font-size:11px" id="cc-arrow-${cat.id}">▼</span>
+        </div>
+      </div>
+      <div class="category-card-body">
+        <div class="category-scoring-grid">
+          <div class="score-mini-card">
+            <div class="score-mini-team">${matchState.homeTeam}</div>
+            <div class="score-stepper">
+              <button class="score-stepper-btn" onclick="catScore('${cat.id}','home',-1)">−</button>
+              <div class="score-stepper-value" id="cat-hs-${cat.id}">${sc.home}</div>
+              <button class="score-stepper-btn" onclick="catScore('${cat.id}','home',1)">+</button>
+            </div>
+          </div>
+          <div class="score-mini-card">
+            <div class="score-mini-team">${matchState.awayTeam}</div>
+            <div class="score-stepper">
+              <button class="score-stepper-btn" onclick="catScore('${cat.id}','away',-1)">−</button>
+              <div class="score-stepper-value" id="cat-as-${cat.id}">${sc.away}</div>
+              <button class="score-stepper-btn" onclick="catScore('${cat.id}','away',1)">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="category-winner-actions">
+          <button class="category-winner-btn primary" onclick="setCatWinner('${cat.id}','home')">${matchState.homeTeam} Wins</button>
+          <button class="category-winner-btn primary" onclick="setCatWinner('${cat.id}','away')">${matchState.awayTeam} Wins</button>
+          <button class="category-winner-btn" onclick="setCatWinner('${cat.id}',null)">Reset</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleCategory(id) { document.getElementById('cc-'+id).classList.toggle('open'); }
+function catScore(id, side, delta) {
+  if (!categoryScores[id]) categoryScores[id]={home:0,away:0,winner:null};
+  categoryScores[id][side] = Math.max(0, categoryScores[id][side]+delta);
+  document.getElementById('cat-'+(side==='home'?'hs':'as')+'-'+id).textContent = categoryScores[id][side];
+}
+function setCatWinner(id, winner) {
+  if (!categoryScores[id]) categoryScores[id]={home:0,away:0,winner:null};
+  categoryScores[id].winner = winner;
+  const c = document.getElementById('cr-chip-'+id);
+  if (winner) { c.textContent=(winner==='home'?matchState.homeTeam:matchState.awayTeam)+' wins'; c.className='chip success'; }
+  else        { c.textContent='pending'; c.className='chip warn'; }
+  updateOverallScore();
+}
+function updateOverallScore() {
+  let h=0,a=0;
+  Object.values(categoryScores).forEach(sc => { if(sc.winner==='home') h++; else if(sc.winner==='away') a++; });
+  document.getElementById('team-overall-home-score').textContent=h;
+  document.getElementById('team-overall-away-score').textContent=a;
+  document.getElementById('overall-home-card').classList.toggle('leading', h>a);
+  document.getElementById('overall-away-card').classList.toggle('leading', a>h);
+}
+
+/* ── DRAWER ────────────────────────────────────────────────────── */
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+document.getElementById('stat-overlay').addEventListener('click', closeDrawer);
+function closeDrawer() {
+  document.getElementById('stat-overlay').classList.remove('show');
+  document.getElementById('stat-drawer').classList.remove('open');
+  document.body.classList.remove('drawer-lock');
+}
+
+/* ── BIND UI EVENTS ────────────────────────────────────────────── */
+function bindUIEvents() {
+  document.getElementById('score-user-menu-trigger').addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('score-user-menu-dropdown').classList.toggle('open');
+  });
+  document.addEventListener('click', () => document.getElementById('score-user-menu-dropdown').classList.remove('open'));
+  document.getElementById('mode-player-btn').addEventListener('click', () => {
+    document.getElementById('mode-player-btn').classList.add('is-active');
+    document.getElementById('mode-host-btn').classList.remove('is-active');
+  });
+  document.getElementById('mode-host-btn').addEventListener('click', () => {
+    document.getElementById('mode-host-btn').classList.add('is-active');
+    document.getElementById('mode-player-btn').classList.remove('is-active');
+  });
+  document.getElementById('save-score').addEventListener('click', () => {
+    document.getElementById('save-msg').textContent='✓ Saved';
+    document.getElementById('save-msg').className='chip success';
+    setTimeout(() => { document.getElementById('save-msg').textContent='Saved just now'; }, 2000);
+  });
+  document.getElementById('back-to-fixtures').addEventListener('click', () => history.back());
+  document.getElementById('score-input-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('score-input-overlay')) closeScoreInput();
+  });
+}
+
+initPage();
+</script>
+</body>
 </html>
