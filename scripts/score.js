@@ -753,14 +753,35 @@ document.addEventListener("DOMContentLoaded", async () => {
       Number.isInteger(pb.currentSetIndex) && pb.sets[pb.currentSetIndex]
         ? pb.sets[pb.currentSetIndex]
         : null;
+
     const { aWins, bWins } = getPickleballSetWins(pb);
+    const neededWins = setsNeededToWin(pb.totalSets);
+    const { homePlayerLabel, awayPlayerLabel } = getPickleballPlayerLabels(category, homeTeamLabel, awayTeamLabel);
+
+    const declareWinnerRow =
+      !pb.categoryLocked && (aWins >= neededWins || bWins >= neededWins)
+        ? `
+          <div class="pickle-next-set-row">
+            ${
+              aWins >= neededWins
+                ? `<button type="button" class="pickle-start-set-btn" data-pickle-action="declare-category" data-side="A">Declare ${escapeHtml(homePlayerLabel)} winner for this category</button>`
+                : ""
+            }
+            ${
+              bWins >= neededWins
+                ? `<button type="button" class="pickle-start-set-btn" data-pickle-action="declare-category" data-side="B">Declare ${escapeHtml(awayPlayerLabel)} winner for this category</button>`
+                : ""
+            }
+          </div>
+        `
+        : "";
 
     return `
       <div class="preset-sport-tag">Team Event Pickleball</div>
 
       <div class="pickle-config-chips">
         <div class="pickle-config-chip">Points to win: ${escapeHtml(pb.targetPoints)}</div>
-        <div class="pickle-config-chip">Total sets: ${escapeHtml(pb.totalSets)}</div>
+        <div class="pickle-config-chip">Best of: ${escapeHtml(pb.totalSets)} sets</div>
         <div class="pickle-config-chip">Sets won: ${escapeHtml(aWins)}-${escapeHtml(bWins)}</div>
       </div>
 
@@ -778,7 +799,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 data-side="A"
                 ${setupLocked ? "disabled" : ""}
               >
-                ${escapeHtml(homeTeamLabel)}
+                ${escapeHtml(homePlayerLabel)}
               </button>
               <button
                 type="button"
@@ -787,7 +808,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 data-side="B"
                 ${setupLocked ? "disabled" : ""}
               >
-                ${escapeHtml(awayTeamLabel)}
+                ${escapeHtml(awayPlayerLabel)}
               </button>
             </div>
           </div>
@@ -802,7 +823,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 data-side="A"
                 ${setupLocked ? "disabled" : ""}
               >
-                ${escapeHtml(homeTeamLabel)}
+                ${escapeHtml(homePlayerLabel)}
               </button>
               <button
                 type="button"
@@ -811,7 +832,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 data-side="B"
                 ${setupLocked ? "disabled" : ""}
               >
-                ${escapeHtml(awayTeamLabel)}
+                ${escapeHtml(awayPlayerLabel)}
               </button>
             </div>
           </div>
@@ -820,18 +841,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="pickle-next-set-row">
           ${
             pb.categoryLocked
-              ? `<div class="pickle-locked-note">Category locked after all sets are completed.</div>`
+              ? `<div class="pickle-locked-note">Category locked after winner declaration.</div>`
               : currentSet && currentSet.started && !currentSet.completed
-                ? `<div class="pickle-note">Set ${escapeHtml(currentSet.number)} is live.</div>`
+                ? `<div class="pickle-note">${escapeHtml(ordinal(currentSet.number))} set is live.</div>`
                 : pb.tossWinner && pb.startingServer && nextSetIndex !== -1
-                  ? `<button
-                      type="button"
-                      class="pickle-start-set-btn"
-                      data-pickle-action="start-set"
-                      data-set-index="${nextSetIndex}"
-                    >
-                      Start ${escapeHtml(ordinal(nextSetIndex + 1))} Set
-                    </button>`
+                  ? `<button type="button" class="pickle-start-set-btn" data-pickle-action="start-set" data-set-index="${nextSetIndex}">Start ${escapeHtml(ordinal(nextSetIndex + 1))} Set</button>`
                   : `<div class="pickle-note">Select toss winner and first server to begin.</div>`
           }
         </div>
@@ -843,34 +857,34 @@ document.addEventListener("DOMContentLoaded", async () => {
             <div class="pickle-live-card">
               <div class="pickle-live-head">
                 <div>
-                  <div class="panel-label">Set ${escapeHtml(currentSet.number)} in progress</div>
+                  <div class="panel-label">${escapeHtml(ordinal(currentSet.number))} set in progress</div>
                   <div class="pickle-note">
                     A point is awarded only when the rally winner is currently serving.
                     If the rally winner was receiving, only the serve changes.
                   </div>
                 </div>
                 <div class="pickle-current-server">
-                  Serve: <strong>${escapeHtml(currentSet.currentServer === "A" ? homeTeamLabel : awayTeamLabel)}</strong>
+                  Serve: <strong>${escapeHtml(currentSet.currentServer === "A" ? homePlayerLabel : awayPlayerLabel)}</strong>
                 </div>
               </div>
 
               <div class="pickle-live-scoreboard">
                 <div class="pickle-live-team">
-                  <span>${escapeHtml(homeTeamLabel)}</span>
+                  <span>${escapeHtml(homePlayerLabel)}</span>
                   <strong class="pickle-live-points">${escapeHtml(currentSet.homePoints)}</strong>
                 </div>
                 <div class="pickle-live-team">
-                  <span>${escapeHtml(awayTeamLabel)}</span>
+                  <span>${escapeHtml(awayPlayerLabel)}</span>
                   <strong class="pickle-live-points">${escapeHtml(currentSet.awayPoints)}</strong>
                 </div>
               </div>
 
               <div class="pickle-rally-row">
                 <button type="button" class="pickle-rally-btn primary" data-pickle-action="rally" data-side="A">
-                  Rally won by ${escapeHtml(homeTeamLabel)}
+                  Rally won by ${escapeHtml(homePlayerLabel)}
                 </button>
                 <button type="button" class="pickle-rally-btn primary" data-pickle-action="rally" data-side="B">
-                  Rally won by ${escapeHtml(awayTeamLabel)}
+                  Rally won by ${escapeHtml(awayPlayerLabel)}
                 </button>
               </div>
             </div>
@@ -878,31 +892,39 @@ document.addEventListener("DOMContentLoaded", async () => {
           : ""
       }
 
+      ${declareWinnerRow}
+
       <div class="pickle-sets-card">
         <div class="panel-label">Set summary</div>
         <div class="pickle-sets-list">
           ${pb.sets
-            .map((set) => {
-              const statusClass = set.completed
-                ? "completed"
-                : set.started
-                  ? "live"
-                  : "pending";
-
+            .map((set, index) => {
+              const statusClass = set.completed ? "completed" : set.started ? "live" : "pending";
               const statusText = set.completed
-                ? `${set.winnerSide === "A" ? homeTeamLabel : awayTeamLabel} won`
+                ? `${set.winnerSide === "A" ? homePlayerLabel : awayPlayerLabel} won`
                 : set.started
                   ? "Live"
                   : "Not started";
 
+              const canUndo = set.started && (set.history?.length > 0 || set.completed);
+              const canReset = set.started || set.completed;
+
               return `
                 <div class="pickle-set-chip ${statusClass}">
                   <div class="pickle-set-top">
-                    <div class="pickle-set-name">Set ${escapeHtml(set.number)}</div>
+                    <div class="pickle-set-name">${escapeHtml(ordinal(index + 1))} set</div>
                     <div class="pickle-set-status">${escapeHtml(statusText)}</div>
                   </div>
                   <div class="pickle-set-scoreline">
-                    ${escapeHtml(homeTeamLabel)} ${escapeHtml(set.homePoints)} - ${escapeHtml(set.awayPoints)} ${escapeHtml(awayTeamLabel)}
+                    ${escapeHtml(homePlayerLabel)} ${escapeHtml(set.homePoints)} - ${escapeHtml(set.awayPoints)} ${escapeHtml(awayPlayerLabel)}
+                  </div>
+                  <div class="pickle-set-actions">
+                    <button type="button" class="lineup-action-btn" data-pickle-action="undo-set" data-set-index="${index}" ${canUndo ? "" : "disabled"}>
+                      Undo
+                    </button>
+                    <button type="button" class="lineup-action-btn" data-pickle-action="reset-set" data-set-index="${index}" ${canReset ? "" : "disabled"}>
+                      Reset
+                    </button>
                   </div>
                 </div>
               `;
