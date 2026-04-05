@@ -792,6 +792,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     return fresh;
   }
 
+  function saveTeamTieState(teamState) {
+    localStorage.setItem(getTeamStorageKey(), JSON.stringify(teamState));
+  }
+
   function computeTeamTieSummary(teamState) {
     const homeWins = teamState.categories.filter((c) => c.winnerSide === "A").length;
     const awayWins = teamState.categories.filter((c) => c.winnerSide === "B").length;
