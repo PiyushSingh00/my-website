@@ -891,6 +891,63 @@ body.drawer-lock {
 }
 
 /* Pickleball team-event flow */
+
+@media (max-width: 700px) {
+  .action-bar,
+  .lineup-toolbar,
+  .lineup-entry-grid,
+  .team-overall-score-grid,
+  .category-scoring-grid,
+  .pickle-live-scoreboard,
+  .pickle-rally-row,
+  .preset-set-row {
+    grid-template-columns: 1fr;
+  }
+
+  .action-bar {
+    flex-wrap: wrap;
+  }
+
+  .ab-center {
+    order: -1;
+    width: 100%;
+  }
+
+  .roster-area {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lineup-review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.lineup-collapse-btn {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(5, 11, 24, 0.95);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lineup-collapse-btn:hover {
+  background: rgba(77, 208, 225, 0.12);
+  border-color: rgba(77, 208, 225, 0.45);
+}
+
+.lineup-review-panel.collapsed #lineup-review-list {
+  display: none;
+}
+
 .pickle-config-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1055,7 +1112,7 @@ body.drawer-lock {
   padding: 12px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   display: grid;
-  gap: 4px;
+  gap: 6px;
   background: rgba(5, 11, 24, 0.76);
 }
 
@@ -1101,33 +1158,21 @@ body.drawer-lock {
   font-weight: 700;
 }
 
+.pickle-set-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
 .pickle-locked-note {
   color: #bbf7d0;
   font-weight: 700;
 }
 
 @media (max-width: 700px) {
-  .action-bar,
-  .lineup-toolbar,
-  .lineup-entry-grid,
-  .team-overall-score-grid,
-  .category-scoring-grid,
   .pickle-live-scoreboard,
-  .pickle-rally-row,
-  .preset-set-row {
-    grid-template-columns: 1fr;
-  }
-
-  .action-bar {
-    flex-wrap: wrap;
-  }
-
-  .ab-center {
-    order: -1;
-    width: 100%;
-  }
-
-  .roster-area {
+  .pickle-rally-row {
     grid-template-columns: 1fr;
   }
 }

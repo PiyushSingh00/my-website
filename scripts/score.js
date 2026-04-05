@@ -115,6 +115,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const teamOverallHomeScore = document.getElementById("team-overall-home-score");
   const teamOverallAwayScore = document.getElementById("team-overall-away-score");
   const teamOverallSub = document.getElementById("team-overall-sub");
+  const toggleLineupReviewBtn = document.getElementById("toggle-lineup-review");
 
   const params = new URLSearchParams(window.location.search);
   const tournamentId = params.get("tournamentId");
@@ -305,6 +306,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
   }
 
+  function setsNeededToWin(totalSets) {
+    return Math.floor(totalSets / 2) + 1;
+  }
+
+  function capturePickleballSetSnapshot(set) {
+    return {
+      started: Boolean(set.started),
+      completed: Boolean(set.completed),
+      currentServer: set.currentServer || null,
+      homePoints: Number(set.homePoints || 0),
+      awayPoints: Number(set.awayPoints || 0),
+      winnerSide: set.winnerSide || null,
+    };
+  }
+
   function createDefaultPickleballTeamData(rawFixtures) {
     const totalSets = getPickleballTotalSets(rawFixtures);
     const targetPoints = getPickleballTargetPoints(rawFixtures);
@@ -324,6 +340,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         homePoints: 0,
         awayPoints: 0,
         winnerSide: null,
+        history: [],
       })),
     };
   }
@@ -345,7 +362,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         homePoints: 0,
         awayPoints: 0,
         winnerSide: null,
+        history: [],
         ...(existingSet || {}),
+        history: Array.isArray(existingSet?.history) ? existingSet.history : [],
       };
     });
 
@@ -433,6 +452,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   }
 
+  function getPickleballPlayerLabels(category, homeTeamLabel, awayTeamLabel) {
+    return {
+      homePlayerLabel: safeText(category?.homePlayer, homeTeamLabel),
+      awayPlayerLabel: safeText(category?.awayPlayer, awayTeamLabel),
+    };
+  }
+
   function hasAnyPickleballSetStarted(pickleballData) {
     return toArray(pickleballData?.sets).some((set) => set?.started);
   }
@@ -443,10 +469,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function getCategoryResultInfo(category, homeTeamLabel, awayTeamLabel) {
     if (category.winnerSide === "A") {
-      return { chipClass: "category-result-chip completed", text: `${homeTeamLabel} won` };
+      return {
+        chipClass: "category-result-chip completed",
+        text: `${safeText(category.homePlayer, homeTeamLabel)} won`,
+      };
     }
     if (category.winnerSide === "B") {
-      return { chipClass: "category-result-chip completed", text: `${awayTeamLabel} won` };
+      return {
+        chipClass: "category-result-chip completed",
+        text: `${safeText(category.awayPlayer, awayTeamLabel)} won`,
+      };
     }
 
     if (category.sportKey === "pickleball") {
@@ -456,8 +488,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? pb.sets[pb.currentSetIndex]
           : null;
 
+      const { homePlayerLabel, awayPlayerLabel } = getPickleballPlayerLabels(category, homeTeamLabel, awayTeamLabel);
+
       if (currentSet && currentSet.started && !currentSet.completed) {
-        const servingName = currentSet.currentServer === "A" ? homeTeamLabel : awayTeamLabel;
+        const servingName = currentSet.currentServer === "A" ? homePlayerLabel : awayPlayerLabel;
         return {
           chipClass: "category-result-chip pending",
           text: `Set ${currentSet.number} live • Serve ${servingName}`,
@@ -944,6 +978,44 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+
+  function clearPickleballSet(set) {
+    set.started = false;
+    set.completed = false;
+    set.currentServer = null;
+    set.homePoints = 0;
+    set.awayPoints = 0;
+    set.winnerSide = null;
+    set.history = [];
+  }
+
+  function clearPickleballFromSetIndex(pb, startIndex) {
+    for (let i = startIndex; i < pb.sets.length; i += 1) {
+      clearPickleballSet(pb.sets[i]);
+    }
+    pb.currentSetIndex = null;
+    pb.categoryLocked = false;
+  }
+
+  function unlockNextCategory(teamTieState, currentIndex) {
+    const nextIndex = teamTieState.categories.findIndex(
+      (item, idx) => idx > currentIndex && item.lineupStatus === "accepted" && !item.categoryLocked
+    );
+    if (nextIndex !== -1) {
+      teamTieState.categories[nextIndex].isScoringOpen = true;
+    }
+  }
+
+  function lockPickleballCategory(category, winnerSide) {
+    const pb = ensurePickleballTeamData(category.sportData, fixtures);
+    pb.categoryLocked = true;
+    pb.currentSetIndex = null;
+    category.sportData = pb;
+    category.winnerSide = winnerSide;
+    category.categoryLocked = true;
+    category.isScoringOpen = false;
+  }
+
   function startPickleballSet(category, setIndex) {
     const pb = ensurePickleballTeamData(category.sportData, fixtures);
     const set = pb.sets[setIndex];
@@ -953,37 +1025,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     set.started = true;
     set.completed = false;
     set.currentServer = pb.startingServer;
+    set.homePoints = 0;
+    set.awayPoints = 0;
+    set.winnerSide = null;
+    set.history = [];
     pb.currentSetIndex = setIndex;
     category.sportData = pb;
     category.isScoringOpen = true;
   }
 
-  function finalizePickleballCategory(category, categoryIndex, teamTieState) {
-    const pb = ensurePickleballTeamData(category.sportData, fixtures);
-    const completedCount = pb.sets.filter((set) => set.completed).length;
-
-    if (completedCount < pb.totalSets) return false;
-
-    pb.categoryLocked = true;
-    category.sportData = pb;
-    category.categoryLocked = true;
-    category.isScoringOpen = false;
-
-    const { aWins, bWins } = getPickleballSetWins(pb);
-    category.winnerSide = aWins > bWins ? "A" : bWins > aWins ? "B" : null;
-
-    const nextIndex = teamTieState.categories.findIndex(
-      (item, idx) => idx > categoryIndex && item.lineupStatus === "accepted" && !item.categoryLocked
-    );
-
-    if (nextIndex !== -1) {
-      teamTieState.categories[nextIndex].isScoringOpen = true;
-    }
-
-    return true;
-  }
-
-  function applyPickleballRally(category, winnerSide, categoryIndex, teamTieState) {
+  function applyPickleballRally(category, winnerSide) {
     const pb = ensurePickleballTeamData(category.sportData, fixtures);
     const currentSet =
       Number.isInteger(pb.currentSetIndex) && pb.sets[pb.currentSetIndex]
@@ -991,6 +1042,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         : null;
 
     if (!currentSet || !currentSet.started || currentSet.completed || pb.categoryLocked) return;
+
+    currentSet.history.push(capturePickleballSetSnapshot(currentSet));
 
     if (currentSet.currentServer === winnerSide) {
       if (winnerSide === "A") currentSet.homePoints += 1;
@@ -1002,23 +1055,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     const targetPoints = Number(pb.targetPoints || 11);
     if (currentSet.homePoints >= targetPoints || currentSet.awayPoints >= targetPoints) {
       currentSet.completed = true;
-      currentSet.winnerSide =
-        currentSet.homePoints > currentSet.awayPoints
-          ? "A"
-          : currentSet.awayPoints > currentSet.homePoints
-            ? "B"
-            : null;
-
+      currentSet.winnerSide = currentSet.homePoints > currentSet.awayPoints ? "A" : "B";
       pb.currentSetIndex = null;
-      category.sportData = pb;
-
-      const finishedCategory = finalizePickleballCategory(category, categoryIndex, teamTieState);
-      if (!finishedCategory) {
-        category.isScoringOpen = true;
-      }
-      return;
     }
 
+    category.sportData = pb;
+  }
+
+  function declarePickleballCategoryWinner(category, winnerSide, categoryIndex, teamTieState) {
+    lockPickleballCategory(category, winnerSide);
+    unlockNextCategory(teamTieState, categoryIndex);
+  }
+
+  function undoPickleballSet(category, setIndex) {
+    const pb = ensurePickleballTeamData(category.sportData, fixtures);
+    const set = pb.sets[setIndex];
+    if (!set || !set.started) return;
+
+    clearPickleballFromSetIndex(pb, setIndex + 1);
+
+    if (set.history.length > 0) {
+      const snapshot = set.history.pop();
+      set.started = snapshot.started;
+      set.completed = snapshot.completed;
+      set.currentServer = snapshot.currentServer;
+      set.homePoints = snapshot.homePoints;
+      set.awayPoints = snapshot.awayPoints;
+      set.winnerSide = snapshot.winnerSide;
+      pb.currentSetIndex = set.started && !set.completed ? setIndex : null;
+    } else {
+      clearPickleballSet(set);
+      pb.currentSetIndex = null;
+    }
+
+    category.winnerSide = null;
+    category.categoryLocked = false;
+    category.isScoringOpen = true;
+    category.sportData = pb;
+  }
+
+  function resetPickleballSet(category, setIndex) {
+    const pb = ensurePickleballTeamData(category.sportData, fixtures);
+    clearPickleballFromSetIndex(pb, setIndex);
+    category.winnerSide = null;
+    category.categoryLocked = false;
+    category.isScoringOpen = true;
     category.sportData = pb;
   }
 
@@ -1052,7 +1133,28 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     card.querySelectorAll('[data-pickle-action="rally"]').forEach((btn) => {
       btn.addEventListener("click", () => {
-        applyPickleballRally(category, btn.dataset.side, categoryIndex, teamTieState);
+        applyPickleballRally(category, btn.dataset.side);
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-pickle-action="declare-category"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        declarePickleballCategoryWinner(category, btn.dataset.side, categoryIndex, teamTieState);
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-pickle-action="undo-set"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        undoPickleballSet(category, Number(btn.dataset.setIndex));
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-pickle-action="reset-set"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        resetPickleballSet(category, Number(btn.dataset.setIndex));
         rerender();
       });
     });
@@ -1125,6 +1227,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? cloneDefaultPresetSportData(tournamentSportKey, rawFixtures)
           : null,
       })),
+      lineupCollapsed: false,
     };
   }
 
@@ -1138,6 +1241,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         saved.homeRoster = Array.isArray(saved.homeRoster) ? saved.homeRoster : fresh.homeRoster;
         saved.awayRoster = Array.isArray(saved.awayRoster) ? saved.awayRoster : fresh.awayRoster;
         saved.tournamentSportKey = saved.tournamentSportKey || fresh.tournamentSportKey;
+        saved.lineupCollapsed = Boolean(saved.lineupCollapsed);
 
         saved.categories = saved.categories.map((category, index) => {
           const merged = {
@@ -1272,6 +1376,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const teamTieState = loadTeamTieState(match, fixtures);
 
+    function syncLineupCollapseUi() {
+      if (!lineupReviewPanel || !toggleLineupReviewBtn) return;
+      lineupReviewPanel.classList.toggle("collapsed", Boolean(teamTieState.lineupCollapsed));
+      toggleLineupReviewBtn.textContent = teamTieState.lineupCollapsed ? "Expand lineup" : "Collapse lineup";
+    }
+
     function syncTeamSummaryUi() {
       const summary = computeTeamTieSummary(teamTieState);
       if (teamOverallHomeScore) teamOverallHomeScore.textContent = String(summary.homeWins);
@@ -1299,6 +1409,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           teamCategoryHelp.textContent = `Complete ${teamTieState.categories[firstUnlockedIndex].name} to unlock the next category.`;
         }
       }
+
+      syncLineupCollapseUi();
     }
 
     function renderLineupReview() {
@@ -1448,12 +1560,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           category.sportKey === "pickleball"
             ? ""
             : `
-              <div class="category-winner-actions" style="margin-top: 14px;">
-                <button type="button" class="category-winner-btn primary" data-action="home-winner">Mark ${escapeHtml(homeLabel)} winner</button>
-                <button type="button" class="category-winner-btn primary" data-action="away-winner">Mark ${escapeHtml(awayLabel)} winner</button>
-                <button type="button" class="category-winner-btn" data-action="clear-winner">Clear result</button>
-              </div>
-            `;
+                <div class="category-winner-actions" style="margin-top: 14px;">
+                  <button type="button" class="category-winner-btn primary" data-action="home-winner">Mark ${escapeHtml(homeLabel)} winner</button>
+                  <button type="button" class="category-winner-btn primary" data-action="away-winner">Mark ${escapeHtml(awayLabel)} winner</button>
+                  <button type="button" class="category-winner-btn" data-action="clear-winner">Clear result</button>
+                </div>
+              `;
 
         card.innerHTML = `
           <div class="category-card-head">
@@ -1500,11 +1612,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             category.winnerSide = "A";
             category.categoryLocked = true;
             category.isScoringOpen = false;
-
-            const nextIndex = teamTieState.categories.findIndex(
-              (item, idx) => idx > index && item.lineupStatus === "accepted" && !item.categoryLocked
-            );
-            if (nextIndex !== -1) teamTieState.categories[nextIndex].isScoringOpen = true;
+            unlockNextCategory(teamTieState, index);
             rerender();
           });
 
@@ -1512,11 +1620,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             category.winnerSide = "B";
             category.categoryLocked = true;
             category.isScoringOpen = false;
-
-            const nextIndex = teamTieState.categories.findIndex(
-              (item, idx) => idx > index && item.lineupStatus === "accepted" && !item.categoryLocked
-            );
-            if (nextIndex !== -1) teamTieState.categories[nextIndex].isScoringOpen = true;
+            unlockNextCategory(teamTieState, index);
             rerender();
           });
 
@@ -1554,6 +1658,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderLineupReview();
       renderTeamCategoryBars();
       syncTeamSummaryUi();
+    });
+
+    toggleLineupReviewBtn?.addEventListener("click", () => {
+      teamTieState.lineupCollapsed = !teamTieState.lineupCollapsed;
+      saveTeamTieState(teamTieState);
+      syncLineupCollapseUi();
     });
 
     renderTeamCategoryBars();
