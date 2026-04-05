@@ -56,48 +56,107 @@
           <button type="button" class="ab-btn ab-save" id="save-score">Save</button>
         </div>
 
-        <section class="scoreboard">
-          <button type="button" class="team-block" id="team-home">
-            <div class="team-name" id="home-name">Home</div>
-            <div class="team-score" id="home-score">0</div>
-            <div class="team-tap-hint">tap to edit</div>
-          </button>
-
-          <div class="scoreboard-center">
-            <div class="vs-badge">VS</div>
-
-            <div class="timer-display" id="timer-display">00:00</div>
-
-            <div class="timer-controls">
-              <button type="button" class="tc-btn" id="timer-start" aria-label="Start timer">▶</button>
-              <button type="button" class="tc-btn" id="timer-pause" aria-label="Pause timer">⏸</button>
-              <button type="button" class="tc-btn" id="timer-reset" aria-label="Reset timer">↺</button>
+        <section class="team-event-shell hidden" id="team-event-shell">
+          <div class="lineup-toolbar">
+            <div class="lineup-toolbar-left">
+              <button type="button" class="ab-btn ab-save" id="receive-lineup-btn">Receive lineup</button>
+              <button type="button" class="ab-btn" id="manual-lineup-btn">Add lineup manually</button>
             </div>
+            <div class="status-chip" id="lineup-state-pill">Waiting for both team lineups</div>
           </div>
 
-          <button type="button" class="team-block" id="team-away">
-            <div class="team-name" id="away-name">Away</div>
-            <div class="team-score" id="away-score">0</div>
-            <div class="team-tap-hint">tap to edit</div>
-          </button>
+          <section class="team-overall-board">
+            <div class="tob-head">
+              <div>
+                <div class="panel-label team-label-top">Overall match score</div>
+                <div class="helper-text" id="team-overall-sub">Category wins between the two teams</div>
+              </div>
+            </div>
+
+            <div class="team-overall-score-grid">
+              <div class="overall-team-card">
+                <div class="overall-team-name" id="team-overall-home-name">Home</div>
+                <div class="overall-team-score" id="team-overall-home-score">0</div>
+              </div>
+
+              <div class="overall-vs">VS</div>
+
+              <div class="overall-team-card">
+                <div class="overall-team-name" id="team-overall-away-name">Away</div>
+                <div class="overall-team-score" id="team-overall-away-score">0</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="lineup-review-panel hidden" id="lineup-review-panel">
+            <div class="lineup-review-head">
+              <div>
+                <p class="panel-label">Review team lineups</p>
+                <div class="helper-text">
+                  Accept, reject, edit, or manually fill category-wise player lineups before scoring.
+                </div>
+              </div>
+            </div>
+            <div id="lineup-review-list"></div>
+          </section>
+
+          <section class="category-bars-wrap">
+            <div class="category-bars-head">
+              <div>
+                <p class="panel-label">Category matches</p>
+                <div class="helper-text" id="team-category-help">
+                  Category bars will unlock after all lineups are accepted.
+                </div>
+              </div>
+            </div>
+            <div id="team-category-bars"></div>
+          </section>
         </section>
 
-        <div class="status-row">
-          <div class="status-chip" id="status-pill">Status: <strong>pending</strong></div>
-          <div class="status-chip" id="winner-pill">Winner: <strong>-</strong></div>
-          <div class="status-chip" id="reason-pill">Reason: <strong>-</strong></div>
-          <button type="button" class="status-chip chip-btn" id="toggle-settings">⚙ Settings</button>
-          <div class="status-chip" id="save-msg">Not saved yet</div>
-        </div>
+        <section class="individual-score-shell" id="individual-score-shell">
+          <section class="scoreboard">
+            <button type="button" class="team-block" id="team-home">
+              <div class="team-name" id="home-name">Home</div>
+              <div class="team-score" id="home-score">0</div>
+              <div class="team-tap-hint">tap to edit</div>
+            </button>
 
-        <section class="settings-panel" id="settings-panel">
-          <div class="settings-inner">
-            <p class="panel-label">Match settings</p>
-            <div id="config-fields"></div>
+            <div class="scoreboard-center">
+              <div class="vs-badge">VS</div>
+
+              <div class="timer-display" id="timer-display">00:00</div>
+
+              <div class="timer-controls">
+                <button type="button" class="tc-btn" id="timer-start" aria-label="Start timer">▶</button>
+                <button type="button" class="tc-btn" id="timer-pause" aria-label="Pause timer">⏸</button>
+                <button type="button" class="tc-btn" id="timer-reset" aria-label="Reset timer">↺</button>
+              </div>
+            </div>
+
+            <button type="button" class="team-block" id="team-away">
+              <div class="team-name" id="away-name">Away</div>
+              <div class="team-score" id="away-score">0</div>
+              <div class="team-tap-hint">tap to edit</div>
+            </button>
+          </section>
+
+          <div class="status-row">
+            <div class="status-chip" id="status-pill">Status: <strong>pending</strong></div>
+            <div class="status-chip" id="winner-pill">Winner: <strong>-</strong></div>
+            <div class="status-chip" id="reason-pill">Reason: <strong>-</strong></div>
+            <button type="button" class="status-chip chip-btn" id="toggle-settings">⚙ Settings</button>
+            <div class="status-chip" id="save-msg">Not saved yet</div>
           </div>
-        </section>
 
-        <section class="roster-area" id="roster-area"></section>
+          <section class="settings-panel" id="settings-panel">
+            <div class="settings-inner">
+              <p class="panel-label">Match settings</p>
+              <div id="config-fields"></div>
+            </div>
+          </section>
+
+          <section class="roster-area" id="roster-area"></section>
+        </section>
       </main>
     </div>
 
