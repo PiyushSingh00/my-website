@@ -1,4 +1,3 @@
-/* Depends on host.css variable palette */
 @import url("host.css");
 
 body.drawer-lock {
@@ -279,6 +278,13 @@ body.drawer-lock {
   color: #001a22;
   border-color: transparent;
   font-weight: 700;
+}
+
+.lineup-action-btn:disabled,
+.category-winner-btn:disabled,
+.score-stepper-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .status-row {
@@ -813,29 +819,6 @@ body.drawer-lock {
   color: var(--muted);
 }
 
-@media (max-width: 700px) {
-  .action-bar,
-  .lineup-toolbar,
-  .lineup-entry-grid,
-  .team-overall-score-grid,
-  .category-scoring-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .action-bar {
-    flex-wrap: wrap;
-  }
-
-  .ab-center {
-    order: -1;
-    width: 100%;
-  }
-
-  .roster-area {
-    grid-template-columns: 1fr;
-  }
-}
-
 .preset-sport-tag {
   display: inline-flex;
   align-items: center;
@@ -907,8 +890,244 @@ body.drawer-lock {
   font-size: 30px;
 }
 
+/* Pickleball team-event flow */
+.pickle-config-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pickle-config-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(5, 11, 24, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pickle-setup-card,
+.pickle-live-card,
+.pickle-sets-card {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(5, 11, 24, 0.76);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.pickle-setup-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.pickle-choice-group {
+  display: grid;
+  gap: 8px;
+}
+
+.pickle-choice-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pickle-choice-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pickle-choice-btn,
+.pickle-rally-btn,
+.pickle-start-set-btn {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(5, 11, 24, 0.95);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pickle-choice-btn.active,
+.pickle-rally-btn.primary,
+.pickle-start-set-btn {
+  background: linear-gradient(135deg, #4dd0e1 0%, #0e7490 100%);
+  color: #001a22;
+  border-color: transparent;
+}
+
+.pickle-choice-btn:disabled,
+.pickle-rally-btn:disabled,
+.pickle-start-set-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pickle-next-set-row {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.pickle-live-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pickle-current-server {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #bbf7d0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pickle-live-scoreboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pickle-live-team {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(8, 14, 30, 0.9);
+  border-radius: 16px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.pickle-live-team span {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(169, 182, 204, 0.95);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pickle-live-points {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 54px;
+  line-height: 1;
+  color: #fff;
+}
+
+.pickle-rally-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pickle-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pickle-sets-list {
+  display: grid;
+  gap: 10px;
+}
+
+.pickle-set-chip {
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  display: grid;
+  gap: 4px;
+  background: rgba(5, 11, 24, 0.76);
+}
+
+.pickle-set-chip.live {
+  border-color: rgba(77, 208, 225, 0.5);
+  background: rgba(77, 208, 225, 0.1);
+}
+
+.pickle-set-chip.completed {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.pickle-set-chip.pending {
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+.pickle-set-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pickle-set-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(169, 182, 204, 0.95);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pickle-set-status {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pickle-set-scoreline {
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.pickle-locked-note {
+  color: #bbf7d0;
+  font-weight: 700;
+}
+
 @media (max-width: 700px) {
+  .action-bar,
+  .lineup-toolbar,
+  .lineup-entry-grid,
+  .team-overall-score-grid,
+  .category-scoring-grid,
+  .pickle-live-scoreboard,
+  .pickle-rally-row,
   .preset-set-row {
+    grid-template-columns: 1fr;
+  }
+
+  .action-bar {
+    flex-wrap: wrap;
+  }
+
+  .ab-center {
+    order: -1;
+    width: 100%;
+  }
+
+  .roster-area {
     grid-template-columns: 1fr;
   }
 }
