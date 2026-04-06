@@ -4,9 +4,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
-  // ===========================================================================
-  // TOPBAR / MODE / BASIC PAGE STATE
-  // ===========================================================================
   document.querySelectorAll(".brand").forEach((el) => {
     el.addEventListener("click", () => {
       window.location.href = "index.html";
@@ -50,7 +47,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer " + localStorage.getItem("token"),
+          Authorization: "Bearer " + (localStorage.getItem("token") || ""),
         },
         body: JSON.stringify({ mode: "player" }),
       });
@@ -64,7 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer " + localStorage.getItem("token"),
+          Authorization: "Bearer " + (localStorage.getItem("token") || ""),
         },
         body: JSON.stringify({ mode: "host" }),
       });
@@ -78,13 +75,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  document
-    .getElementById("players-back-btn")
-    ?.addEventListener("click", () => (window.location.href = "host.html"));
+  document.getElementById("players-back-btn")?.addEventListener("click", () => {
+    window.location.href = "host.html";
+  });
 
-  // ===========================================================================
-  // DOM REFS
-  // ===========================================================================
+  const TEAM_EVENT_CATEGORY_ID = "__team_event__";
+  const expandedTeamIds = new Set();
+
   const tableWrapper = document.getElementById("players-table-wrapper");
   const tableBody = document.getElementById("players-table-body");
   const emptyState = document.getElementById("players-empty-state");
@@ -94,22 +91,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const datesEl = document.getElementById("players-tournament-dates");
   const codeEl = document.getElementById("players-tournament-code");
 
-  const fixturesTournamentNameEl = document.getElementById("fixtures-tournament-name");
-  const fixturesTournamentSportEl = document.getElementById("fixtures-tournament-sport");
-  const fixturesTournamentDatesEl = document.getElementById("fixtures-tournament-dates");
-  const fixturesTournamentCodeEl = document.getElementById("fixtures-tournament-code");
-  const embeddedFixturesHelperTextEl = document.getElementById("embedded-fixtures-helper-text") || document.querySelector("#fixtures-embed > p.helper-text");
-
   const playersTabs = document.getElementById("players-tabs");
 
-  // Add player modal
   const addPlayerBtn = document.getElementById("add-player-btn");
   const addPlayerModal = document.getElementById("host-add-player-modal");
   const addPlayerClose = document.getElementById("host-add-player-close");
   const addPlayerForm = document.getElementById("host-add-player-form");
   const addPlayerCategory = document.getElementById("host-player-category");
 
-  // Captain modals
   const makeCaptainsBtn = document.getElementById("make-captains-btn");
   const createPoolsBtn = document.getElementById("create-pools-btn");
 
@@ -133,14 +122,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const teamSetupToggleBtn = document.getElementById("team-setup-toggle-btn");
   const teamSetupContent = document.getElementById("team-setup-content");
 
-  // Pools
   const poolsSection = document.getElementById("pools-section");
   const poolsGrid = document.getElementById("pools-grid");
   const unassignedTeams = document.getElementById("unassigned-teams");
   const resetPoolsBtn = document.getElementById("reset-pools-btn");
   const randomizePoolsBtn = document.getElementById("randomize-pools-btn");
 
-  // Embedded fixtures
+  const leaderboardSection = document.getElementById("leaderboard-section");
+  const leaderboardTableBody = document.getElementById("leaderboard-table-body");
+
   const fixturesEmbed = document.getElementById("fixtures-embed");
   const fixturesGenerateBtn = document.getElementById("fixtures-generate-btn");
   const fixturesConfigureBtn = document.getElementById("fixtures-configure-fields-btn");
@@ -150,17 +140,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fixturesNoneSelected = document.getElementById("fixtures-none-selected");
   const fixturesToast = document.getElementById("fixtures-toast");
   const createFixturesBtn = document.getElementById("create-fixtures-btn");
+  const fixturesTournamentNameEl = document.getElementById("fixtures-tournament-name");
+  const fixturesTournamentSportEl = document.getElementById("fixtures-tournament-sport");
+  const fixturesTournamentDatesEl = document.getElementById("fixtures-tournament-dates");
+  const fixturesTournamentCodeEl = document.getElementById("fixtures-tournament-code");
+  const embeddedFixturesHelperTextEl = document.getElementById("embedded-fixtures-helper-text");
 
-  const leaderboardSection = document.getElementById("leaderboard-section");
-  const leaderboardTableBody = document.getElementById("leaderboard-table-body");
-
-  // ===========================================================================
-  // STATE
-  // ===========================================================================
   let allPlayers = [];
   let activeFilter = "all";
   let tournamentCategories = [];
   let tournamentMetaCache = null;
+  let isTeamSetupCollapsed = false;
 
   let captainState = {
     selectedCaptainIds: [],
@@ -172,8 +162,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     rows: [],
   };
 
-  let isTeamSetupCollapsed = false;
-
   const fixturesUi = {
     wrap: fixturesEmbed,
     generateBtn: fixturesGenerateBtn,
@@ -183,22 +171,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     groupsEl: fixturesGroups,
     noneSelectedEl: fixturesNoneSelected,
     toastEl: fixturesToast,
-    isOpen: false,
     didInit: false,
   };
 
   const fixturesState = {
-    categories: [],
-    players: [],
-    acceptedByCategory: {},
     fixtures: null,
+    categories: [],
+    acceptedByCategory: {},
     activeCategoryId: null,
-    editMode: false,
   };
 
-  // ===========================================================================
-  // HELPERS
-  // ===========================================================================
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -294,7 +276,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function shuffle(arr) {
     const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
+    for (let i = a.length - 1; i > 0; i -= 1) {
       const j = Math.floor(Math.random() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
     }
@@ -315,7 +297,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ...options,
       headers: {
         ...(options.headers || {}),
-        Authorization: "Bearer " + localStorage.getItem("token"),
+        Authorization: "Bearer " + (localStorage.getItem("token") || ""),
       },
     });
 
@@ -407,6 +389,63 @@ document.addEventListener("DOMContentLoaded", async () => {
     return getAdvancedMode() === "pickleball_team_league";
   }
 
+  function getRequestedLeagueRounds() {
+    const raw = Number(getAdvancedSettings()?.roundRobinMatches || 0);
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  }
+
+  function getTournamentStartDate() {
+    const raw = String(tournamentMetaCache?.tournamentDates || "").trim();
+    const iso = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) {
+      const dt = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T09:00:00`);
+      if (!Number.isNaN(dt.getTime())) return dt;
+    }
+
+    const dmy = raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (dmy) {
+      const day = dmy[1].padStart(2, "0");
+      const month = dmy[2].padStart(2, "0");
+      const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+      const dt = new Date(`${year}-${month}-${day}T09:00:00`);
+      if (!Number.isNaN(dt.getTime())) return dt;
+    }
+
+    const dt = new Date();
+    dt.setHours(9, 0, 0, 0);
+    return dt;
+  }
+
+  function getAvailableCourtNames() {
+    const meta = tournamentMetaCache || {};
+    const advanced = getAdvancedSettings();
+    const options = [meta.courtNames, advanced.courtNames, advanced.courts, meta.courts];
+
+    for (const value of options) {
+      if (Array.isArray(value) && value.length) {
+        return value.map((x, i) => String(x || `Court ${i + 1}`).trim()).filter(Boolean);
+      }
+      if (typeof value === "string" && value.trim()) {
+        const arr = value.split(",").map((x) => x.trim()).filter(Boolean);
+        if (arr.length) return arr;
+      }
+    }
+
+    return ["Court 1", "Court 2", "Court 3"];
+  }
+
+  function formatDateInputValue(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function formatTimeInputValue(date) {
+    const h = String(date.getHours()).padStart(2, "0");
+    const m = String(date.getMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+  }
 
   function syncTeamSetupUi() {
     if (teamSetupContent) teamSetupContent.classList.toggle("hidden", isTeamSetupCollapsed);
@@ -421,39 +460,76 @@ document.addEventListener("DOMContentLoaded", async () => {
     syncTeamSetupUi();
   });
 
-  function updateEmbeddedFixturesHeader() {    if (fixturesTournamentNameEl) fixturesTournamentNameEl.textContent = tournamentMetaCache?.tournamentName || "Tournament";
+  function getCaptainSubmittedPlayers(captain) {
+    const raw = captain?.teamPlayers || captain?.players || captain?.members || captain?.submittedPlayers || captain?.roster || [];
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((item) => typeof item === "string" ? item : (item?.playerName || item?.name || item?.fullName || item?.username || ""))
+      .map((name) => String(name || "").trim())
+      .filter(Boolean);
+  }
+
+  function getConfirmedTeams() {
+    return captainState.confirmedCaptains.map((captain) => ({
+      teamKey: `captain:${captain.playerId}`,
+      captainId: captain.playerId,
+      captainName: captain.playerName,
+      teamName: captain.teamName || captain.playerName,
+      categoryId: captain.categoryId,
+      teamStatus: captain.teamStatus || "pending",
+      teamPlayers: getCaptainSubmittedPlayers(captain),
+    }));
+  }
+
+  function getTeamEventFixtureBucket() {
+    const categories = fixturesState.fixtures?.categories || {};
+    return categories[TEAM_EVENT_CATEGORY_ID] || Object.values(categories)[0] || null;
+  }
+
+  function updateEmbeddedFixturesHeader() {
+    if (fixturesTournamentNameEl) fixturesTournamentNameEl.textContent = tournamentMetaCache?.tournamentName || "Tournament";
     if (fixturesTournamentSportEl) fixturesTournamentSportEl.textContent = tournamentMetaCache?.sportName || "";
     if (fixturesTournamentDatesEl) fixturesTournamentDatesEl.textContent = tournamentMetaCache?.tournamentDates || "";
     if (fixturesTournamentCodeEl) fixturesTournamentCodeEl.textContent = tournamentMetaCache?.accessCode || "";
 
-    if (embeddedFixturesHelperTextEl) {
-      if (isPickleballTeamLeagueMode()) {
-        embeddedFixturesHelperTextEl.textContent =
-          "View generated fixtures for each category. In Pickleball team league mode, league rounds are played first, leaderboard match points come from cumulative actual points scored across all submatches, and knockout progression follows after standings are finalized.";
-      } else if (isLeagueKnockoutFormat()) {
-        embeddedFixturesHelperTextEl.textContent =
-          "View generated fixtures for each category. League + knockout formats will show league rounds first, followed by knockout progression.";
-      } else if (isGroupKnockoutFormat()) {
-        embeddedFixturesHelperTextEl.textContent =
-          "View generated fixtures for each category. Group + knockout uses the created pools first and knockout progression follows later.";
-      } else {
-        embeddedFixturesHelperTextEl.textContent =
-          "Fixtures are auto-generated in random order for each category. BYE indicates a free pass to the next round.";
-      }
+    if (!embeddedFixturesHelperTextEl) return;
+
+    if (isTournamentTeamEvent() && isLeagueKnockoutFormat()) {
+      embeddedFixturesHelperTextEl.textContent =
+        "For team events, the fixture list shows team vs team ties. Categories act as submatches inside each tie. League schedules are shown as editable match tables.";
+      return;
     }
+
+    if (isTournamentTeamEvent()) {
+      embeddedFixturesHelperTextEl.textContent =
+        "For team events, the fixture list shows team vs team ties. Categories act as submatches inside each tie and are handled later on the score page.";
+      return;
+    }
+
+    if (isLeagueKnockoutFormat()) {
+      embeddedFixturesHelperTextEl.textContent =
+        "View generated fixtures for each category. League + knockout formats will show league rounds first, followed by knockout progression.";
+      return;
+    }
+
+    if (isGroupKnockoutFormat()) {
+      embeddedFixturesHelperTextEl.textContent =
+        "View generated fixtures for each category. Group + knockout uses the created pools first and knockout progression follows later.";
+      return;
+    }
+
+    embeddedFixturesHelperTextEl.textContent =
+      "Fixtures are auto-generated in random order for each category. BYE indicates a free pass to the next round.";
   }
 
-  // ===========================================================================
-  // TOURNAMENT META
-  // ===========================================================================
   async function loadTournamentMeta() {
     const host = await apiGet("/api/host/tournaments");
     if (host.ok) {
       const list = normalizeTournamentList(host.data);
-      const t = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
-      if (t) {
-        tournamentMetaCache = t;
-        hydrateTournamentMetaUi(t);
+      const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
+      if (found) {
+        tournamentMetaCache = found;
+        hydrateTournamentMetaUi(found);
         return;
       }
     }
@@ -461,20 +537,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pub = await apiGet("/api/tournaments");
     if (pub.ok) {
       const list = normalizeTournamentList(pub.data);
-      const t = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
-      if (t) {
-        tournamentMetaCache = t;
-        hydrateTournamentMetaUi(t);
+      const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
+      if (found) {
+        tournamentMetaCache = found;
+        hydrateTournamentMetaUi(found);
       }
     }
   }
 
-  function hydrateTournamentMetaUi(t) {
-    titleEl && (titleEl.textContent = t.tournamentName ?? "Tournament");
-    sportEl && (sportEl.textContent = t.sportName ?? "");
-    datesEl && (datesEl.textContent = t.tournamentDates ?? "");
-    codeEl && (codeEl.textContent = t.accessCode ?? "");
-    tournamentCategories = normalizeCategories(t.categories);
+  function hydrateTournamentMetaUi(tournament) {
+    titleEl.textContent = tournament?.tournamentName || "Tournament";
+    sportEl.textContent = tournament?.sportName || "";
+    datesEl.textContent = tournament?.tournamentDates || "";
+    codeEl.textContent = tournament?.accessCode || "";
+    tournamentCategories = normalizeCategories(tournament?.categories);
     updateEmbeddedFixturesHeader();
     refreshStageSpecificUi();
     renderPlayerTabs();
@@ -499,12 +575,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // ===========================================================================
-  // PLAYERS TABLE / FILTERS
-  // ===========================================================================
   function renderPlayerTabs() {
     if (!playersTabs) return;
-
     const counts = computeCounts(allPlayers);
     const tabs = [
       { key: "all", label: "All players", count: counts.all },
@@ -516,17 +588,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     ];
 
     playersTabs.innerHTML = "";
-
     tabs.forEach((tab) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = `players-tab ${activeFilter === tab.key ? "active" : ""}`;
-      btn.dataset.playerFilter = tab.key;
-      btn.innerHTML = `
-        <span>${escapeHtml(tab.label)}</span>
-        <span class="tab-count">${tab.count}</span>
-      `;
-            btn.addEventListener("click", async () => {
+      btn.innerHTML = `<span>${escapeHtml(tab.label)}</span><span class="tab-count">${tab.count}</span>`;
+      btn.addEventListener("click", async () => {
         activeFilter = tab.key;
         renderPlayerTabs();
         renderPlayers();
@@ -551,43 +618,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (tableWrapper) tableWrapper.style.display = filtered.length ? "block" : "none";
 
     if (!filtered.length) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="5" class="muted">No players in this category.</td>
-        </tr>
-      `;
+      tableBody.innerHTML = `<tr><td colspan="5" class="muted">No players in this category.</td></tr>`;
       return;
     }
 
     filtered.forEach((player) => {
       const status = normalizeStatusPlayersPage(player);
       const tr = document.createElement("tr");
-
       tr.innerHTML = `
         <td>${escapeHtml(getPlayerDisplayName(player))}</td>
         <td>${escapeHtml(player.age ?? "—")}</td>
         <td>${escapeHtml(player.gender ?? "—")}</td>
-        <td>
-          <span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span>
-        </td>
+        <td><span class="status-pill ${statusClass(status)}">${statusLabel(status)}</span></td>
         <td>
           <div class="row-actions">
-            <button
-              type="button"
-              class="action-btn accept"
-              data-action="accept"
-              ${status === "accepted" ? "disabled" : ""}
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              class="action-btn reject"
-              data-action="reject"
-              ${status === "rejected" ? "disabled" : ""}
-            >
-              Reject
-            </button>
+            <button type="button" class="action-btn accept" data-action="accept" ${status === "accepted" ? "disabled" : ""}>Accept</button>
+            <button type="button" class="action-btn reject" data-action="reject" ${status === "rejected" ? "disabled" : ""}>Reject</button>
           </div>
         </td>
       `;
@@ -640,12 +686,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     for (const c of candidates) {
-      const opts = {
+      const r = await apiJson(c.url, {
         method: c.method,
         headers: c.body ? { "Content-Type": "application/json" } : undefined,
         body: c.body || undefined,
-      };
-      const r = await apiJson(c.url, opts);
+      });
       if (r.ok) return r.data;
     }
 
@@ -683,12 +728,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderPlayers();
   }
 
-  // ===========================================================================
-  // ADD PLAYER MODAL
-  // ===========================================================================
   function populateAddPlayerCategoryOptions() {
     if (!addPlayerCategory) return;
-
     addPlayerCategory.innerHTML = `<option value="">Select category</option>`;
     tournamentCategories.forEach((c) => {
       const id = c.categoryId || c.id;
@@ -701,17 +742,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function openAddPlayerModal() {
-    if (!addPlayerModal) return;
     populateAddPlayerCategoryOptions();
     addPlayerForm?.reset();
-    addPlayerModal.classList.remove("hidden");
-    addPlayerModal.setAttribute("aria-hidden", "false");
+    addPlayerModal?.classList.remove("hidden");
+    addPlayerModal?.setAttribute("aria-hidden", "false");
   }
 
   function closeAddPlayerModal() {
-    if (!addPlayerModal) return;
-    addPlayerModal.classList.add("hidden");
-    addPlayerModal.setAttribute("aria-hidden", "true");
+    addPlayerModal?.classList.add("hidden");
+    addPlayerModal?.setAttribute("aria-hidden", "true");
   }
 
   addPlayerBtn?.addEventListener("click", openAddPlayerModal);
@@ -722,7 +761,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   addPlayerForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-
     const payload = {
       playerName: document.getElementById("host-player-name")?.value?.trim() || "",
       age: Number(document.getElementById("host-player-age")?.value || 0),
@@ -756,9 +794,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     alert("Could not add player. Check backend route.");
   });
 
-  // ===========================================================================
-  // CAPTAINS
-  // ===========================================================================
   function getDefaultCaptainState() {
     return {
       selectedCaptainIds: [],
@@ -782,8 +817,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       selectedCaptainIds: captainState.selectedCaptainIds,
       confirmedCaptains: captainState.confirmedCaptains,
     });
-
     if (!r.ok) throw new Error("Could not save captains");
+  }
+
+  async function updateCaptainTeamStatus(playerId, nextStatus) {
+    const captain = captainState.confirmedCaptains.find((c) => String(c.playerId) === String(playerId));
+    if (!captain) return;
+    captain.teamStatus = nextStatus;
+    await saveCaptainStateToDb();
   }
 
   function openMakeCaptainsModal() {
@@ -814,7 +855,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   makeCaptainsModal?.addEventListener("click", (e) => {
     if (e.target === makeCaptainsModal) closeMakeCaptainsModal();
   });
-
   confirmCaptainsClose?.addEventListener("click", closeConfirmCaptainsModal);
   confirmCaptainsCancelBtn?.addEventListener("click", closeConfirmCaptainsModal);
   confirmCaptainsModal?.addEventListener("click", (e) => {
@@ -831,12 +871,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     makeCaptainsEmpty?.classList.add("hidden");
-
     acceptedPlayers.forEach((player) => {
       const playerId = String(getPlayerId(player));
       const checked = captainState.selectedCaptainIds.includes(playerId);
-      const categoryId = getPlayerCategoryId(player);
-
       const row = document.createElement("label");
       row.className = "captain-pick-row";
       row.innerHTML = `
@@ -844,7 +881,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <input class="captain-checkbox" type="checkbox" value="${escapeHtml(playerId)}" ${checked ? "checked" : ""} />
           <div>
             <div class="captain-pick-name">${escapeHtml(getPlayerDisplayName(player))}</div>
-            <div class="captain-pick-meta">${escapeHtml(getCategoryNameById(categoryId))}</div>
+            <div class="captain-pick-meta">${escapeHtml(getCategoryNameById(getPlayerCategoryId(player)))}</div>
           </div>
         </div>
       `;
@@ -853,17 +890,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   makeCaptainsSaveBtn?.addEventListener("click", () => {
-    const selected = Array.from(makeCaptainsList.querySelectorAll(".captain-checkbox:checked")).map((el) =>
-      String(el.value)
-    );
-    captainState.selectedCaptainIds = selected;
+    captainState.selectedCaptainIds = Array.from(makeCaptainsList.querySelectorAll(".captain-checkbox:checked")).map((el) => String(el.value));
     closeMakeCaptainsModal();
     openConfirmCaptainsModal();
   });
 
   function renderConfirmCaptainsForm() {
     confirmCaptainsList.innerHTML = "";
-
     const selectedPlayers = captainState.selectedCaptainIds
       .map((id) => allPlayers.find((p) => String(getPlayerId(p)) === String(id)))
       .filter(Boolean);
@@ -874,11 +907,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     confirmCaptainsEmpty?.classList.add("hidden");
-
     selectedPlayers.forEach((player) => {
       const playerId = String(getPlayerId(player));
       const existing = captainState.confirmedCaptains.find((c) => String(c.playerId) === playerId);
-
       const card = document.createElement("div");
       card.className = "confirm-captain-card";
       card.innerHTML = `
@@ -888,7 +919,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             <div class="confirm-captain-category">${escapeHtml(getCategoryNameById(getPlayerCategoryId(player)))}</div>
           </div>
         </div>
-
         <div class="field-group">
           <label>Team name (optional)</label>
           <input
@@ -906,22 +936,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   confirmCaptainsForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-
     const selectedPlayers = captainState.selectedCaptainIds
       .map((id) => allPlayers.find((p) => String(getPlayerId(p)) === String(id)))
       .filter(Boolean);
 
     captainState.confirmedCaptains = selectedPlayers.map((player, index) => {
       const playerId = String(getPlayerId(player));
-      const teamNameInput = confirmCaptainsList.querySelector(
-        `.confirm-team-name-input[data-player-id="${CSS.escape(playerId)}"]`
-      );
-
+      const existing = captainState.confirmedCaptains.find((c) => String(c.playerId) === playerId) || {};
+      const teamNameInput = confirmCaptainsList.querySelector(`.confirm-team-name-input[data-player-id="${CSS.escape(playerId)}"]`);
       return {
+        ...existing,
         playerId,
         playerName: getPlayerDisplayName(player),
         categoryId: getPlayerCategoryId(player),
-        teamName: teamNameInput?.value?.trim() || `Team ${index + 1}`,
+        teamName: teamNameInput?.value?.trim() || existing.teamName || `Team ${index + 1}`,
+        teamStatus: existing.teamStatus || "pending",
       };
     });
 
@@ -937,7 +966,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderCaptainsSummary() {
     if (!captainsSummarySection) return;
-
     captainsSummarySection.classList.remove("hidden");
     captainsSummaryList.innerHTML = "";
     syncTeamSetupUi();
@@ -950,22 +978,76 @@ document.addEventListener("DOMContentLoaded", async () => {
     captainsSummaryEmpty?.classList.add("hidden");
 
     captainState.confirmedCaptains.forEach((captain) => {
+      const playerId = String(captain.playerId || "");
+      const expanded = expandedTeamIds.has(playerId);
+      const teamPlayers = getCaptainSubmittedPlayers(captain);
+      const teamStatus = String(captain.teamStatus || "pending");
+      const statusChipClass = teamStatus === "accepted"
+        ? "status-pill status-pill--accepted"
+        : teamStatus === "rejected"
+          ? "status-pill status-pill--rejected"
+          : "status-pill status-pill--pending";
+      const statusChipText = teamStatus === "accepted"
+        ? "Team accepted"
+        : teamStatus === "rejected"
+          ? "Team rejected"
+          : "Team pending";
+
       const card = document.createElement("div");
       card.className = "captain-summary-card";
       card.innerHTML = `
-        <div class="captain-summary-left">
-          <div class="captain-summary-name">${escapeHtml(captain.playerName)}</div>
-          <div class="captain-summary-meta">${escapeHtml(getCategoryNameById(captain.categoryId))}</div>
+        <button type="button" class="captain-summary-head-btn" data-team-card-toggle="${escapeHtml(playerId)}">
+          <div class="captain-summary-left">
+            <div class="captain-summary-name">${escapeHtml(captain.teamName || captain.playerName || "Team")}</div>
+            <div class="captain-summary-meta">Captain: ${escapeHtml(captain.playerName || "—")}</div>
+          </div>
+          <div class="row-actions" style="align-items:center; gap:8px;">
+            <span class="${statusChipClass}">${escapeHtml(statusChipText)}</span>
+            <span class="team-name-chip">${expanded ? "▾" : "▸"}</span>
+          </div>
+        </button>
+        <div class="team-setup-details${expanded ? "" : " hidden"}" data-team-card-body="${escapeHtml(playerId)}">
+          <div class="helper-text" style="margin-bottom:10px;">Players submitted by captain</div>
+          <div class="captains-summary-list">
+            ${teamPlayers.length
+              ? teamPlayers.map((name) => `<div class="captain-summary-card"><div class="captain-summary-left"><div class="captain-summary-name">${escapeHtml(name)}</div></div></div>`).join("")
+              : `<div class="empty-state compact-empty"><div class="feature-icon">👥</div><h3>No team list yet</h3><p class="muted">Team players from captain submission on join mode will appear here once linked.</p></div>`}
+          </div>
+          <div class="row-actions" style="margin-top:12px;">
+            <button type="button" class="action-btn accept" data-team-status="accepted" data-team-player-id="${escapeHtml(playerId)}">Accept team</button>
+            <button type="button" class="action-btn reject" data-team-status="rejected" data-team-player-id="${escapeHtml(playerId)}">Reject team</button>
+          </div>
         </div>
-        <div class="team-name-chip">${escapeHtml(captain.teamName || "—")}</div>
       `;
       captainsSummaryList.appendChild(card);
     });
+
+    captainsSummaryList.querySelectorAll("[data-team-card-toggle]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const playerId = String(btn.getAttribute("data-team-card-toggle") || "");
+        if (!playerId) return;
+        if (expandedTeamIds.has(playerId)) expandedTeamIds.delete(playerId);
+        else expandedTeamIds.add(playerId);
+        renderCaptainsSummary();
+      });
+    });
+
+    captainsSummaryList.querySelectorAll("[data-team-status]").forEach((btn) => {
+      btn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const playerId = String(btn.getAttribute("data-team-player-id") || "");
+        const nextStatus = String(btn.getAttribute("data-team-status") || "pending");
+        if (!playerId) return;
+        try {
+          await updateCaptainTeamStatus(playerId, nextStatus);
+          renderCaptainsSummary();
+        } catch (err) {
+          alert(err.message || "Could not update team status.");
+        }
+      });
+    });
   }
 
-  // ===========================================================================
-  // POOLS
-  // ===========================================================================
   async function loadPoolsFromDb() {
     const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/pools`);
     captainState.pools = r.ok ? (r.data || null) : null;
@@ -978,20 +1060,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!r.ok) throw new Error("Could not save pools");
   }
 
-  function getConfirmedTeams() {
-    return captainState.confirmedCaptains.map((captain) => ({
-      teamKey: `captain:${captain.playerId}`,
-      captainId: captain.playerId,
-      captainName: captain.playerName,
-      teamName: captain.teamName || captain.playerName,
-      categoryId: captain.categoryId,
-    }));
-  }
-
   function buildEmptyPools() {
     const pools = { groups: {}, unassigned: [] };
     const groupCount = Number(tournamentMetaCache?.groupCount || 0);
-    for (let i = 1; i <= groupCount; i++) {
+    for (let i = 1; i <= groupCount; i += 1) {
       pools.groups[`Pool ${i}`] = [];
     }
     return pools;
@@ -1001,13 +1073,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pools = buildEmptyPools();
     const shuffledTeams = shuffle([...teams]);
     const poolNames = Object.keys(pools.groups);
-
     shuffledTeams.forEach((team, index) => {
-      const poolIndex = index % groupCount;
-      const poolName = poolNames[poolIndex];
+      const poolName = poolNames[index % groupCount];
       pools.groups[poolName].push(team.teamKey);
     });
-
     return pools;
   }
 
@@ -1016,45 +1085,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     const validKeys = new Set(teams.map((t) => t.teamKey));
     const groupCount = Number(tournamentMetaCache?.groupCount || 0);
 
-    if (
-      !captainState.pools ||
-      !captainState.pools.groups ||
-      Object.keys(captainState.pools.groups).length !== groupCount
-    ) {
+    if (!captainState.pools || !captainState.pools.groups || Object.keys(captainState.pools.groups).length !== groupCount) {
       captainState.pools = buildEmptyPools();
     }
 
-    const allPlaced = new Set();
-
+    const placed = new Set();
     Object.keys(captainState.pools.groups).forEach((poolName) => {
       captainState.pools.groups[poolName] = (captainState.pools.groups[poolName] || []).filter((teamKey) => {
-        const ok = validKeys.has(teamKey) && !allPlaced.has(teamKey);
-        if (ok) allPlaced.add(teamKey);
+        const ok = validKeys.has(teamKey) && !placed.has(teamKey);
+        if (ok) placed.add(teamKey);
         return ok;
       });
     });
 
     captainState.pools.unassigned = (captainState.pools.unassigned || []).filter((teamKey) => {
-      const ok = validKeys.has(teamKey) && !allPlaced.has(teamKey);
-      if (ok) allPlaced.add(teamKey);
+      const ok = validKeys.has(teamKey) && !placed.has(teamKey);
+      if (ok) placed.add(teamKey);
       return ok;
     });
 
     teams.forEach((team) => {
-      if (!allPlaced.has(team.teamKey)) {
-        captainState.pools.unassigned.push(team.teamKey);
-      }
+      if (!placed.has(team.teamKey)) captainState.pools.unassigned.push(team.teamKey);
     });
   }
 
   function openPoolsSection() {
-    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
-
+    if (!isGroupKnockoutFormat()) return;
     if (!captainState.confirmedCaptains.length) {
       alert("Please confirm captains first.");
       return;
     }
-
     ensurePoolsState();
     poolsSection?.classList.remove("hidden");
     renderPools();
@@ -1064,22 +1124,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   createPoolsBtn?.addEventListener("click", openPoolsSection);
 
   randomizePoolsBtn?.addEventListener("click", async () => {
-    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
-
+    if (!isGroupKnockoutFormat()) return;
     const teams = getConfirmedTeams();
     if (!teams.length) {
       alert("Please confirm captains first.");
       return;
     }
-
     const groupCount = Number(tournamentMetaCache?.groupCount || 0);
     if (!groupCount) {
       alert("Number of pools not found.");
       return;
     }
-
     captainState.pools = buildRandomPools(teams, groupCount);
-
     try {
       await savePoolsToDb();
       renderPools();
@@ -1089,19 +1145,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   resetPoolsBtn?.addEventListener("click", async () => {
-    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
-
+    if (!isGroupKnockoutFormat()) return;
     const teams = getConfirmedTeams();
     if (!teams.length) {
       alert("Please confirm captains first.");
       return;
     }
-
     captainState.pools = buildEmptyPools();
-    teams.forEach((team) => {
-      captainState.pools.unassigned.push(team.teamKey);
-    });
-
+    teams.forEach((team) => captainState.pools.unassigned.push(team.teamKey));
     try {
       await savePoolsToDb();
       renderPools();
@@ -1112,36 +1163,29 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function moveTeamToZone(teamKey, zoneName) {
     Object.keys(captainState.pools.groups).forEach((poolName) => {
-      captainState.pools.groups[poolName] = captainState.pools.groups[poolName].filter(
-        (key) => key !== teamKey
-      );
+      captainState.pools.groups[poolName] = captainState.pools.groups[poolName].filter((key) => key !== teamKey);
     });
-
     captainState.pools.unassigned = captainState.pools.unassigned.filter((key) => key !== teamKey);
-
-    if (zoneName === "unassigned") {
-      captainState.pools.unassigned.push(teamKey);
-    } else {
+    if (zoneName === "unassigned") captainState.pools.unassigned.push(teamKey);
+    else {
       captainState.pools.groups[zoneName] = captainState.pools.groups[zoneName] || [];
       captainState.pools.groups[zoneName].push(teamKey);
     }
   }
 
   function renderPools() {
-    if (tournamentMetaCache?.stageFormat !== "group_knockout") return;
-    if (!captainState.pools) ensurePoolsState();
+    if (!isGroupKnockoutFormat()) return;
+    ensurePoolsState();
     if (!poolsGrid || !unassignedTeams) return;
 
     const teams = getConfirmedTeams();
     const teamMap = new Map(teams.map((team) => [team.teamKey, team]));
-
     unassignedTeams.innerHTML = "";
     poolsGrid.innerHTML = "";
 
     function createTeamCard(teamKey) {
       const team = teamMap.get(teamKey);
       if (!team) return null;
-
       const card = document.createElement("div");
       card.className = "team-card";
       card.draggable = true;
@@ -1150,15 +1194,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="team-card-name">${escapeHtml(team.teamName)}</div>
         <div class="team-card-meta">Captain: ${escapeHtml(team.captainName)}</div>
       `;
-
-      card.addEventListener("dragstart", () => {
-        card.classList.add("dragging");
-      });
-
-      card.addEventListener("dragend", () => {
-        card.classList.remove("dragging");
-      });
-
+      card.addEventListener("dragstart", () => card.classList.add("dragging"));
+      card.addEventListener("dragend", () => card.classList.remove("dragging"));
       return card;
     }
 
@@ -1167,21 +1204,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         e.preventDefault();
         dropzone.classList.add("drag-over");
       });
-
-      dropzone.addEventListener("dragleave", () => {
-        dropzone.classList.remove("drag-over");
-      });
-
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag-over"));
       dropzone.addEventListener("drop", async (e) => {
         e.preventDefault();
         dropzone.classList.remove("drag-over");
-
         const dragging = document.querySelector(".team-card.dragging");
         const teamKey = dragging?.dataset.teamKey;
         if (!teamKey) return;
-
         moveTeamToZone(teamKey, zoneName);
-
         try {
           await savePoolsToDb();
           renderPools();
@@ -1192,7 +1222,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     wireDropzone(unassignedTeams, "unassigned");
-
     (captainState.pools.unassigned || []).forEach((teamKey) => {
       const card = createTeamCard(teamKey);
       if (card) unassignedTeams.appendChild(card);
@@ -1201,41 +1230,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     Object.keys(captainState.pools.groups).forEach((poolName) => {
       const col = document.createElement("div");
       col.className = "pool-column";
-      col.innerHTML = `
-        <h3>${escapeHtml(poolName)}</h3>
-        <div class="team-dropzone" data-pool="${escapeHtml(poolName)}"></div>
-      `;
-
+      col.innerHTML = `<h3>${escapeHtml(poolName)}</h3><div class="team-dropzone" data-pool="${escapeHtml(poolName)}"></div>`;
       const dropzone = col.querySelector(".team-dropzone");
       wireDropzone(dropzone, poolName);
-
       (captainState.pools.groups[poolName] || []).forEach((teamKey) => {
         const card = createTeamCard(teamKey);
         if (card) dropzone.appendChild(card);
       });
-
       poolsGrid.appendChild(col);
     });
   }
 
-  // ===========================================================================
-  // LEADERBOARD (OPTIONAL NEW BLOCK)
-  // ===========================================================================
-    async function loadLeaderboardFromDb() {
-    const categoryId =
-      String(activeFilter === "all"
-        ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
-        : activeFilter);
+  async function loadLeaderboardFromDb() {
+    const categoryId = isTournamentTeamEvent()
+      ? TEAM_EVENT_CATEGORY_ID
+      : String(activeFilter === "all" ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "") : activeFilter);
 
     if (!categoryId) {
       leaderboardState.rows = [];
       return;
     }
 
-    const r = await apiGet(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`
-    );
-
+    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`);
     leaderboardState.rows = r.ok
       ? Array.isArray(r.data?.rows)
         ? r.data.rows
@@ -1247,17 +1263,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderLeaderboard() {
     if (!leaderboardSection || !leaderboardTableBody) return;
-
     leaderboardTableBody.innerHTML = "";
-
     if (!leaderboardState.rows.length) {
-      leaderboardTableBody.innerHTML = `
-        <tr><td colspan="6" class="muted">No leaderboard data yet.</td></tr>
-      `;
+      leaderboardTableBody.innerHTML = `<tr><td colspan="6" class="muted">No leaderboard data yet.</td></tr>`;
       return;
     }
-
-
     leaderboardState.rows.forEach((row, idx) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -1271,9 +1281,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       leaderboardTableBody.appendChild(tr);
     });
   }
-  // ===========================================================================
-  // FIXTURES EMBED
-  // ===========================================================================
+
   function makeMatchId() {
     if (window.crypto && crypto.randomUUID) return "M-" + crypto.randomUUID();
     return "M-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -1286,12 +1294,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     return t.split(" + ").map((x) => x.trim()).filter(Boolean);
   }
 
-  function ensureMatchMeta(m) {
-    if (!m || typeof m !== "object") return m;
-    if (!m.matchId) m.matchId = makeMatchId();
-    if (!Array.isArray(m.homePlayers)) m.homePlayers = splitTeamName(m.home);
-    if (!Array.isArray(m.awayPlayers)) m.awayPlayers = splitTeamName(m.away);
-    return m;
+  function ensureMatchMeta(match) {
+    if (!match || typeof match !== "object") return match;
+    if (!match.matchId) match.matchId = makeMatchId();
+    if (!Array.isArray(match.homePlayers)) match.homePlayers = splitTeamName(match.home);
+    if (!Array.isArray(match.awayPlayers)) match.awayPlayers = splitTeamName(match.away);
+    return match;
   }
 
   function nextPow2(n) {
@@ -1312,28 +1320,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   function buildEntrants(names, teamSize) {
     const size = Math.max(1, Number(teamSize || 1));
     const shuffled = shuffle(names);
-
     const entrants = [];
-    const dropped = [];
     const teamMap = {};
 
     if (size === 1) {
-      shuffled.forEach((n) => (teamMap[n] = [n]));
-      return { entrants: shuffled, dropped: [], teamMap };
+      shuffled.forEach((name) => {
+        teamMap[name] = [name];
+      });
+      return { entrants: shuffled, teamMap };
     }
 
     for (let i = 0; i < shuffled.length; i += size) {
       const chunk = shuffled.slice(i, i + size);
-      if (chunk.length < size) {
-        dropped.push(...chunk);
-        continue;
-      }
+      if (chunk.length < size) continue;
       const teamName = chunk.join(" + ");
       entrants.push(teamName);
       teamMap[teamName] = chunk;
     }
 
-    return { entrants, dropped, teamMap };
+    return { entrants, teamMap };
   }
 
   function createBracket(names, teamMap = {}) {
@@ -1353,31 +1358,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const round1 = [];
     for (let i = 0; i < list.length; i += 2) {
-      const home = list[i];
-      const away = list[i + 1];
-      round1.push(
-        ensureMatchMeta({
-          home,
-          away,
-          homePlayers: rosterOf(home),
-          awayPlayers: rosterOf(away),
-        })
-      );
+      round1.push(ensureMatchMeta({
+        home: list[i],
+        away: list[i + 1],
+        homePlayers: rosterOf(list[i]),
+        awayPlayers: rosterOf(list[i + 1]),
+      }));
     }
     rounds.push(round1);
 
-    for (let r = 1; r < totalRounds; r++) {
+    for (let r = 1; r < totalRounds; r += 1) {
       const prev = rounds[r - 1];
       const next = [];
       for (let i = 0; i < prev.length; i += 2) {
-        next.push(
-          ensureMatchMeta({
-            home: "TBD",
-            away: "TBD",
-            homePlayers: [],
-            awayPlayers: [],
-          })
-        );
+        next.push(ensureMatchMeta({ home: "TBD", away: "TBD", homePlayers: [], awayPlayers: [] }));
       }
       rounds.push(next);
     }
@@ -1388,21 +1382,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   function computeAcceptedByCategory() {
     const accepted = getAcceptedPlayers();
     const map = {};
-
     tournamentCategories.forEach((c) => {
       const cid = c.categoryId || c.id;
       map[cid] = accepted
         .filter((p) => String(getPlayerCategoryId(p)) === String(cid))
         .map((p) => getPlayerDisplayName(p));
     });
-
     fixturesState.acceptedByCategory = map;
-  }
-
-  function getConfirmedTeamsForCategory(categoryId) {
-    return getConfirmedTeams().filter(
-      (team) => String(team.categoryId || "") === String(categoryId || "")
-    );
   }
 
   function getFixtureEntrantsForCategory(categoryMeta) {
@@ -1410,12 +1396,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!cid) return { entrants: [], teamMap: {}, sourceCount: 0 };
 
     if (isTournamentTeamEvent()) {
-      const teams = getConfirmedTeamsForCategory(cid);
+      const teams = getConfirmedTeams().filter((team) => team.teamStatus !== "rejected");
       const entrants = teams.map((team) => team.teamName).filter(Boolean);
       const teamMap = {};
-      teams.forEach((team) => {
-        teamMap[team.teamName] = [team.teamName];
-      });
+      teams.forEach((team) => { teamMap[team.teamName] = [team.teamName]; });
       return { entrants, teamMap, sourceCount: entrants.length };
     }
 
@@ -1431,29 +1415,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     return r.data?.data || r.data;
   }
 
+  async function persistFixturesState() {
+    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`, fixturesState.fixtures || { categories: {} });
+    if (!r.ok) throw new Error(r.data?.message || "Failed to save fixtures");
+    fixturesState.fixtures = migrateFixtures(r.data || fixturesState.fixtures || { categories: {} });
+  }
+
   function migrateFixtures(fixturesObj) {
     if (!fixturesObj?.categories) return fixturesObj;
     Object.values(fixturesObj.categories).forEach((cat) => {
-      if (!cat?.rounds) return;
-      cat.rounds.forEach((round) => {
-        if (!Array.isArray(round)) return;
-        round.forEach((m) => {
-          if (m && typeof m === "object") ensureMatchMeta(m);
+      if (!cat) return;
+      if (Array.isArray(cat.matches)) {
+        cat.matches = cat.matches.map((m) => ensureMatchMeta(m));
+      }
+      if (Array.isArray(cat.rounds)) {
+        cat.rounds.forEach((round) => {
+          if (!Array.isArray(round)) return;
+          round.forEach((match) => ensureMatchMeta(match));
         });
-      });
+      }
     });
     return fixturesObj;
   }
 
   function renderCategoryToggles() {
     if (!fixturesUi.toggleWrap) return;
+    if (isTournamentTeamEvent()) {
+      fixturesUi.toggleWrap.innerHTML = "";
+      fixturesUi.toggleWrap.classList.add("hidden");
+      return;
+    }
 
+    fixturesUi.toggleWrap.classList.remove("hidden");
     fixturesUi.toggleWrap.innerHTML = "";
     const catList = fixturesState.categories
-      .map((c) => ({
-        id: c.categoryId || c.id,
-        label: categoryLabel(c),
-      }))
+      .map((c) => ({ id: c.categoryId || c.id, label: categoryLabel(c) }))
       .filter((x) => x.id);
 
     if (!catList.length) {
@@ -1461,116 +1457,63 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    catList.forEach((c) => {
+    catList.forEach((cat) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "toggle-btn";
-      btn.textContent = c.label;
-
-      if (String(fixturesState.activeCategoryId) === String(c.id)) {
-        btn.classList.add("active");
-      }
-
+      btn.className = `toggle-btn ${String(fixturesState.activeCategoryId) === String(cat.id) ? "active" : ""}`;
+      btn.textContent = cat.label;
       btn.addEventListener("click", () => {
-        fixturesState.activeCategoryId = c.id;
-        fixturesUi.toggleWrap
-          .querySelectorAll("button")
-          .forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-
-        if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
-        renderCategoryBracket(c.id);
+        fixturesState.activeCategoryId = cat.id;
+        renderCategoryToggles();
+        fixturesUi.noneSelectedEl.style.display = "none";
+        renderCategoryBracket(cat.id);
       });
-
       fixturesUi.toggleWrap.appendChild(btn);
     });
   }
 
-  function getDisplayRoundLabel(cat, round, r) {
-    const explicit = Array.isArray(round)
-      ? round.find((m) => m?.roundLabel)?.roundLabel
-      : "";
-    if (explicit) return explicit;
-
-    if (Array.isArray(cat?.roundLabels) && cat.roundLabels[r]) {
-      return cat.roundLabels[r];
-    }
-
-    if (isLeagueKnockoutFormat()) {
-      const totalRounds = Number(cat?.totalRounds || cat?.rounds?.length || 0);
-      const remaining = totalRounds - r;
-      if (round?.length === 1 && remaining === 1) return "Final";
-      if (round?.length === 2 && remaining <= 2) return "Semi-final";
-      return `Round ${r + 1}`;
-    }
-
-    return getRoundLabel(r, cat?.totalRounds || cat?.rounds?.length || 0);
-  }
-
-  function buildFixtureCard(m, r, i) {
-    const home = m?.home ?? "BYE";
-    const away = m?.away ?? "BYE";
+  function buildFixtureCard(match, roundIndex, matchIndex, categoryId) {
+    const home = match?.home ?? "BYE";
+    const away = match?.away ?? "BYE";
     const homeBye = String(home).toUpperCase() === "BYE";
     const awayBye = String(away).toUpperCase() === "BYE";
-    const scoreText =
-      m && (m.homeScore != null || m.awayScore != null)
-        ? `${Number(m.homeScore || 0)} - ${Number(m.awayScore || 0)}`
-        : "";
-
     return `
       <div class="bk-card">
-        <div class="fixture-line">
-          <span>${escapeHtml(home)}</span>
-        </div>
-        <div class="fixture-line">
-          <span>${escapeHtml(away)}</span>
-        </div>
-        ${scoreText ? `<div class="captain-summary-meta">Score: ${escapeHtml(scoreText)}</div>` : ""}
+        <div class="fixture-line"><span>${escapeHtml(home)}</span></div>
+        <div class="fixture-line"><span>${escapeHtml(away)}</span></div>
         <div class="fixture-actions">
-          ${
-            !homeBye && !awayBye
-              ? `
+          ${!homeBye && !awayBye ? `
             <button
               type="button"
               class="start-scoring-btn btn-dark"
               data-tournament-id="${escapeHtml(tournamentId)}"
-              data-category-id="${escapeHtml(fixturesState.activeCategoryId || "")}"
-              data-round="${r}"
-              data-match="${i}"
-            >
-              Start scoring
-            </button>
-          `
-              : ""
-          }
+              data-category-id="${escapeHtml(categoryId)}"
+              data-round="${roundIndex}"
+              data-match="${matchIndex}"
+            >Start scoring</button>` : ""}
         </div>
       </div>
     `;
   }
 
-  function renderCategoryBracket(categoryId) {
-    if (!fixturesUi.groupsEl) return;
-    fixturesUi.groupsEl.innerHTML = "";
+  function getDisplayRoundLabel(cat, round, roundIndex) {
+    const explicit = Array.isArray(round) ? round.find((m) => m?.roundLabel)?.roundLabel : "";
+    if (explicit) return explicit;
+    return getRoundLabel(roundIndex, cat?.totalRounds || cat?.rounds?.length || 0);
+  }
 
+  function renderIndividualCategoryFixtures(categoryId) {
+    fixturesUi.groupsEl.innerHTML = "";
     const cat = fixturesState.fixtures?.categories?.[categoryId];
-    const categoryMeta = fixturesState.categories.find(
-      (c) => String(c.categoryId || c.id) === String(categoryId)
-    );
+    const categoryMeta = fixturesState.categories.find((c) => String(c.categoryId || c.id) === String(categoryId));
+
     if (!cat || !Array.isArray(cat.rounds) || !cat.rounds.length) {
       const entrantInfo = categoryMeta ? getFixtureEntrantsForCategory(categoryMeta) : { sourceCount: 0 };
       fixturesUi.groupsEl.innerHTML = `
         <div class="empty-state" style="display:flex;">
           <div class="feature-icon">🧩</div>
           <h3>No fixtures yet</h3>
-          <p class="muted">
-            ${entrantInfo.sourceCount < 2
-              ? (isTournamentTeamEvent()
-                  ? "Not enough confirmed teams to generate fixtures."
-                  : "Not enough accepted players to generate fixtures.")
-              : (isLeagueKnockoutFormat()
-                  ? "Click “Regenerate fixtures” to create league rounds and knockout progression."
-                  : "Click “Regenerate fixtures” to create the fixtures.")}
-          </p>
+          <p class="muted">${entrantInfo.sourceCount < 2 ? "Not enough accepted players to generate fixtures." : "Click “Regenerate fixtures” to create the fixtures."}</p>
         </div>
       `;
       return;
@@ -1578,7 +1521,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const wrapper = document.createElement("div");
     wrapper.className = "fixtures-group";
-
     const title = document.createElement("h3");
     title.className = "fixtures-group-title";
     title.textContent = cat.label || categoryLabel(categoryMeta || {}) || "Category";
@@ -1586,19 +1528,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const roundsWrap = document.createElement("div");
     roundsWrap.className = "fixtures-rounds";
-
-    cat.rounds.forEach((round, r) => {
+    cat.rounds.forEach((round, roundIndex) => {
       const col = document.createElement("div");
       col.className = "fixtures-round-col";
-      col.innerHTML = `<div class="round-title">${escapeHtml(getDisplayRoundLabel(cat, round, r))}</div>`;
-
-      round.forEach((m, i) => {
+      col.innerHTML = `<div class="round-title">${escapeHtml(getDisplayRoundLabel(cat, round, roundIndex))}</div>`;
+      round.forEach((match, matchIndex) => {
         const item = document.createElement("div");
         item.className = "fixtures-round-match";
-        item.innerHTML = buildFixtureCard(m, r, i);
+        item.innerHTML = buildFixtureCard(match, roundIndex, matchIndex, categoryId);
         col.appendChild(item);
       });
-
       roundsWrap.appendChild(col);
     });
 
@@ -1606,107 +1545,399 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesUi.groupsEl.appendChild(wrapper);
   }
 
+  function getPairKey(a, b) {
+    return [a, b].sort().join("::");
+  }
+
+  function buildBalancedLeaguePairs(teamNames, requestedMatches) {
+    const names = shuffle(teamNames.filter(Boolean));
+    const teamCount = names.length;
+    if (teamCount < 2) return { pairs: [], matchesPerTeam: 0 };
+
+    let matchesPerTeam = Math.min(Math.max(1, Number(requestedMatches || 0)), teamCount - 1);
+    if ((teamCount * matchesPerTeam) % 2 !== 0) matchesPerTeam -= 1;
+    if (matchesPerTeam < 1) return { pairs: [], matchesPerTeam: 0 };
+
+    const allPairs = [];
+    for (let i = 0; i < names.length; i += 1) {
+      for (let j = i + 1; j < names.length; j += 1) {
+        allPairs.push([names[i], names[j]]);
+      }
+    }
+
+    let bestPairs = [];
+    let bestScore = -1;
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      const counts = Object.fromEntries(names.map((name) => [name, 0]));
+      const selected = [];
+      const seen = new Set();
+      for (const [a, b] of shuffle(allPairs)) {
+        const key = getPairKey(a, b);
+        if (seen.has(key)) continue;
+        if (counts[a] >= matchesPerTeam || counts[b] >= matchesPerTeam) continue;
+        selected.push({ home: a, away: b });
+        counts[a] += 1;
+        counts[b] += 1;
+        seen.add(key);
+      }
+      const score = names.reduce((sum, name) => sum + counts[name], 0);
+      if (score > bestScore) {
+        bestScore = score;
+        bestPairs = selected;
+      }
+      if (names.every((name) => counts[name] === matchesPerTeam)) break;
+    }
+
+    return { pairs: bestPairs, matchesPerTeam };
+  }
+
+  function scheduleLeaguePairs(pairs, courtNames, baseDate) {
+    const matchDurationMs = 2 * 60 * 60 * 1000;
+    const teamNext = new Map();
+    const courtNext = new Map();
+    const baseTs = baseDate.getTime();
+    courtNames.forEach((court) => courtNext.set(court, baseTs));
+
+    return pairs.map((pair, index) => {
+      let bestCourt = courtNames[0];
+      let bestStart = Number.MAX_SAFE_INTEGER;
+
+      courtNames.forEach((court) => {
+        const start = Math.max(
+          baseTs,
+          teamNext.get(pair.home) || baseTs,
+          teamNext.get(pair.away) || baseTs,
+          courtNext.get(court) || baseTs
+        );
+        if (start < bestStart) {
+          bestStart = start;
+          bestCourt = court;
+        }
+      });
+
+      const end = bestStart + matchDurationMs;
+      teamNext.set(pair.home, end);
+      teamNext.set(pair.away, end);
+      courtNext.set(bestCourt, end);
+
+      const dt = new Date(bestStart);
+      return ensureMatchMeta({
+        matchId: makeMatchId(),
+        matchNo: index + 1,
+        home: pair.home,
+        away: pair.away,
+        homePlayers: [pair.home],
+        awayPlayers: [pair.away],
+        date: formatDateInputValue(dt),
+        time: formatTimeInputValue(dt),
+        court: bestCourt,
+        stage: "league",
+        roundLabel: `League Match ${index + 1}`,
+      });
+    });
+  }
+
+  function renderTeamEventScheduleTable(cat) {
+    const matches = Array.isArray(cat?.matches)
+      ? cat.matches
+      : Array.isArray(cat?.rounds?.[0])
+        ? cat.rounds[0]
+        : [];
+
+    if (!matches.length) {
+      fixturesUi.groupsEl.innerHTML = `
+        <div class="empty-state" style="display:flex;">
+          <div class="feature-icon">🗓️</div>
+          <h3>No team fixtures yet</h3>
+          <p class="muted">Click “Regenerate fixtures” to create the team match schedule.</p>
+        </div>
+      `;
+      return;
+    }
+
+    fixturesUi.groupsEl.innerHTML = `
+      <div class="fixtures-group">
+        <h3 class="fixtures-group-title">${escapeHtml(cat?.label || "Team fixtures")}</h3>
+        <div class="players-table-wrapper">
+          <table class="players-table">
+            <thead>
+              <tr>
+                <th>Match no</th>
+                <th>Team 1</th>
+                <th>Team 2</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Court</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${matches.map((match, index) => {
+                const editing = Boolean(match._editing);
+                const dateCell = editing
+                  ? `<input type="date" data-edit-field="date" data-index="${index}" value="${escapeHtml(match.date || "")}" />`
+                  : escapeHtml(match.date || "—");
+                const timeCell = editing
+                  ? `<input type="time" data-edit-field="time" data-index="${index}" value="${escapeHtml(match.time || "")}" />`
+                  : escapeHtml(match.time || "—");
+                const courtCell = editing
+                  ? `<input type="text" data-edit-field="court" data-index="${index}" value="${escapeHtml(match.court || "")}" placeholder="Court name" />`
+                  : escapeHtml(match.court || "—");
+                return `
+                  <tr>
+                    <td>${escapeHtml(match.matchNo || index + 1)}</td>
+                    <td>${escapeHtml(match.home || "—")}</td>
+                    <td>${escapeHtml(match.away || "—")}</td>
+                    <td>${dateCell}</td>
+                    <td>${timeCell}</td>
+                    <td>${courtCell}</td>
+                    <td>
+                      <div class="row-actions">
+                        <button type="button" class="action-btn accept start-scoring-btn" data-tournament-id="${escapeHtml(tournamentId)}" data-category-id="${escapeHtml(TEAM_EVENT_CATEGORY_ID)}" data-round="0" data-match="${index}">Start scoring</button>
+                        ${editing
+                          ? `<button type="button" class="action-btn accept" data-schedule-action="save" data-index="${index}">Save</button><button type="button" class="action-btn reject" data-schedule-action="cancel" data-index="${index}">Cancel</button>`
+                          : `<button type="button" class="action-btn" data-schedule-action="edit" data-index="${index}">Edit</button>`}
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  async function handleTeamScheduleAction(action, index) {
+    const cat = getTeamEventFixtureBucket();
+    if (!cat) return;
+    const matches = Array.isArray(cat.matches) ? cat.matches : (Array.isArray(cat.rounds?.[0]) ? cat.rounds[0] : []);
+    const match = matches[index];
+    if (!match) return;
+
+    if (action === "edit") {
+      match._editing = true;
+      renderTeamEventScheduleTable(cat);
+      return;
+    }
+
+    if (action === "cancel") {
+      match._editing = false;
+      renderTeamEventScheduleTable(cat);
+      return;
+    }
+
+    if (action === "save") {
+      const root = fixturesUi.groupsEl;
+      match.date = root?.querySelector(`input[data-edit-field="date"][data-index="${index}"]`)?.value || match.date || "";
+      match.time = root?.querySelector(`input[data-edit-field="time"][data-index="${index}"]`)?.value || match.time || "";
+      match.court = root?.querySelector(`input[data-edit-field="court"][data-index="${index}"]`)?.value?.trim() || match.court || "";
+      match._editing = false;
+      cat.matches = matches;
+      cat.rounds = [matches];
+      try {
+        await persistFixturesState();
+        renderTeamEventScheduleTable(getTeamEventFixtureBucket());
+        showToast("Match schedule updated");
+      } catch (err) {
+        alert(err.message || "Could not save match schedule.");
+      }
+    }
+  }
+
+  function renderTeamEventFixtures() {
+    fixturesUi.groupsEl.innerHTML = "";
+    const cat = getTeamEventFixtureBucket();
+    if (!cat) {
+      const teams = getConfirmedTeams().filter((team) => team.teamStatus !== "rejected");
+      fixturesUi.groupsEl.innerHTML = `
+        <div class="empty-state" style="display:flex;">
+          <div class="feature-icon">🧩</div>
+          <h3>No fixtures yet</h3>
+          <p class="muted">${teams.length < 2 ? "Not enough confirmed teams to generate fixtures." : "Click “Regenerate fixtures” to create the team fixtures."}</p>
+        </div>
+      `;
+      return;
+    }
+
+    if (cat.displayMode === "team_schedule") {
+      renderTeamEventScheduleTable(cat);
+      return;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "fixtures-group";
+    const title = document.createElement("h3");
+    title.className = "fixtures-group-title";
+    title.textContent = cat.label || "Team fixtures";
+    wrapper.appendChild(title);
+
+    const roundsWrap = document.createElement("div");
+    roundsWrap.className = "fixtures-rounds";
+    (cat.rounds || []).forEach((round, roundIndex) => {
+      const col = document.createElement("div");
+      col.className = "fixtures-round-col";
+      col.innerHTML = `<div class="round-title">${escapeHtml(getDisplayRoundLabel(cat, round, roundIndex))}</div>`;
+      round.forEach((match, matchIndex) => {
+        const item = document.createElement("div");
+        item.className = "fixtures-round-match";
+        item.innerHTML = buildFixtureCard(match, roundIndex, matchIndex, TEAM_EVENT_CATEGORY_ID);
+        col.appendChild(item);
+      });
+      roundsWrap.appendChild(col);
+    });
+
+    wrapper.appendChild(roundsWrap);
+    fixturesUi.groupsEl.appendChild(wrapper);
+  }
+
+  function renderCategoryBracket(categoryId) {
+    if (isTournamentTeamEvent()) {
+      renderTeamEventFixtures();
+      return;
+    }
+    renderIndividualCategoryFixtures(categoryId);
+  }
+
   async function generateAndSaveFixtures() {
-    if (isLeagueKnockoutFormat()) {
-      const categoryId = String(
-        fixturesState.activeCategoryId ||
-        fixturesState.categories?.[0]?.categoryId ||
-        fixturesState.categories?.[0]?.id ||
-        ""
-      );
-
-      if (!categoryId) {
-        showToast("Select a category first");
+    if (isTournamentTeamEvent()) {
+      const teams = getConfirmedTeams().filter((team) => team.teamStatus !== "rejected");
+      if (teams.length < 2) {
+        showToast("Not enough confirmed teams to regenerate fixtures");
         return;
       }
 
-      const r = await apiPost(
-        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/generate-league`,
-        { categoryId }
-      );
+      if (isLeagueKnockoutFormat()) {
+        const requestedRounds = getRequestedLeagueRounds() || 1;
+        const { pairs, matchesPerTeam } = buildBalancedLeaguePairs(teams.map((team) => team.teamName), requestedRounds);
+        if (!pairs.length) {
+          showToast("Could not build league fixtures for the selected number of rounds");
+          return;
+        }
 
-      if (!r.ok) {
-        showToast(r.data?.message || "Could not generate league / knockout fixtures");
+        const scheduledMatches = scheduleLeaguePairs(pairs, shuffle(getAvailableCourtNames()), getTournamentStartDate());
+        fixturesState.fixtures = migrateFixtures({
+          tournamentType: "team",
+          teamCategories: tournamentCategories,
+          categories: {
+            [TEAM_EVENT_CATEGORY_ID]: {
+              categoryId: TEAM_EVENT_CATEGORY_ID,
+              label: `League schedule • ${matchesPerTeam} matches per team`,
+              displayMode: "team_schedule",
+              rounds: [scheduledMatches],
+              matches: scheduledMatches,
+              totalRounds: 1,
+            },
+          },
+        });
+
+        try {
+          await persistFixturesState();
+          showToast("League fixtures generated");
+          renderTeamEventFixtures();
+        } catch (err) {
+          alert(err.message || "Could not save league fixtures.");
+        }
         return;
       }
 
-      fixturesState.fixtures = migrateFixtures(r.data?.fixtures || r.data || { categories: {} });
-      fixturesState.editMode = false;
+      const teamMap = {};
+      const entrants = teams.map((team) => {
+        teamMap[team.teamName] = [team.teamName];
+        return team.teamName;
+      });
+      const bracket = createBracket(entrants, teamMap);
+      if (!bracket) {
+        showToast("Not enough confirmed teams to regenerate fixtures");
+        return;
+      }
 
-      showToast("League / knockout fixtures generated");
-      await loadLeaderboardFromDb();
-      renderLeaderboard();
-      renderCategoryToggles();
-      if (categoryId) renderCategoryBracket(categoryId);
+      fixturesState.fixtures = migrateFixtures({
+        tournamentType: "team",
+        teamCategories: tournamentCategories,
+        categories: {
+          [TEAM_EVENT_CATEGORY_ID]: {
+            categoryId: TEAM_EVENT_CATEGORY_ID,
+            label: "Team fixtures",
+            displayMode: "team_bracket",
+            ...bracket,
+          },
+        },
+      });
+
+      try {
+        await persistFixturesState();
+        showToast("Team fixtures regenerated");
+        renderTeamEventFixtures();
+      } catch (err) {
+        alert(err.message || "Could not save fixtures.");
+      }
       return;
     }
 
     const newFixtures = { categories: {} };
     let createdAny = false;
-
-    fixturesState.categories.forEach((c) => {
-      const cid = c.categoryId || c.id;
+    fixturesState.categories.forEach((category) => {
+      const cid = category.categoryId || category.id;
       if (!cid) return;
-
-      const { entrants, teamMap } = getFixtureEntrantsForCategory(c);
+      const { entrants, teamMap } = getFixtureEntrantsForCategory(category);
       const bracket = createBracket(entrants, teamMap);
-
       newFixtures.categories[cid] = {
         categoryId: cid,
-        label: categoryLabel(c),
+        label: categoryLabel(category),
         ...(bracket ? bracket : { rounds: [], totalRounds: 0 }),
       };
-
       if (bracket) createdAny = true;
     });
 
     if (!createdAny) {
-      showToast(isTournamentTeamEvent() ? "Not enough confirmed teams to regenerate fixtures" : "Not enough accepted players to regenerate fixtures");
+      showToast("Not enough accepted players to regenerate fixtures");
       return;
     }
 
-    const r = await apiPost(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
-      newFixtures
-    );
-
+    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`, newFixtures);
     if (!r.ok) {
       showToast("Failed to regenerate fixtures");
       return;
     }
 
     fixturesState.fixtures = migrateFixtures(r.data || newFixtures);
-    fixturesState.editMode = false;
-
     showToast("Fixtures regenerated");
     renderCategoryToggles();
-    if (fixturesState.activeCategoryId) renderCategoryBracket(fixturesState.activeCategoryId);
+    if (fixturesState.activeCategoryId) renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
   }
 
   async function initFixturesIfNeeded() {
     if (fixturesUi.didInit) return;
     fixturesUi.didInit = true;
 
-    fixturesUi.groupsEl?.addEventListener("click", (e) => {
+    fixturesUi.groupsEl?.addEventListener("click", async (e) => {
+      const scheduleBtn = e.target.closest("[data-schedule-action]");
+      if (scheduleBtn) {
+        await handleTeamScheduleAction(
+          String(scheduleBtn.getAttribute("data-schedule-action") || ""),
+          Number(scheduleBtn.getAttribute("data-index") || -1)
+        );
+        return;
+      }
+
       const btn = e.target.closest(".start-scoring-btn");
       if (!btn) return;
-
       const tId = btn.dataset.tournamentId || "";
       const cId = btn.dataset.categoryId || "";
       const round = btn.dataset.round || "0";
       const match = btn.dataset.match || "0";
-
       window.location.href = `score.html?tournamentId=${tId}&categoryId=${cId}&round=${round}&match=${match}`;
     });
 
     fixturesUi.configureBtn?.addEventListener("click", () => {
-      if (!fixturesState.activeCategoryId) {
+      const targetCategoryId = isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : fixturesState.activeCategoryId;
+      if (!targetCategoryId) {
         showToast("Select a category first");
         return;
       }
-      window.location.href =
-        `schema.html?tournamentId=${encodeURIComponent(tournamentId)}` +
-        `&categoryId=${encodeURIComponent(fixturesState.activeCategoryId)}`;
+      window.location.href = `schema.html?tournamentId=${encodeURIComponent(tournamentId)}&categoryId=${encodeURIComponent(targetCategoryId)}`;
     });
 
     fixturesUi.generateBtn?.addEventListener("click", async () => {
@@ -1720,31 +1951,30 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function openAndLoadFixtures() {
     fixturesUi.wrap?.classList.remove("hidden");
-    fixturesUi.isOpen = true;
-
     await initFixturesIfNeeded();
     updateEmbeddedFixturesHeader();
 
     fixturesState.categories = tournamentCategories || [];
-    fixturesState.players = allPlayers || [];
     computeAcceptedByCategory();
 
     const existing = await loadFixturesFromDb();
-    if (existing) {
-      fixturesState.fixtures = migrateFixtures(existing);
-    } else {
-      fixturesState.fixtures = { categories: {} };
+    fixturesState.fixtures = existing ? migrateFixtures(existing) : { categories: {} };
+
+    if (isTournamentTeamEvent()) {
+      fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
+      renderCategoryToggles();
+      if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
+      renderTeamEventFixtures();
+      fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
     }
 
-    fixturesState.activeCategoryId =
-      fixturesState.activeCategoryId ||
-      String(fixturesState.categories?.[0]?.categoryId || fixturesState.categories?.[0]?.id || "");
-
+    fixturesState.activeCategoryId = fixturesState.activeCategoryId || String(fixturesState.categories?.[0]?.categoryId || fixturesState.categories?.[0]?.id || "");
     renderCategoryToggles();
 
     if (fixturesState.activeCategoryId) {
       if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
-      renderCategoryBracket(fixturesState.activeCategoryId);
+      renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
     } else if (fixturesUi.noneSelectedEl) {
       fixturesUi.noneSelectedEl.style.display = "flex";
     }
@@ -1753,9 +1983,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   createFixturesBtn?.addEventListener("click", openAndLoadFixtures);
-  // ===========================================================================
-  // LOAD EVERYTHING
-  // ===========================================================================
+
   await loadTournamentMeta();
   await loadPlayers();
   await loadCaptainStateFromDb();
