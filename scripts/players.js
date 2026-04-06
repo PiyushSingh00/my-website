@@ -94,6 +94,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const datesEl = document.getElementById("players-tournament-dates");
   const codeEl = document.getElementById("players-tournament-code");
 
+  const fixturesTournamentNameEl = document.getElementById("fixtures-tournament-name");
+  const fixturesTournamentSportEl = document.getElementById("fixtures-tournament-sport");
+  const fixturesTournamentDatesEl = document.getElementById("fixtures-tournament-dates");
+  const fixturesTournamentCodeEl = document.getElementById("fixtures-tournament-code");
+  const embeddedFixturesHelperTextEl = document.getElementById("embedded-fixtures-helper-text") || document.querySelector("#fixtures-embed > p.helper-text");
+
   const playersTabs = document.getElementById("players-tabs");
 
   // Add player modal
@@ -149,6 +155,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const randomizeTeamNumbersBtn = document.getElementById("randomize-team-numbers-btn");
   const saveTeamNumbersBtn = document.getElementById("save-team-numbers-btn");
   const lockTeamNumbersBtn = document.getElementById("lock-team-numbers-btn");
+
+  const confirmedTeamsSection = document.getElementById("confirmed-teams-section");
+  const confirmedTeamsList = document.getElementById("confirmed-teams-list");
+  const confirmedTeamsCountChip = document.getElementById("confirmed-teams-count-chip");
 
   const lineupReviewSection = document.getElementById("lineup-review-section");
   const lineupReviewList = document.getElementById("lineup-review-list");
@@ -392,6 +402,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     return cat ? categoryLabel(cat) : "Category";
   }
 
+  function getAdvancedSettings() {
+    return safeJson(tournamentMetaCache?.advancedSettings, tournamentMetaCache?.advancedSettings) || {};
+  }
+
+  function getAdvancedMode() {
+    return getAdvancedSettings()?.advancedMode || "";
+  }
+
+  function isTournamentTeamEvent() {
+    return String(tournamentMetaCache?.tournamentType || "").toLowerCase() === "team";
+  }
+
+  function isGroupKnockoutFormat() {
+    return String(tournamentMetaCache?.stageFormat || "") === "group_knockout";
+  }
+
+  function isLeagueKnockoutFormat() {
+    return String(tournamentMetaCache?.stageFormat || "") === "round_robin_knockout";
+  }
+
+  function isPickleballTeamLeagueMode() {
+    return getAdvancedMode() === "pickleball_team_league";
+  }
+
+  function updateEmbeddedFixturesHeader() {
+    if (fixturesTournamentNameEl) fixturesTournamentNameEl.textContent = tournamentMetaCache?.tournamentName || "Tournament";
+    if (fixturesTournamentSportEl) fixturesTournamentSportEl.textContent = tournamentMetaCache?.sportName || "";
+    if (fixturesTournamentDatesEl) fixturesTournamentDatesEl.textContent = tournamentMetaCache?.tournamentDates || "";
+    if (fixturesTournamentCodeEl) fixturesTournamentCodeEl.textContent = tournamentMetaCache?.accessCode || "";
+
+    if (embeddedFixturesHelperTextEl) {
+      if (isPickleballTeamLeagueMode()) {
+        embeddedFixturesHelperTextEl.textContent =
+          "View generated fixtures for each category. In Pickleball team league mode, league rounds are played first, leaderboard match points come from cumulative actual points scored across all submatches, and knockout progression follows after standings are finalized.";
+      } else if (isLeagueKnockoutFormat()) {
+        embeddedFixturesHelperTextEl.textContent =
+          "View generated fixtures for each category. League + knockout formats will show league rounds first, followed by knockout progression.";
+      } else if (isGroupKnockoutFormat()) {
+        embeddedFixturesHelperTextEl.textContent =
+          "View generated fixtures for each category. Group + knockout uses the created pools first and knockout progression follows later.";
+      } else {
+        embeddedFixturesHelperTextEl.textContent =
+          "Fixtures are auto-generated in random order for each category. BYE indicates a free pass to the next round.";
+      }
+    }
+  }
+
   // ===========================================================================
   // TOURNAMENT META
   // ===========================================================================
@@ -424,15 +481,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     datesEl && (datesEl.textContent = t.tournamentDates ?? "");
     codeEl && (codeEl.textContent = t.accessCode ?? "");
     tournamentCategories = normalizeCategories(t.categories);
+    updateEmbeddedFixturesHeader();
     refreshStageSpecificUi();
     renderPlayerTabs();
   }
 
   function refreshStageSpecificUi() {
-    const isGroupKnockout = tournamentMetaCache?.stageFormat === "group_knockout";
     const hasConfirmed = captainState.confirmedCaptains.length > 0;
 
-    if (!isGroupKnockout) {
+    if (!isGroupKnockoutFormat()) {
       createPoolsBtn?.classList.add("hidden");
       poolsSection?.classList.add("hidden");
     } else {
@@ -440,14 +497,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (teamNumberSection) {
-      const advancedMode =
-        tournamentMetaCache?.advancedSettings?.advancedMode ||
-        safeJson(tournamentMetaCache?.advancedSettings, {})?.advancedMode ||
-        "";
-      const showTeamNumbers =
-        tournamentMetaCache?.stageFormat === "number_draw_league_knockout" ||
-        advancedMode === "pickleball_team_league";
-      teamNumberSection.classList.toggle("hidden", !showTeamNumbers);
+      teamNumberSection.classList.add("hidden");
+    }
+
+    if (confirmedTeamsSection) {
+      const shouldShowConfirmedTeams =
+        hasConfirmed && (isLeagueKnockoutFormat() || isPickleballTeamLeagueMode() || isTournamentTeamEvent());
+      confirmedTeamsSection.classList.toggle("hidden", !shouldShowConfirmedTeams);
     }
 
     if (lineupReviewSection) {
@@ -457,8 +513,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (leaderboardSection) {
       const shouldShow =
         tournamentMetaCache?.stageFormat === "round_robin" ||
-        tournamentMetaCache?.stageFormat === "group_knockout" ||
-        tournamentMetaCache?.stageFormat === "number_draw_league_knockout";
+        isGroupKnockoutFormat() ||
+        isLeagueKnockoutFormat();
       leaderboardSection.classList.toggle("hidden", !shouldShow);
     }
   }
@@ -895,8 +951,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       await saveCaptainStateToDb();
       closeConfirmCaptainsModal();
       renderCaptainsSummary();
+      renderConfirmedTeamsSummary();
       refreshStageSpecificUi();
-      renderTeamNumberAssignment();
     } catch (err) {
       alert(err.message || "Could not save captains.");
     }
@@ -926,6 +982,38 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="team-name-chip">${escapeHtml(captain.teamName || "—")}</div>
       `;
       captainsSummaryList.appendChild(card);
+    });
+  }
+
+  function renderConfirmedTeamsSummary() {
+    if (!confirmedTeamsSection || !confirmedTeamsList || !confirmedTeamsCountChip) return;
+
+    const teams = getConfirmedTeams();
+    confirmedTeamsList.innerHTML = "";
+    confirmedTeamsCountChip.textContent = `${teams.length} team${teams.length === 1 ? "" : "s"}`;
+
+    if (!teams.length) {
+      confirmedTeamsList.innerHTML = `
+        <div class="empty-state compact-empty">
+          <div class="feature-icon">🏷️</div>
+          <h3>No confirmed teams yet</h3>
+          <p class="muted">Confirm captains first. Their team names will appear here and be used directly for fixtures.</p>
+        </div>
+      `;
+      return;
+    }
+
+    teams.forEach((team) => {
+      const card = document.createElement("div");
+      card.className = "captain-summary-card";
+      card.innerHTML = `
+        <div class="captain-summary-left">
+          <div class="captain-summary-name">${escapeHtml(team.teamName)}</div>
+          <div class="captain-summary-meta">Captain: ${escapeHtml(team.captainName)}</div>
+        </div>
+        <div class="team-name-chip">${escapeHtml(getCategoryNameById(team.categoryId))}</div>
+      `;
+      confirmedTeamsList.appendChild(card);
     });
   }
 
@@ -1612,6 +1700,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesState.acceptedByCategory = map;
   }
 
+  function getConfirmedTeamsForCategory(categoryId) {
+    return getConfirmedTeams().filter(
+      (team) => String(team.categoryId || "") === String(categoryId || "")
+    );
+  }
+
+  function getFixtureEntrantsForCategory(categoryMeta) {
+    const cid = categoryMeta?.categoryId || categoryMeta?.id;
+    if (!cid) return { entrants: [], teamMap: {}, sourceCount: 0 };
+
+    if (isTournamentTeamEvent()) {
+      const teams = getConfirmedTeamsForCategory(cid);
+      const entrants = teams.map((team) => team.teamName).filter(Boolean);
+      const teamMap = {};
+      teams.forEach((team) => {
+        teamMap[team.teamName] = [team.teamName];
+      });
+      return { entrants, teamMap, sourceCount: entrants.length };
+    }
+
+    const names = fixturesState.acceptedByCategory[cid] || [];
+    const teamSize = Number(categoryMeta?.teamSize || 1);
+    const { entrants, teamMap } = buildEntrants(names, teamSize);
+    return { entrants, teamMap, sourceCount: names.length };
+  }
+
   async function loadFixturesFromDb() {
     const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
     if (!r.ok) return null;
@@ -1673,11 +1787,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function getDisplayRoundLabel(cat, round, r) {
+    const explicit = Array.isArray(round)
+      ? round.find((m) => m?.roundLabel)?.roundLabel
+      : "";
+    if (explicit) return explicit;
+
+    if (Array.isArray(cat?.roundLabels) && cat.roundLabels[r]) {
+      return cat.roundLabels[r];
+    }
+
+    if (isLeagueKnockoutFormat()) {
+      const totalRounds = Number(cat?.totalRounds || cat?.rounds?.length || 0);
+      const remaining = totalRounds - r;
+      if (round?.length === 1 && remaining === 1) return "Final";
+      if (round?.length === 2 && remaining <= 2) return "Semi-final";
+      return `Round ${r + 1}`;
+    }
+
+    return getRoundLabel(r, cat?.totalRounds || cat?.rounds?.length || 0);
+  }
+
   function buildFixtureCard(m, r, i) {
     const home = m?.home ?? "BYE";
     const away = m?.away ?? "BYE";
     const homeBye = String(home).toUpperCase() === "BYE";
     const awayBye = String(away).toUpperCase() === "BYE";
+    const scoreText =
+      m && (m.homeScore != null || m.awayScore != null)
+        ? `${Number(m.homeScore || 0)} - ${Number(m.awayScore || 0)}`
+        : "";
 
     return `
       <div class="bk-card">
@@ -1687,6 +1826,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="fixture-line">
           <span>${escapeHtml(away)}</span>
         </div>
+        ${scoreText ? `<div class="captain-summary-meta">Score: ${escapeHtml(scoreText)}</div>` : ""}
         <div class="fixture-actions">
           ${
             !homeBye && !awayBye
@@ -1714,16 +1854,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesUi.groupsEl.innerHTML = "";
 
     const cat = fixturesState.fixtures?.categories?.[categoryId];
+    const categoryMeta = fixturesState.categories.find(
+      (c) => String(c.categoryId || c.id) === String(categoryId)
+    );
     if (!cat || !Array.isArray(cat.rounds) || !cat.rounds.length) {
-      const acceptedNames = fixturesState.acceptedByCategory[categoryId] || [];
+      const entrantInfo = categoryMeta ? getFixtureEntrantsForCategory(categoryMeta) : { sourceCount: 0 };
       fixturesUi.groupsEl.innerHTML = `
         <div class="empty-state" style="display:flex;">
           <div class="feature-icon">🧩</div>
           <h3>No fixtures yet</h3>
           <p class="muted">
-            ${acceptedNames.length < 2
-              ? "Not enough accepted players to generate fixtures."
-              : "Click “Regenerate fixtures” to create the bracket."}
+            ${entrantInfo.sourceCount < 2
+              ? (isTournamentTeamEvent()
+                  ? "Not enough confirmed teams to generate fixtures."
+                  : "Not enough accepted players to generate fixtures.")
+              : (isLeagueKnockoutFormat()
+                  ? "Click “Regenerate fixtures” to create league rounds and knockout progression."
+                  : "Click “Regenerate fixtures” to create the fixtures.")}
           </p>
         </div>
       `;
@@ -1735,7 +1882,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const title = document.createElement("h3");
     title.className = "fixtures-group-title";
-    title.textContent = cat.label || "Category";
+    title.textContent = cat.label || categoryLabel(categoryMeta || {}) || "Category";
     wrapper.appendChild(title);
 
     const roundsWrap = document.createElement("div");
@@ -1744,7 +1891,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     cat.rounds.forEach((round, r) => {
       const col = document.createElement("div");
       col.className = "fixtures-round-col";
-      col.innerHTML = `<div class="round-title">${escapeHtml(getRoundLabel(r, cat.totalRounds || cat.rounds.length))}</div>`;
+      col.innerHTML = `<div class="round-title">${escapeHtml(getDisplayRoundLabel(cat, round, r))}</div>`;
 
       round.forEach((m, i) => {
         const item = document.createElement("div");
@@ -1761,6 +1908,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function generateAndSaveFixtures() {
+    if (isLeagueKnockoutFormat()) {
+      const categoryId = String(
+        fixturesState.activeCategoryId ||
+        fixturesState.categories?.[0]?.categoryId ||
+        fixturesState.categories?.[0]?.id ||
+        ""
+      );
+
+      if (!categoryId) {
+        showToast("Select a category first");
+        return;
+      }
+
+      const r = await apiPost(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/generate-league`,
+        { categoryId }
+      );
+
+      if (!r.ok) {
+        showToast(r.data?.message || "Could not generate league / knockout fixtures");
+        return;
+      }
+
+      fixturesState.fixtures = migrateFixtures(r.data?.fixtures || r.data || { categories: {} });
+      fixturesState.editMode = false;
+
+      showToast("League / knockout fixtures generated");
+      await loadHostLineupReview(categoryId);
+      await loadLeaderboardFromDb();
+      renderLineupReview();
+      renderLeaderboard();
+      renderCategoryToggles();
+      if (categoryId) renderCategoryBracket(categoryId);
+      return;
+    }
+
     const newFixtures = { categories: {} };
     let createdAny = false;
 
@@ -1768,11 +1951,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const cid = c.categoryId || c.id;
       if (!cid) return;
 
-      const names = fixturesState.acceptedByCategory[cid] || [];
-      const teamSize = Number(c.teamSize || 1);
-
-      const { entrants } = buildEntrants(names, teamSize);
-      const bracket = createBracket(entrants);
+      const { entrants, teamMap } = getFixtureEntrantsForCategory(c);
+      const bracket = createBracket(entrants, teamMap);
 
       newFixtures.categories[cid] = {
         categoryId: cid,
@@ -1784,7 +1964,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     if (!createdAny) {
-      showToast("Not enough accepted players to regenerate fixtures");
+      showToast(isTournamentTeamEvent() ? "Not enough confirmed teams to regenerate fixtures" : "Not enough accepted players to regenerate fixtures");
       return;
     }
 
@@ -1798,7 +1978,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    fixturesState.fixtures = r.data || newFixtures;
+    fixturesState.fixtures = migrateFixtures(r.data || newFixtures);
     fixturesState.editMode = false;
 
     showToast("Fixtures regenerated");
@@ -1941,6 +2121,7 @@ async function finalizeHostProgression(categoryId) {
     fixturesUi.isOpen = true;
 
     await initFixturesIfNeeded();
+    updateEmbeddedFixturesHeader();
 
     fixturesState.categories = tournamentCategories || [];
     fixturesState.players = allPlayers || [];
@@ -1970,7 +2151,26 @@ async function finalizeHostProgression(categoryId) {
   }
 
   createFixturesBtn?.addEventListener("click", openAndLoadFixtures);
-  finalizeProgressionBtn?.addEventListener("click", finalizeHostProgression);
+  finalizeProgressionBtn?.addEventListener("click", async () => {
+    const categoryId = String(
+      fixturesState.activeCategoryId ||
+      tournamentCategories?.[0]?.categoryId ||
+      tournamentCategories?.[0]?.id ||
+      ""
+    );
+
+    if (!categoryId) {
+      showToast("Select a category first");
+      return;
+    }
+
+    await finalizeHostProgression(categoryId);
+    await loadLeaderboardFromDb();
+    renderLeaderboard();
+    const existing = await loadFixturesFromDb();
+    fixturesState.fixtures = existing ? migrateFixtures(existing) : { categories: {} };
+    if (fixturesState.activeCategoryId) renderCategoryBracket(fixturesState.activeCategoryId);
+  });
   // ===========================================================================
   // LOAD EVERYTHING
   // ===========================================================================
@@ -1978,13 +2178,12 @@ async function finalizeHostProgression(categoryId) {
   await loadPlayers();
   await loadCaptainStateFromDb();
   await loadPoolsFromDb();
-  await loadTeamNumbersFromDb();
   await loadLineupsFromDb();
   await loadLeaderboardFromDb();
 
   renderPlayers();
   renderCaptainsSummary();
-  renderTeamNumberAssignment();
+  renderConfirmedTeamsSummary();
   renderLineupReview();
   renderLeaderboard();
   refreshStageSpecificUi();

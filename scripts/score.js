@@ -114,6 +114,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const teamOverallAwayName = document.getElementById("team-overall-away-name");
   const teamOverallHomeScore = document.getElementById("team-overall-home-score");
   const teamOverallAwayScore = document.getElementById("team-overall-away-score");
+  const teamOverallHomePoints = document.getElementById("team-overall-home-points");
+  const teamOverallAwayPoints = document.getElementById("team-overall-away-points");
+  const teamOverallHomePointsLabel = document.getElementById("team-overall-home-points-label");
+  const teamOverallAwayPointsLabel = document.getElementById("team-overall-away-points-label");
   const teamOverallSub = document.getElementById("team-overall-sub");
   const toggleLineupReviewBtn = document.getElementById("toggle-lineup-review");
 
@@ -1298,12 +1302,93 @@ document.addEventListener("DOMContentLoaded", async () => {
     localStorage.setItem(getTeamStorageKey(), JSON.stringify(teamState));
   }
 
+  function getPickleballCategoryMatchPoints(category) {
+    const pb = ensurePickleballTeamData(category?.sportData, fixtures);
+    return toArray(pb?.sets).reduce(
+      (acc, set) => {
+        acc.home += Number(set?.homePoints || 0);
+        acc.away += Number(set?.awayPoints || 0);
+        return acc;
+      },
+      { home: 0, away: 0 }
+    );
+  }
+
+  function getPresetCategoryMatchPoints(category) {
+    const sportKey = category?.sportKey || "";
+    const data = category?.sportData || {};
+
+    if (sportKey === "pickleball") {
+      return getPickleballCategoryMatchPoints(category);
+    }
+
+    if (sportKey === "cricket") {
+      return {
+        home: Number(data.homeRuns || 0),
+        away: Number(data.awayRuns || 0),
+      };
+    }
+
+    if (sportKey === "football") {
+      return {
+        home: Number(data.homeGoals || 0),
+        away: Number(data.awayGoals || 0),
+      };
+    }
+
+    if (sportKey === "badminton") {
+      return toArray(data.games).reduce(
+        (acc, game) => {
+          acc.home += Number(game?.a || 0);
+          acc.away += Number(game?.b || 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    if (sportKey === "tennis") {
+      return toArray(data.sets).reduce(
+        (acc, setRow) => {
+          acc.home += Number(setRow?.a || 0);
+          acc.away += Number(setRow?.b || 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    return {
+      home: Number(category?.homeScore || 0),
+      away: Number(category?.awayScore || 0),
+    };
+  }
+
+  function getCategoryMatchPoints(category) {
+    return getPresetCategoryMatchPoints(category);
+  }
+
+  function formatCategoryPointsText(category) {
+    const points = getCategoryMatchPoints(category);
+    return `${Number(points.home || 0)}-${Number(points.away || 0)} pts`;
+  }
+
   function computeTeamTieSummary(teamState) {
     const homeWins = teamState.categories.filter((c) => c.winnerSide === "A").length;
     const awayWins = teamState.categories.filter((c) => c.winnerSide === "B").length;
     const acceptedCount = teamState.categories.filter((c) => c.lineupStatus === "accepted").length;
     const rejectedCount = teamState.categories.filter((c) => c.lineupStatus === "rejected").length;
     const allAccepted = teamState.categories.length > 0 && acceptedCount === teamState.categories.length;
+
+    const matchPointTotals = teamState.categories.reduce(
+      (acc, category) => {
+        const pts = getCategoryMatchPoints(category);
+        acc.homeMatchPoints += Number(pts.home || 0);
+        acc.awayMatchPoints += Number(pts.away || 0);
+        return acc;
+      },
+      { homeMatchPoints: 0, awayMatchPoints: 0 }
+    );
 
     return {
       homeWins,
@@ -1312,6 +1397,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       rejectedCount,
       total: teamState.categories.length,
       allAccepted,
+      homeMatchPoints: matchPointTotals.homeMatchPoints,
+      awayMatchPoints: matchPointTotals.awayMatchPoints,
     };
   }
 
@@ -1392,8 +1479,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (teamOverallHomeName) teamOverallHomeName.textContent = homeLabel;
     if (teamOverallAwayName) teamOverallAwayName.textContent = awayLabel;
+    if (teamOverallHomePointsLabel) teamOverallHomePointsLabel.textContent = homeLabel;
+    if (teamOverallAwayPointsLabel) teamOverallAwayPointsLabel.textContent = awayLabel;
     if (teamOverallSub) {
-      teamOverallSub.textContent = "Overall score updates category wins between the two teams.";
+      teamOverallSub.textContent = "Shows both category wins and cumulative actual points scored across all submatches.";
     }
 
     const teamTieState = loadTeamTieState(match, fixtures);
@@ -1408,6 +1497,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const summary = computeTeamTieSummary(teamTieState);
       if (teamOverallHomeScore) teamOverallHomeScore.textContent = String(summary.homeWins);
       if (teamOverallAwayScore) teamOverallAwayScore.textContent = String(summary.awayWins);
+      if (teamOverallHomePoints) teamOverallHomePoints.textContent = String(summary.homeMatchPoints);
+      if (teamOverallAwayPoints) teamOverallAwayPoints.textContent = String(summary.awayMatchPoints);
 
       if (!lineupStatePill) return;
 
@@ -1597,6 +1688,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
             <div class="category-actions">
               <div class="status-chip ${resultInfo.chipClass}">${escapeHtml(resultInfo.text)}</div>
+              <div class="status-chip"><strong>${escapeHtml(formatCategoryPointsText(category))}</strong></div>
               <button type="button" class="lineup-action-btn primary" data-action="toggle-scoring" ${canToggle ? "" : "disabled"}>
                 ${escapeHtml(buttonLabel)}
               </button>

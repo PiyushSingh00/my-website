@@ -68,14 +68,15 @@
           <section class="team-overall-board">
             <div class="tob-head">
               <div>
-                <div class="panel-label team-label-top">Overall match score</div>
-                <div class="helper-text" id="team-overall-sub">Category wins between the two teams</div>
+                <div class="panel-label team-label-top">Overall tie summary</div>
+                <div class="helper-text" id="team-overall-sub">Shows both category wins and cumulative actual points scored across all submatches.</div>
               </div>
             </div>
 
             <div class="team-overall-score-grid">
               <div class="overall-team-card">
                 <div class="overall-team-name" id="team-overall-home-name">Home</div>
+                <div class="helper-text">Category wins</div>
                 <div class="overall-team-score" id="team-overall-home-score">0</div>
               </div>
 
@@ -83,7 +84,21 @@
 
               <div class="overall-team-card">
                 <div class="overall-team-name" id="team-overall-away-name">Away</div>
+                <div class="helper-text">Category wins</div>
                 <div class="overall-team-score" id="team-overall-away-score">0</div>
+              </div>
+            </div>
+
+            <div class="status-row" style="margin-top: 14px; justify-content: center;">
+              <div class="status-chip">
+                <span id="team-overall-home-points-label">Home</span>
+                <strong id="team-overall-home-points">0</strong>
+                <span>match points</span>
+              </div>
+              <div class="status-chip">
+                <span id="team-overall-away-points-label">Away</span>
+                <strong id="team-overall-away-points">0</strong>
+                <span>match points</span>
               </div>
             </div>
           </section>

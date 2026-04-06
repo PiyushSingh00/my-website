@@ -187,8 +187,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Advanced settings inputs
   const advancedModeInput = document.getElementById("w-advanced-mode");
   const rrRoundsInput = document.getElementById("w-rr-rounds");
-    const qualifierCountInput = document.getElementById("w-qualifier-count");
+  const qualifierCountInput = document.getElementById("w-qualifier-count");
   const tieSubmatchCountInput = document.getElementById("w-tie-submatch-count");
+  const tieSubmatchWrap = document.getElementById("wiz-tie-submatch-wrap");
   const lineupLockRuleInput = document.getElementById("w-lineup-lock-rule");
   const participationRuleInput = document.getElementById("w-participation-rule");
   const tiebreakRuleInput = document.getElementById("w-tiebreak-rule");
@@ -466,7 +467,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function shouldUseMatchPointStandings() {
-    return wiz.stageFormat === "round_robin_knockout";
+    return wiz.advancedSettings.advancedMode === "pickleball_team_league";
   }
 
   function updateFormatNotes() {
@@ -474,7 +475,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       knockout: "Straight elimination bracket. Lose once and the team or player is out.",
       round_robin: "Everyone plays everyone in one league table.",
       group_knockout: "Teams are divided into groups first, then top teams move to knockout.",
-      round_robin_knockout: "All teams play in one common league table. No groups are created. Standings are based on total match points. Top teams qualify for knockout.",
+      round_robin_knockout: "All teams play in one common league table. No groups are created. Top teams qualify for knockout.",
     }[wiz.stageFormat] || "";
 
     if (stageFormatNoteWrap && stageFormatNoteText) {
@@ -483,7 +484,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const advancedNote = wiz.advancedSettings.advancedMode === "pickleball_team_league"
-      ? "Pickleball team league defaults: 5 league ties per team, 5 submatches per tie, standings on total match points, top 4 to semifinals, tiebreak: head-to-head → ties won → decider tie, semifinals 1 vs 4 and 2 vs 3."
+      ? "Pickleball team league defaults: 5 league ties per team, submatches per tie will match number of categories for team events, leaderboard is based on cumulative actual points scored across all submatches, top 4 go to semifinals, tiebreak: head-to-head → ties won → decider tie, semifinals 1 vs 4 and 2 vs 3."
       : "";
 
     if (advancedFormatNoteWrap && advancedFormatNoteText) {
@@ -513,6 +514,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     const show = wiz.tournamentType === "team";
     minWrap?.classList.toggle("hidden", !show);
     maxWrap?.classList.toggle("hidden", !show);
+  }
+
+  function getEffectiveTieSubmatchCount() {
+    if (wiz.tournamentType === "team") {
+      return Math.max(1, Number(wiz.eventCount || 1));
+    }
+
+    const manual = Number(tieSubmatchCountInput?.value || wiz.advancedSettings.tieSubmatchCount || 0);
+    return manual > 0 ? manual : Math.max(1, Number(wiz.eventCount || 1));
+  }
+
+  function toggleTieSubmatchField() {
+    const isTeamEvent = wiz.tournamentType === "team";
+    tieSubmatchWrap?.classList.toggle("hidden", isTeamEvent);
+
+    if (isTeamEvent) {
+      const derived = String(getEffectiveTieSubmatchCount());
+      wiz.advancedSettings.tieSubmatchCount = derived;
+      if (tieSubmatchCountInput) tieSubmatchCountInput.value = derived;
+    }
   }
 
   function toggleGroupCountSection() {
@@ -678,6 +699,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     toggleLeaguePointsSection();
     toggleTeamPlayerLimitsSection();
+    toggleTieSubmatchField();
   }
 
   function renderCourtNameFields() {
@@ -763,6 +785,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     toggleGroupCountSection();
     toggleLeaguePointsSection();
     toggleTeamPlayerLimitsSection();
+    toggleTieSubmatchField();
     toggleAmountSection();
     updateFormatNotes();
   }
@@ -843,7 +866,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       wiz.advancedSettings.advancedMode = advancedModeInput?.value || "";
       wiz.advancedSettings.roundRobinMatches = rrRoundsInput?.value || "";
       wiz.advancedSettings.qualifierCount = qualifierCountInput?.value || "";
-      wiz.advancedSettings.tieSubmatchCount = tieSubmatchCountInput?.value || "";
+      wiz.advancedSettings.tieSubmatchCount = String(getEffectiveTieSubmatchCount());
       wiz.advancedSettings.lineupLockRule = lineupLockRuleInput?.value || "";
       wiz.advancedSettings.participationRule = participationRuleInput?.value || "";
       wiz.advancedSettings.tiebreakRule = tiebreakRuleInput?.value || "";
@@ -919,24 +942,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const advancedMode = advancedModeInput?.value || "";
-      if (advancedMode === "pickleball_team_league" || stageFormat === "round_robin_knockout") {
-        const rrRounds = Number(rrRoundsInput?.value || 0);
-        const qualifiers = Number(qualifierCountInput?.value || 0);
-        const submatches = Number(tieSubmatchCountInput?.value || 0);
+        if (advancedMode === "pickleball_team_league" || stageFormat === "round_robin_knockout") {
+          const rrRounds = Number(rrRoundsInput?.value || 0);
+          const qualifiers = Number(qualifierCountInput?.value || 0);
+          const submatches = getEffectiveTieSubmatchCount();
 
-        if (!rrRounds || rrRounds < 1) {
-          alert("Please enter the number of league rounds.");
-          return false;
+          if (!rrRounds || rrRounds < 1) {
+            alert("Please enter the number of league rounds.");
+            return false;
+          }
+          if (!qualifiers || qualifiers < 2) {
+            alert("Please enter how many teams qualify.");
+            return false;
+          }
+          if (!submatches || submatches < 1) {
+            alert("Please enter number of submatches per tie.");
+            return false;
+          }
         }
-        if (!qualifiers || qualifiers < 2) {
-          alert("Please enter how many teams qualify.");
-          return false;
-        }
-        if (!submatches || submatches < 1) {
-          alert("Please enter number of submatches per tie.");
-          return false;
-        }
-      }
     }
 
     if (n === 2) {
@@ -1010,8 +1033,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         <h3>Advanced settings</h3>
         <p><strong>Advanced mode:</strong> ${escapeHtml(wiz.advancedSettings.advancedMode || "—")}</p>
         <p><strong>League rounds:</strong> ${escapeHtml(wiz.advancedSettings.roundRobinMatches || "—")}</p>
-                <p><strong>Qualifier count:</strong> ${escapeHtml(wiz.advancedSettings.qualifierCount || "—")}</p>
-        <p><strong>Submatches per tie:</strong> ${escapeHtml(wiz.advancedSettings.tieSubmatchCount || "—")}</p>
+        <p><strong>Qualifier count:</strong> ${escapeHtml(wiz.advancedSettings.qualifierCount || "—")}</p>
+        <p><strong>Submatches per tie:</strong> ${escapeHtml(String(getEffectiveTieSubmatchCount()))}</p>
         <p><strong>Lineup lock rule:</strong> ${escapeHtml(wiz.advancedSettings.lineupLockRule || "—")}</p>
         <p><strong>Participation rule:</strong> ${escapeHtml(wiz.advancedSettings.participationRule || "—")}</p>
         <p><strong>Tiebreak rule:</strong> ${escapeHtml(wiz.advancedSettings.tiebreakRule || "—")}</p>
@@ -1030,7 +1053,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <p><strong>Points per set:</strong> ${escapeHtml(wiz.tournamentRules.pointsPerSet || "—")}</p>
         <p><strong>Min players per team:</strong> ${escapeHtml(wiz.tournamentRules.minPlayersPerTeam || "—")}</p>
         <p><strong>Max players per team:</strong> ${escapeHtml(wiz.tournamentRules.maxPlayersPerTeam || "—")}</p>
-        <p><strong>Standings rule:</strong> ${shouldUseMatchPointStandings() ? "Total match points only" : `Win ${escapeHtml(wiz.leaguePoints.win || "—")}, Loss ${escapeHtml(wiz.leaguePoints.loss || "—")}, Draw ${escapeHtml(wiz.leaguePoints.draw || "—")}`}</p>
+        <p><strong>Standings rule:</strong> ${shouldUseMatchPointStandings() ? "Calculated from cumulative actual points scored across all submatches" : `Win ${escapeHtml(wiz.leaguePoints.win || "—")}, Loss ${escapeHtml(wiz.leaguePoints.loss || "—")}, Draw ${escapeHtml(wiz.leaguePoints.draw || "—")}`}</p>
       </div>
 
       <div class="review-section">
@@ -1066,9 +1089,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         qualifierCount: wiz.advancedSettings.qualifierCount
           ? Number(wiz.advancedSettings.qualifierCount)
           : null,
-        tieSubmatchCount: wiz.advancedSettings.tieSubmatchCount
-          ? Number(wiz.advancedSettings.tieSubmatchCount)
-          : null,
+        tieSubmatchCount: getEffectiveTieSubmatchCount(),
         lineupLockRule: wiz.advancedSettings.lineupLockRule || null,
         participationRule: wiz.advancedSettings.participationRule || null,
         tiebreakRule: wiz.advancedSettings.tiebreakRule || null,
@@ -1955,6 +1976,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     tournamentTypeSelect?.addEventListener("change", () => {
       wiz.tournamentType = tournamentTypeSelect.value;
       toggleTeamPlayerLimitsSection();
+      toggleTieSubmatchField();
       renderEventConfig();
     });
 
@@ -1967,6 +1989,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     eventCountInput?.addEventListener("input", () => {
       wiz.eventCount = Math.max(1, Number(eventCountInput.value || 1));
+      if (wiz.tournamentType === "team") {
+        const derived = String(getEffectiveTieSubmatchCount());
+        wiz.advancedSettings.tieSubmatchCount = derived;
+        if (tieSubmatchCountInput) tieSubmatchCountInput.value = derived;
+      }
       renderEventConfig();
     });
 
@@ -2012,13 +2039,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     advancedModeInput?.addEventListener("change", () => {
       const val = advancedModeInput.value;
       wiz.advancedSettings.advancedMode = val;
+
       if (val === "pickleball_team_league") {
         stageFormatSelect.value = "round_robin_knockout";
         wiz.stageFormat = stageFormatSelect.value;
 
         if (!rrRoundsInput.value) rrRoundsInput.value = "5";
         if (!qualifierCountInput.value) qualifierCountInput.value = "4";
-        if (!tieSubmatchCountInput.value) tieSubmatchCountInput.value = "5";
+
+        if (wiz.tournamentType === "team") {
+          const derived = String(getEffectiveTieSubmatchCount());
+          wiz.advancedSettings.tieSubmatchCount = derived;
+          if (tieSubmatchCountInput) tieSubmatchCountInput.value = derived;
+        } else if (!tieSubmatchCountInput.value) {
+          tieSubmatchCountInput.value = "5";
+        }
+
         if (!lineupLockRuleInput.value) lineupLockRuleInput.value = "captain_submit_host_lock";
         if (!participationRuleInput.value) participationRuleInput.value = "all_bench_must_play_once";
         if (!tiebreakRuleInput.value) {
@@ -2026,7 +2062,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (!semifinalPairingInput.value) semifinalPairingInput.value = "1v4_2v3";
       }
+
       toggleGroupCountSection();
+      toggleTieSubmatchField();
       toggleLeaguePointsSection();
       updateFormatNotes();
     });
