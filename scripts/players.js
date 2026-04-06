@@ -179,6 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     categories: [],
     acceptedByCategory: {},
     activeCategoryId: null,
+    bulkEditMode: false,
   };
 
   function escapeHtml(value) {
@@ -498,6 +499,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   function getTeamEventFixtureBucket() {
     const categories = fixturesState.fixtures?.categories || {};
     return categories[TEAM_EVENT_CATEGORY_ID] || Object.values(categories)[0] || null;
+  }
+
+  function updateFixturesEditButtonState() {
+    if (!fixturesEditBtn) return;
+    const cat = getTeamEventFixtureBucket();
+    const canEdit = Boolean(
+      isTournamentTeamEvent() &&
+      cat &&
+      cat.displayMode === "team_schedule" &&
+      ((Array.isArray(cat.matches) && cat.matches.length) || (Array.isArray(cat.rounds?.[0]) && cat.rounds[0].length))
+    );
+
+    fixturesEditBtn.style.display = canEdit ? "inline-flex" : "none";
+    fixturesEditBtn.textContent = fixturesState.bulkEditMode ? "Save fixtures" : "Edit fixtures";
   }
 
   function updateEmbeddedFixturesHeader() {
@@ -1528,6 +1543,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p class="muted">${entrantInfo.sourceCount < 2 ? "Not enough accepted players to generate fixtures." : "Click “Regenerate fixtures” to create the fixtures."}</p>
         </div>
       `;
+      updateFixturesEditButtonState();
       return;
     }
 
@@ -1555,6 +1571,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     wrapper.appendChild(roundsWrap);
     fixturesUi.groupsEl.appendChild(wrapper);
+    updateFixturesEditButtonState();
   }
 
   function getPairKey(a, b) {
@@ -1708,8 +1725,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p class="muted">Click “Regenerate fixtures” to create the team match schedule.</p>
         </div>
       `;
+      updateFixturesEditButtonState();
       return;
     }
+
+    const editing = Boolean(fixturesState.bulkEditMode);
 
     fixturesUi.groupsEl.innerHTML = `
       <div class="fixtures-group">
@@ -1729,7 +1749,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             </thead>
             <tbody>
               ${matches.map((match, index) => {
-                const editing = Boolean(match._editing);
+                const team1Cell = editing
+                  ? `<input class="schedule-edit-input" type="text" data-edit-field="home" data-index="${index}" value="${escapeHtml(match.home || "")}" placeholder="Team 1" />`
+                  : escapeHtml(match.home || "—");
+                const team2Cell = editing
+                  ? `<input class="schedule-edit-input" type="text" data-edit-field="away" data-index="${index}" value="${escapeHtml(match.away || "")}" placeholder="Team 2" />`
+                  : escapeHtml(match.away || "—");
                 const dateCell = editing
                   ? `<input class="schedule-edit-input" type="date" data-edit-field="date" data-index="${index}" value="${escapeHtml(match.date || "")}" />`
                   : escapeHtml(match.date || "—");
@@ -1742,17 +1767,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return `
                   <tr>
                     <td>${escapeHtml(match.matchNo || index + 1)}</td>
-                    <td>${escapeHtml(match.home || "—")}</td>
-                    <td>${escapeHtml(match.away || "—")}</td>
+                    <td>${team1Cell}</td>
+                    <td>${team2Cell}</td>
                     <td>${dateCell}</td>
                     <td>${timeCell}</td>
                     <td>${courtCell}</td>
                     <td>
                       <div class="row-actions">
-                        <button type="button" class="action-btn accept start-scoring-btn" data-tournament-id="${escapeHtml(tournamentId)}" data-category-id="${escapeHtml(TEAM_EVENT_CATEGORY_ID)}" data-round="0" data-match="${index}">Start scoring</button>
                         ${editing
-                          ? `<button type="button" class="action-btn accept" data-schedule-action="save" data-index="${index}">Save</button><button type="button" class="action-btn reject" data-schedule-action="cancel" data-index="${index}">Cancel</button>`
-                          : `<button type="button" class="action-btn" data-schedule-action="edit" data-index="${index}">Edit</button>`}
+                          ? `<span class="captain-summary-meta">Editing…</span>`
+                          : `<button type="button" class="action-btn accept start-scoring-btn" data-tournament-id="${escapeHtml(tournamentId)}" data-category-id="${escapeHtml(TEAM_EVENT_CATEGORY_ID)}" data-round="0" data-match="${index}">Start scoring</button>`}
                       </div>
                     </td>
                   </tr>
@@ -1763,41 +1787,51 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       </div>
     `;
+    updateFixturesEditButtonState();
+  }
+
+  async function saveAllTeamScheduleEdits() {
+    const cat = getTeamEventFixtureBucket();
+    if (!cat) return;
+
+    const matches = Array.isArray(cat.matches)
+      ? cat.matches
+      : Array.isArray(cat.rounds?.[0])
+        ? cat.rounds[0]
+        : [];
+
+    matches.forEach((match, index) => {
+      const root = fixturesUi.groupsEl;
+      const home = root?.querySelector(`input[data-edit-field="home"][data-index="${index}"]`)?.value?.trim() || match.home || "";
+      const away = root?.querySelector(`input[data-edit-field="away"][data-index="${index}"]`)?.value?.trim() || match.away || "";
+      const date = root?.querySelector(`input[data-edit-field="date"][data-index="${index}"]`)?.value || match.date || "";
+      const time = root?.querySelector(`input[data-edit-field="time"][data-index="${index}"]`)?.value || match.time || "";
+      const court = root?.querySelector(`input[data-edit-field="court"][data-index="${index}"]`)?.value?.trim() || match.court || "";
+
+      match.home = home;
+      match.away = away;
+      match.homePlayers = home ? [home] : [];
+      match.awayPlayers = away ? [away] : [];
+      match.date = date;
+      match.time = time;
+      match.court = court;
+    });
+
+    cat.matches = matches;
+    cat.rounds = [matches];
+
+    await persistFixturesState();
+    fixturesState.bulkEditMode = false;
+    renderTeamEventScheduleTable(getTeamEventFixtureBucket());
+    showToast("Fixtures updated");
   }
 
   async function handleTeamScheduleAction(action, index) {
-    const cat = getTeamEventFixtureBucket();
-    if (!cat) return;
-    const matches = Array.isArray(cat.matches) ? cat.matches : (Array.isArray(cat.rounds?.[0]) ? cat.rounds[0] : []);
-    const match = matches[index];
-    if (!match) return;
-
-    if (action === "edit") {
-      match._editing = true;
-      renderTeamEventScheduleTable(cat);
-      return;
-    }
-
-    if (action === "cancel") {
-      match._editing = false;
-      renderTeamEventScheduleTable(cat);
-      return;
-    }
-
-    if (action === "save") {
-      const root = fixturesUi.groupsEl;
-      match.date = root?.querySelector(`input[data-edit-field="date"][data-index="${index}"]`)?.value || match.date || "";
-      match.time = root?.querySelector(`input[data-edit-field="time"][data-index="${index}"]`)?.value || match.time || "";
-      match.court = root?.querySelector(`input[data-edit-field="court"][data-index="${index}"]`)?.value?.trim() || match.court || "";
-      match._editing = false;
-      cat.matches = matches;
-      cat.rounds = [matches];
+    if (action === "save_all") {
       try {
-        await persistFixturesState();
-        renderTeamEventScheduleTable(getTeamEventFixtureBucket());
-        showToast("Match schedule updated");
+        await saveAllTeamScheduleEdits();
       } catch (err) {
-        alert(err.message || "Could not save match schedule.");
+        alert(err.message || "Could not save fixtures.");
       }
     }
   }
@@ -1814,6 +1848,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p class="muted">${teams.length < 2 ? "Not enough confirmed teams to generate fixtures." : "Click “Regenerate fixtures” to create the team fixtures."}</p>
         </div>
       `;
+      updateFixturesEditButtonState();
       return;
     }
 
@@ -1846,6 +1881,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     wrapper.appendChild(roundsWrap);
     fixturesUi.groupsEl.appendChild(wrapper);
+    updateFixturesEditButtonState();
   }
 
   function renderCategoryBracket(categoryId) {
@@ -1860,6 +1896,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (isTournamentTeamEvent()) {
       const teams = getConfirmedTeams().filter((team) => team.teamStatus !== "rejected");
       if (teams.length < 2) {
+        fixturesState.bulkEditMode = false;
         showToast("Not enough confirmed teams to regenerate fixtures");
         return;
       }
@@ -1873,7 +1910,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         const scheduledMatches = scheduleLeaguePairs(pairs, shuffle(getAvailableCourtNames()), getTournamentStartDate());
-        fixturesState.fixtures = migrateFixtures({
+        fixturesState.bulkEditMode = false;
+        fixturesState.bulkEditMode = false;
+      fixturesState.fixtures = migrateFixtures({
           tournamentType: "team",
           teamCategories: tournamentCategories,
           categories: {
@@ -1958,6 +1997,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    fixturesState.bulkEditMode = false;
     fixturesState.fixtures = migrateFixtures(r.data || newFixtures);
     showToast("Fixtures regenerated");
     renderCategoryToggles();
@@ -1969,15 +2009,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesUi.didInit = true;
 
     fixturesUi.groupsEl?.addEventListener("click", async (e) => {
-      const scheduleBtn = e.target.closest("[data-schedule-action]");
-      if (scheduleBtn) {
-        await handleTeamScheduleAction(
-          String(scheduleBtn.getAttribute("data-schedule-action") || ""),
-          Number(scheduleBtn.getAttribute("data-index") || -1)
-        );
-        return;
-      }
-
       const btn = e.target.closest(".start-scoring-btn");
       if (!btn) return;
       const tId = btn.dataset.tournamentId || "";
@@ -2000,8 +2031,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       await generateAndSaveFixtures();
     });
 
-    fixturesUi.editBtn?.addEventListener("click", () => {
-      showToast("Edit fixtures flow is not enabled in this version.");
+    fixturesUi.editBtn?.addEventListener("click", async () => {
+      const cat = getTeamEventFixtureBucket();
+      if (!cat || cat.displayMode !== "team_schedule") {
+        showToast("Edit fixtures is available for the team schedule table.");
+        return;
+      }
+
+      if (!fixturesState.bulkEditMode) {
+        fixturesState.bulkEditMode = true;
+        renderTeamEventScheduleTable(cat);
+        showToast("Edit mode enabled");
+        return;
+      }
+
+      await handleTeamScheduleAction("save_all", -1);
     });
   }
 
@@ -2021,6 +2065,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderCategoryToggles();
       if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
       renderTeamEventFixtures();
+      updateFixturesEditButtonState();
       fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
@@ -2035,6 +2080,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       fixturesUi.noneSelectedEl.style.display = "flex";
     }
 
+    updateFixturesEditButtonState();
     fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
