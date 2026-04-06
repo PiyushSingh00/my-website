@@ -351,7 +351,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function applyFilter(players) {
-    if (activeFilter === "all") return players;
+    if (isTournamentTeamEvent() || activeFilter === "all") return players;
     return players.filter((p) => String(getPlayerCategoryId(p) || "") === String(activeFilter));
   }
 
@@ -470,6 +470,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function syncAddPlayerCategoryUi() {
+    if (!addPlayerCategory) return;
+    const wrap = addPlayerCategory.closest(".field-group");
+    if (isTournamentTeamEvent()) {
+      addPlayerCategory.required = false;
+      addPlayerCategory.value = "";
+      wrap?.classList.add("hidden");
+    } else {
+      addPlayerCategory.required = true;
+      wrap?.classList.remove("hidden");
+    }
+  }
+
   teamSetupToggleBtn?.addEventListener("click", () => {
     isTeamSetupCollapsed = !isTeamSetupCollapsed;
     syncTeamSetupUi();
@@ -582,6 +595,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     tournamentCategories = normalizeCategories(tournament?.categories);
     updateEmbeddedFixturesHeader();
     refreshStageSpecificUi();
+    syncAddPlayerCategoryUi();
     renderPlayerTabs();
   }
 
@@ -606,6 +620,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderPlayerTabs() {
     if (!playersTabs) return;
+
+    if (isTournamentTeamEvent()) {
+      activeFilter = "all";
+      playersTabs.innerHTML = "";
+      playersTabs.classList.add("hidden");
+      return;
+    }
+
+    playersTabs.classList.remove("hidden");
     const counts = computeCounts(allPlayers);
     const tabs = [
       { key: "all", label: "All players", count: counts.all },
@@ -759,6 +782,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function populateAddPlayerCategoryOptions() {
     if (!addPlayerCategory) return;
+
+    if (isTournamentTeamEvent()) {
+      addPlayerCategory.innerHTML = `<option value="${TEAM_EVENT_CATEGORY_ID}">Not applicable for team event</option>`;
+      addPlayerCategory.value = TEAM_EVENT_CATEGORY_ID;
+      syncAddPlayerCategoryUi();
+      return;
+    }
+
     addPlayerCategory.innerHTML = `<option value="">Select category</option>`;
     tournamentCategories.forEach((c) => {
       const id = c.categoryId || c.id;
@@ -768,11 +799,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       opt.textContent = categoryLabel(c);
       addPlayerCategory.appendChild(opt);
     });
+    syncAddPlayerCategoryUi();
   }
 
   function openAddPlayerModal() {
     populateAddPlayerCategoryOptions();
     addPlayerForm?.reset();
+    if (isTournamentTeamEvent() && addPlayerCategory) {
+      addPlayerCategory.value = TEAM_EVENT_CATEGORY_ID;
+    }
+    syncAddPlayerCategoryUi();
     addPlayerModal?.classList.remove("hidden");
     addPlayerModal?.setAttribute("aria-hidden", "false");
   }
@@ -795,12 +831,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       age: Number(document.getElementById("host-player-age")?.value || 0),
       gender: document.getElementById("host-player-gender")?.value || "",
       phone: document.getElementById("host-player-phone")?.value?.trim() || "",
-      categoryId: addPlayerCategory?.value || "",
+      categoryId: isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : (addPlayerCategory?.value || ""),
       status: "accepted",
       addedByHost: true,
     };
 
-    if (!payload.playerName || !payload.age || !payload.gender || !payload.phone || !payload.categoryId) {
+    if (!payload.playerName || !payload.age || !payload.gender || !payload.phone || (!isTournamentTeamEvent() && !payload.categoryId)) {
       alert("Please fill all player details.");
       return;
     }
@@ -910,7 +946,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <input class="captain-checkbox" type="checkbox" value="${escapeHtml(playerId)}" ${checked ? "checked" : ""} />
           <div>
             <div class="captain-pick-name">${escapeHtml(getPlayerDisplayName(player))}</div>
-            <div class="captain-pick-meta">${escapeHtml(getCategoryNameById(getPlayerCategoryId(player)))}</div>
+            ${isTournamentTeamEvent() ? "" : `<div class="captain-pick-meta">${escapeHtml(getCategoryNameById(getPlayerCategoryId(player)))}</div>`}
           </div>
         </div>
       `;
@@ -945,7 +981,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="confirm-captain-head">
           <div>
             <div class="confirm-captain-name">${escapeHtml(getPlayerDisplayName(player))}</div>
-            <div class="confirm-captain-category">${escapeHtml(getCategoryNameById(getPlayerCategoryId(player)))}</div>
+            ${isTournamentTeamEvent() ? "" : `<div class="confirm-captain-category">${escapeHtml(getCategoryNameById(getPlayerCategoryId(player)))}</div>`}
           </div>
         </div>
         <div class="field-group">
@@ -2096,5 +2132,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCaptainsSummary();
   renderLeaderboard();
   refreshStageSpecificUi();
+  syncAddPlayerCategoryUi();
   syncTeamSetupUi();
 });
