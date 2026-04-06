@@ -130,6 +130,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const captainsSummarySection = document.getElementById("captains-summary-section");
   const captainsSummaryEmpty = document.getElementById("captains-summary-empty");
   const captainsSummaryList = document.getElementById("captains-summary-list");
+  const teamSetupToggleBtn = document.getElementById("team-setup-toggle-btn");
+  const teamSetupContent = document.getElementById("team-setup-content");
 
   // Pools
   const poolsSection = document.getElementById("pools-section");
@@ -149,20 +151,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fixturesToast = document.getElementById("fixtures-toast");
   const createFixturesBtn = document.getElementById("create-fixtures-btn");
 
-  // Optional future blocks
-  const teamNumberSection = document.getElementById("team-number-section");
-  const teamNumberList = document.getElementById("team-number-list");
-  const randomizeTeamNumbersBtn = document.getElementById("randomize-team-numbers-btn");
-  const saveTeamNumbersBtn = document.getElementById("save-team-numbers-btn");
-  const lockTeamNumbersBtn = document.getElementById("lock-team-numbers-btn");
-
-  const confirmedTeamsSection = document.getElementById("confirmed-teams-section");
-  const confirmedTeamsList = document.getElementById("confirmed-teams-list");
-  const confirmedTeamsCountChip = document.getElementById("confirmed-teams-count-chip");
-
-  const lineupReviewSection = document.getElementById("lineup-review-section");
-  const lineupReviewList = document.getElementById("lineup-review-list");
-  const finalizeProgressionBtn = document.getElementById("finalize-progression-btn");
   const leaderboardSection = document.getElementById("leaderboard-section");
   const leaderboardTableBody = document.getElementById("leaderboard-table-body");
 
@@ -180,18 +168,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     pools: null,
   };
 
-  let teamNumberState = {
-    assignments: [],
-    locked: false,
-  };
-
-  let lineupState = {
-    ties: [],
-  };
-
   let leaderboardState = {
     rows: [],
   };
+
+  let isTeamSetupCollapsed = false;
 
   const fixturesUi = {
     wrap: fixturesEmbed,
@@ -426,8 +407,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     return getAdvancedMode() === "pickleball_team_league";
   }
 
-  function updateEmbeddedFixturesHeader() {
-    if (fixturesTournamentNameEl) fixturesTournamentNameEl.textContent = tournamentMetaCache?.tournamentName || "Tournament";
+
+  function syncTeamSetupUi() {
+    if (teamSetupContent) teamSetupContent.classList.toggle("hidden", isTeamSetupCollapsed);
+    if (teamSetupToggleBtn) {
+      teamSetupToggleBtn.textContent = isTeamSetupCollapsed ? "▸" : "▾";
+      teamSetupToggleBtn.setAttribute("aria-expanded", String(!isTeamSetupCollapsed));
+    }
+  }
+
+  teamSetupToggleBtn?.addEventListener("click", () => {
+    isTeamSetupCollapsed = !isTeamSetupCollapsed;
+    syncTeamSetupUi();
+  });
+
+  function updateEmbeddedFixturesHeader() {    if (fixturesTournamentNameEl) fixturesTournamentNameEl.textContent = tournamentMetaCache?.tournamentName || "Tournament";
     if (fixturesTournamentSportEl) fixturesTournamentSportEl.textContent = tournamentMetaCache?.sportName || "";
     if (fixturesTournamentDatesEl) fixturesTournamentDatesEl.textContent = tournamentMetaCache?.tournamentDates || "";
     if (fixturesTournamentCodeEl) fixturesTournamentCodeEl.textContent = tournamentMetaCache?.accessCode || "";
@@ -496,20 +490,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       createPoolsBtn?.classList.toggle("hidden", !hasConfirmed);
     }
 
-    if (teamNumberSection) {
-      teamNumberSection.classList.add("hidden");
-    }
-
-    if (confirmedTeamsSection) {
-      const shouldShowConfirmedTeams =
-        hasConfirmed && (isLeagueKnockoutFormat() || isPickleballTeamLeagueMode() || isTournamentTeamEvent());
-      confirmedTeamsSection.classList.toggle("hidden", !shouldShowConfirmedTeams);
-    }
-
-    if (lineupReviewSection) {
-      lineupReviewSection.classList.toggle("hidden", !hasConfirmed);
-    }
-
     if (leaderboardSection) {
       const shouldShow =
         tournamentMetaCache?.stageFormat === "round_robin" ||
@@ -550,9 +530,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeFilter = tab.key;
         renderPlayerTabs();
         renderPlayers();
-        await loadLineupsFromDb();
         await loadLeaderboardFromDb();
-        renderLineupReview();
         renderLeaderboard();
       });
       playersTabs.appendChild(btn);
@@ -951,7 +929,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       await saveCaptainStateToDb();
       closeConfirmCaptainsModal();
       renderCaptainsSummary();
-      renderConfirmedTeamsSummary();
       refreshStageSpecificUi();
     } catch (err) {
       alert(err.message || "Could not save captains.");
@@ -963,6 +940,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     captainsSummarySection.classList.remove("hidden");
     captainsSummaryList.innerHTML = "";
+    syncTeamSetupUi();
 
     if (!captainState.confirmedCaptains.length) {
       captainsSummaryEmpty?.classList.remove("hidden");
@@ -982,38 +960,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="team-name-chip">${escapeHtml(captain.teamName || "—")}</div>
       `;
       captainsSummaryList.appendChild(card);
-    });
-  }
-
-  function renderConfirmedTeamsSummary() {
-    if (!confirmedTeamsSection || !confirmedTeamsList || !confirmedTeamsCountChip) return;
-
-    const teams = getConfirmedTeams();
-    confirmedTeamsList.innerHTML = "";
-    confirmedTeamsCountChip.textContent = `${teams.length} team${teams.length === 1 ? "" : "s"}`;
-
-    if (!teams.length) {
-      confirmedTeamsList.innerHTML = `
-        <div class="empty-state compact-empty">
-          <div class="feature-icon">🏷️</div>
-          <h3>No confirmed teams yet</h3>
-          <p class="muted">Confirm captains first. Their team names will appear here and be used directly for fixtures.</p>
-        </div>
-      `;
-      return;
-    }
-
-    teams.forEach((team) => {
-      const card = document.createElement("div");
-      card.className = "captain-summary-card";
-      card.innerHTML = `
-        <div class="captain-summary-left">
-          <div class="captain-summary-name">${escapeHtml(team.teamName)}</div>
-          <div class="captain-summary-meta">Captain: ${escapeHtml(team.captainName)}</div>
-        </div>
-        <div class="team-name-chip">${escapeHtml(getCategoryNameById(team.categoryId))}</div>
-      `;
-      confirmedTeamsList.appendChild(card);
     });
   }
 
@@ -1273,225 +1219,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ===========================================================================
-  // TEAM NUMBER ASSIGNMENT (OPTIONAL NEW BLOCK)
-  // ===========================================================================
-  async function loadTeamNumbersFromDb() {
-    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-numbers`);
-    if (r.ok && r.data) {
-      teamNumberState.assignments = Array.isArray(r.data.assignments) ? r.data.assignments : [];
-      teamNumberState.locked = !!r.data.locked;
-    } else {
-      teamNumberState.assignments = [];
-      teamNumberState.locked = false;
-    }
-  }
-
-  async function saveTeamNumbersToDb() {
-    const r = await apiPut(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-numbers`, {
-      assignments: teamNumberState.assignments,
-      locked: teamNumberState.locked,
-    });
-    if (!r.ok) throw new Error("Could not save team numbers.");
-  }
-
-  function buildDefaultTeamNumberAssignments() {
-    const teams = getConfirmedTeams();
-    const fixedCount =
-      Number(tournamentMetaCache?.advancedSettings?.fixedTeamCount) ||
-      Number(safeJson(tournamentMetaCache?.advancedSettings, {})?.fixedTeamCount) ||
-      teams.length;
-
-    teamNumberState.assignments = teams.slice(0, fixedCount).map((team, idx) => ({
-      teamNumber: idx + 1,
-      teamKey: team.teamKey,
-      teamName: team.teamName,
-      captainName: team.captainName,
-    }));
-  }
-
-  function renderTeamNumberAssignment() {
-    if (!teamNumberSection || !teamNumberList) return;
-
-    const teams = getConfirmedTeams();
-    if (!teams.length) {
-      teamNumberList.innerHTML = `<div class="muted">Confirm captains first.</div>`;
-      return;
-    }
-
-    if (!teamNumberState.assignments.length) {
-      buildDefaultTeamNumberAssignments();
-    }
-
-    teamNumberList.innerHTML = "";
-
-    teamNumberState.assignments.forEach((row, idx) => {
-      const wrapper = document.createElement("div");
-      wrapper.className = "team-number-row";
-
-      const options = teams
-        .map(
-          (team) => `
-            <option value="${escapeHtml(team.teamKey)}" ${team.teamKey === row.teamKey ? "selected" : ""}>
-              ${escapeHtml(team.teamName)} — ${escapeHtml(team.captainName)}
-            </option>
-          `
-        )
-        .join("");
-
-      wrapper.innerHTML = `
-        <div class="team-number-chip">Team ${idx + 1}</div>
-        <select class="team-number-select" data-index="${idx}" ${teamNumberState.locked ? "disabled" : ""}>
-          ${options}
-        </select>
-      `;
-
-      teamNumberList.appendChild(wrapper);
-    });
-
-    teamNumberList.querySelectorAll(".team-number-select").forEach((sel) => {
-      sel.addEventListener("change", () => {
-        const index = Number(sel.dataset.index);
-        const picked = teams.find((t) => t.teamKey === sel.value);
-        if (!picked) return;
-        teamNumberState.assignments[index] = {
-          teamNumber: index + 1,
-          teamKey: picked.teamKey,
-          teamName: picked.teamName,
-          captainName: picked.captainName,
-        };
-      });
-    });
-  }
-
-  randomizeTeamNumbersBtn?.addEventListener("click", () => {
-    const teams = shuffle(getConfirmedTeams());
-    teamNumberState.assignments = teams.map((team, idx) => ({
-      teamNumber: idx + 1,
-      teamKey: team.teamKey,
-      teamName: team.teamName,
-      captainName: team.captainName,
-    }));
-    renderTeamNumberAssignment();
-  });
-
-  saveTeamNumbersBtn?.addEventListener("click", async () => {
-    try {
-      await saveTeamNumbersToDb();
-      alert("Team numbers saved.");
-    } catch (err) {
-      alert(err.message || "Could not save team numbers.");
-    }
-  });
-
-  lockTeamNumbersBtn?.addEventListener("click", async () => {
-    teamNumberState.locked = true;
-    try {
-      await saveTeamNumbersToDb();
-      renderTeamNumberAssignment();
-      alert("Team numbers locked.");
-    } catch (err) {
-      alert(err.message || "Could not lock team numbers.");
-    }
-  });
-
-  // ===========================================================================
-  // LINEUP REVIEW (OPTIONAL NEW BLOCK)
-  // ===========================================================================
-    async function loadLineupsFromDb() {
-    const categoryId =
-      String(activeFilter === "all"
-        ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
-        : activeFilter);
-
-    if (!categoryId) {
-      lineupState.ties = [];
-      return;
-    }
-
-    const r = await apiGet(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups?categoryId=${encodeURIComponent(categoryId)}`
-    );
-
-    lineupState.ties = r.ok && Array.isArray(r.data?.ties) ? r.data.ties : [];
-  }
-
-    function renderLineupReview() {
-    if (!lineupReviewSection || !lineupReviewList) return;
-
-    lineupReviewList.innerHTML = "";
-
-    if (!lineupState.ties.length) {
-      lineupReviewList.innerHTML = `
-        <div class="empty-state compact-empty">
-          <div class="feature-icon">📝</div>
-          <h3>No lineup submissions yet</h3>
-          <p class="muted">Captain lineup slips will appear here once submitted.</p>
-        </div>
-      `;
-      return;
-    }
-
-    lineupState.ties.forEach((tie) => {
-      const card = document.createElement("div");
-      card.className = "lineup-review-card";
-      card.innerHTML = `
-        <div class="lineup-review-head">
-          <div>
-            <strong>${escapeHtml(tie.home || "Team A")} vs ${escapeHtml(tie.away || "Team B")}</strong>
-            <div class="captain-summary-meta">${escapeHtml(tie.roundLabel || "")}</div>
-          </div>
-          <span class="status-pill ${tie.lineupLocked ? "status-pill--accepted" : "status-pill--pending"}">
-            ${tie.lineupLocked ? "Locked" : "Open"}
-          </span>
-        </div>
-
-        <div class="captain-summary-meta" style="width:100%;">
-          Home approval: ${escapeHtml(tie?.lineupApproval?.home || "pending")} •
-          Away approval: ${escapeHtml(tie?.lineupApproval?.away || "pending")}
-        </div>
-
-        <div class="row-actions">
-          <button type="button" class="action-btn accept" data-lineup-action="approve" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">Approve home</button>
-          <button type="button" class="action-btn reject" data-lineup-action="reject" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">Reject home</button>
-          <button type="button" class="action-btn accept" data-lineup-action="approve" data-side="away" data-tie-id="${escapeHtml(tie.tieId)}">Approve away</button>
-          <button type="button" class="action-btn reject" data-lineup-action="reject" data-side="away" data-tie-id="${escapeHtml(tie.tieId)}">Reject away</button>
-          <button type="button" class="action-btn" data-lineup-action="${tie.lineupLocked ? "unlock" : "lock"}" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">
-            ${tie.lineupLocked ? "Unlock" : "Lock"}
-          </button>
-        </div>
-      `;
-
-      lineupReviewList.appendChild(card);
-    });
-
-    lineupReviewList.querySelectorAll("[data-lineup-action]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const action = btn.getAttribute("data-lineup-action");
-        const side = btn.getAttribute("data-side");
-        const tieId = btn.getAttribute("data-tie-id");
-
-        const categoryId =
-          String(activeFilter === "all"
-            ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
-            : activeFilter);
-
-        const r = await apiPost(
-          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups/review`,
-          { categoryId, tieId, side, action }
-        );
-
-        if (!r.ok) {
-          showToast(r.data?.message || "Failed to update lineup review");
-          return;
-        }
-
-        showToast("Lineup review updated");
-        await loadLineupsFromDb();
-        renderLineupReview();
-      });
-    });
-  }
-  // ===========================================================================
   // LEADERBOARD (OPTIONAL NEW BLOCK)
   // ===========================================================================
     async function loadLeaderboardFromDb() {
@@ -1543,34 +1270,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
       leaderboardTableBody.appendChild(tr);
     });
-  }
-  async function finalizeHostProgression() {
-    const categoryId =
-      String(activeFilter === "all"
-        ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
-        : activeFilter);
-
-    if (!categoryId) {
-      showToast("Select a category first");
-      return;
-    }
-
-    const r = await apiPost(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/progression/finalize`,
-      { categoryId }
-    );
-
-    if (!r.ok) {
-      showToast(r.data?.message || "Failed to finalize progression");
-      return;
-    }
-
-    showToast(r.data?.changed ? "Knockout generated" : "No new progression yet");
-
-    await loadLineupsFromDb();
-    await loadLeaderboardFromDb();
-    renderLineupReview();
-    renderLeaderboard();
   }
   // ===========================================================================
   // FIXTURES EMBED
@@ -1935,9 +1634,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       fixturesState.editMode = false;
 
       showToast("League / knockout fixtures generated");
-      await loadHostLineupReview(categoryId);
       await loadLeaderboardFromDb();
-      renderLineupReview();
       renderLeaderboard();
       renderCategoryToggles();
       if (categoryId) renderCategoryBracket(categoryId);
@@ -1985,101 +1682,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderCategoryToggles();
     if (fixturesState.activeCategoryId) renderCategoryBracket(fixturesState.activeCategoryId);
   }
-  async function loadHostLineupReview(categoryId) {
-  if (!lineupReviewList || !categoryId) return;
-
-  const resp = await apiGet(
-    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups?categoryId=${encodeURIComponent(categoryId)}`
-  );
-
-  if (!resp.ok) {
-    lineupReviewList.innerHTML = `
-      <div class="empty-state compact-empty">
-        <h3>No tie lineups yet</h3>
-        <p class="muted">${escapeHtml(resp.data?.message || "Nothing submitted yet.")}</p>
-      </div>
-    `;
-    return;
-  }
-
-  const ties = Array.isArray(resp.data?.ties) ? resp.data.ties : [];
-  if (!ties.length) {
-    lineupReviewList.innerHTML = `
-      <div class="empty-state compact-empty">
-        <h3>No tie lineups yet</h3>
-        <p class="muted">Captains will appear here after they submit lineups.</p>
-      </div>
-    `;
-    return;
-  }
-
-  lineupReviewList.innerHTML = ties
-    .map((tie) => `
-      <div class="lineup-review-card">
-        <div class="lineup-review-head">
-          <div>
-            <strong>${escapeHtml(tie.home || "-")} vs ${escapeHtml(tie.away || "-")}</strong>
-            <div class="captain-summary-meta">${escapeHtml(tie.roundLabel || "")}</div>
-          </div>
-          <div class="team-name-chip">${tie.lineupLocked ? "Locked" : "Open"}</div>
-        </div>
-
-        <div class="captain-summary-meta" style="width:100%;">
-          Home approval: ${escapeHtml(tie?.lineupApproval?.home || "pending")} •
-          Away approval: ${escapeHtml(tie?.lineupApproval?.away || "pending")}
-        </div>
-
-        <div class="row-actions">
-          <button type="button" class="action-btn accept" data-lineup-action="approve" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">Approve home</button>
-          <button type="button" class="action-btn reject" data-lineup-action="reject" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">Reject home</button>
-          <button type="button" class="action-btn accept" data-lineup-action="approve" data-side="away" data-tie-id="${escapeHtml(tie.tieId)}">Approve away</button>
-          <button type="button" class="action-btn reject" data-lineup-action="reject" data-side="away" data-tie-id="${escapeHtml(tie.tieId)}">Reject away</button>
-          <button type="button" class="action-btn" data-lineup-action="${tie.lineupLocked ? "unlock" : "lock"}" data-side="home" data-tie-id="${escapeHtml(tie.tieId)}">
-            ${tie.lineupLocked ? "Unlock" : "Lock"}
-          </button>
-        </div>
-      </div>
-    `)
-    .join("");
-
-  lineupReviewList.querySelectorAll("[data-lineup-action]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const action = btn.getAttribute("data-lineup-action");
-      const side = btn.getAttribute("data-side");
-      const tieId = btn.getAttribute("data-tie-id");
-
-      const resp2 = await apiPost(
-        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups/review`,
-        { categoryId, tieId, side, action }
-      );
-
-      if (!resp2.ok) {
-        showToast(resp2.data?.message || "Failed to update lineup review");
-        return;
-      }
-
-      showToast("Lineup review updated");
-      await loadHostLineupReview(categoryId);
-    });
-  });
-}
-
-async function finalizeHostProgression(categoryId) {
-  if (!categoryId) return;
-
-  const resp = await apiPost(
-    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/progression/finalize`,
-    { categoryId }
-  );
-
-  if (!resp.ok) {
-    showToast(resp.data?.message || "Failed to finalize progression");
-    return;
-  }
-
-  showToast(resp.data?.changed ? "Knockout generated" : "No new progression yet");
-  await loadHostLineupReview(categoryId);
-}
 
   async function initFixturesIfNeeded() {
     if (fixturesUi.didInit) return;
@@ -2151,26 +1753,6 @@ async function finalizeHostProgression(categoryId) {
   }
 
   createFixturesBtn?.addEventListener("click", openAndLoadFixtures);
-  finalizeProgressionBtn?.addEventListener("click", async () => {
-    const categoryId = String(
-      fixturesState.activeCategoryId ||
-      tournamentCategories?.[0]?.categoryId ||
-      tournamentCategories?.[0]?.id ||
-      ""
-    );
-
-    if (!categoryId) {
-      showToast("Select a category first");
-      return;
-    }
-
-    await finalizeHostProgression(categoryId);
-    await loadLeaderboardFromDb();
-    renderLeaderboard();
-    const existing = await loadFixturesFromDb();
-    fixturesState.fixtures = existing ? migrateFixtures(existing) : { categories: {} };
-    if (fixturesState.activeCategoryId) renderCategoryBracket(fixturesState.activeCategoryId);
-  });
   // ===========================================================================
   // LOAD EVERYTHING
   // ===========================================================================
@@ -2178,13 +1760,11 @@ async function finalizeHostProgression(categoryId) {
   await loadPlayers();
   await loadCaptainStateFromDb();
   await loadPoolsFromDb();
-  await loadLineupsFromDb();
   await loadLeaderboardFromDb();
 
   renderPlayers();
   renderCaptainsSummary();
-  renderConfirmedTeamsSummary();
-  renderLineupReview();
   renderLeaderboard();
   refreshStageSpecificUi();
+  syncTeamSetupUi();
 });

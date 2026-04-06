@@ -98,40 +98,28 @@
           </table>
         </div>
 
-        <!-- CAPTAINS SUMMARY -->
+        <!-- TEAM SETUP -->
         <section id="captains-summary-section" class="captains-summary-section hidden">
           <div class="section-head">
             <div>
               <p class="eyebrow">Team setup</p>
               <h2 class="section-title">Confirmed captains</h2>
             </div>
+
+            <button type="button" class="btn-dark" id="team-setup-toggle-btn" aria-expanded="true">
+              ▾
+            </button>
           </div>
 
-          <div id="captains-summary-empty" class="empty-state compact-empty">
-            <div class="feature-icon">🧢</div>
-            <h3>No captains confirmed yet</h3>
-            <p class="muted">Select captains first, then confirm them with team names.</p>
-          </div>
-
-          <div id="captains-summary-list" class="captains-summary-list"></div>
-        </section>
-
-        <!-- CONFIRMED TEAMS -->
-        <section id="confirmed-teams-section" class="captains-summary-section hidden">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">League setup</p>
-              <h2 class="section-title">Confirmed teams</h2>
+          <div id="team-setup-content">
+            <div id="captains-summary-empty" class="empty-state compact-empty">
+              <div class="feature-icon">🧢</div>
+              <h3>No captains confirmed yet</h3>
+              <p class="muted">Select captains first, then confirm them with team names.</p>
             </div>
 
-            <div class="team-name-chip" id="confirmed-teams-count-chip">0 teams</div>
+            <div id="captains-summary-list" class="captains-summary-list"></div>
           </div>
-
-          <p class="helper-text">
-            League + Knockout fixtures will use these confirmed team names directly. No Team 1, Team 2 style number mapping is required.
-          </p>
-
-          <div id="confirmed-teams-list" class="captains-summary-list"></div>
         </section>
 
         <!-- POOLS -->
@@ -162,28 +150,6 @@
           </div>
 
           <div id="pools-grid" class="pools-grid"></div>
-        </section>
-
-        <!-- LINEUP REVIEW -->
-        <section id="lineup-review-section" class="captains-summary-section hidden">
-          <div class="section-head">
-  <div>
-    <p class="eyebrow">Tie workflow</p>
-    <h2 class="section-title">Lineup review</h2>
-  </div>
-
-  <button type="button" class="btn-primary" id="finalize-progression-btn">
-    Finalize progression
-  </button>
-</div>
-
-          <div id="lineup-review-list" class="captains-summary-list">
-            <div class="empty-state compact-empty">
-              <div class="feature-icon">📝</div>
-              <h3>No lineup submissions yet</h3>
-              <p class="muted">Captain lineup slips will appear here once submitted.</p>
-            </div>
-          </div>
         </section>
 
         <!-- LEADERBOARD -->
