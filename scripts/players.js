@@ -419,19 +419,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   function getAvailableCourtNames() {
     const meta = tournamentMetaCache || {};
     const advanced = getAdvancedSettings();
-    const options = [meta.courtNames, advanced.courtNames, advanced.courts, meta.courts];
+    const desiredCount = Math.max(
+      1,
+      Number(meta.courtCount || advanced.courtCount || 0) || 0
+    );
 
-    for (const value of options) {
+    const normalizeCourtList = (value) => {
       if (Array.isArray(value) && value.length) {
-        return value.map((x, i) => String(x || `Court ${i + 1}`).trim()).filter(Boolean);
+        const arr = value.map((x, i) => String(x || `Court ${i + 1}`).trim()).filter(Boolean);
+        while (desiredCount && arr.length < desiredCount) arr.push(`Court ${arr.length + 1}`);
+        return [...new Set(arr)];
       }
       if (typeof value === "string" && value.trim()) {
         const arr = value.split(",").map((x) => x.trim()).filter(Boolean);
-        if (arr.length) return arr;
+        while (desiredCount && arr.length < desiredCount) arr.push(`Court ${arr.length + 1}`);
+        return [...new Set(arr)];
       }
+      return [];
+    };
+
+    const options = [meta.courtNames, advanced.courtNames, advanced.courts, meta.courts];
+    for (const value of options) {
+      const arr = normalizeCourtList(value);
+      if (arr.length) return arr;
     }
 
-    return ["Court 1", "Court 2", "Court 3"];
+    const fallbackCount = desiredCount || 3;
+    return Array.from({ length: fallbackCount }, (_, i) => `Court ${i + 1}`);
   }
 
   function formatDateInputValue(date) {
@@ -994,26 +1008,24 @@ document.addEventListener("DOMContentLoaded", async () => {
           : "Team pending";
 
       const card = document.createElement("div");
-      card.className = "captain-summary-card";
+      card.className = "captain-summary-card team-setup-card";
       card.innerHTML = `
         <button type="button" class="captain-summary-head-btn" data-team-card-toggle="${escapeHtml(playerId)}">
           <div class="captain-summary-left">
             <div class="captain-summary-name">${escapeHtml(captain.teamName || captain.playerName || "Team")}</div>
             <div class="captain-summary-meta">Captain: ${escapeHtml(captain.playerName || "—")}</div>
           </div>
-          <div class="row-actions" style="align-items:center; gap:8px;">
+          <div class="row-actions team-setup-head-actions">
             <span class="${statusChipClass}">${escapeHtml(statusChipText)}</span>
-            <span class="team-name-chip">${expanded ? "▾" : "▸"}</span>
+            <span class="team-name-chip team-toggle-chip">${expanded ? "▾" : "▸"}</span>
           </div>
         </button>
         <div class="team-setup-details${expanded ? "" : " hidden"}" data-team-card-body="${escapeHtml(playerId)}">
-          <div class="helper-text" style="margin-bottom:10px;">Players submitted by captain</div>
-          <div class="captains-summary-list">
-            ${teamPlayers.length
-              ? teamPlayers.map((name) => `<div class="captain-summary-card"><div class="captain-summary-left"><div class="captain-summary-name">${escapeHtml(name)}</div></div></div>`).join("")
-              : `<div class="empty-state compact-empty"><div class="feature-icon">👥</div><h3>No team list yet</h3><p class="muted">Team players from captain submission on join mode will appear here once linked.</p></div>`}
-          </div>
-          <div class="row-actions" style="margin-top:12px;">
+          <div class="helper-text team-setup-helper">Players submitted by captain</div>
+          ${teamPlayers.length
+            ? `<div class="team-player-list">${teamPlayers.map((name, idx) => `<div class="team-player-row"><span class="team-player-index">${idx + 1}</span><span class="team-player-name">${escapeHtml(name)}</span></div>`).join("")}</div>`
+            : `<div class="empty-state compact-empty team-setup-empty"><div class="feature-icon">👥</div><h3>No team list yet</h3><p class="muted">Team players from captain submission on join mode will appear here once linked.</p></div>`}
+          <div class="row-actions team-setup-actions">
             <button type="button" class="action-btn accept" data-team-status="accepted" data-team-player-id="${escapeHtml(playerId)}">Accept team</button>
             <button type="button" class="action-btn reject" data-team-status="rejected" data-team-player-id="${escapeHtml(playerId)}">Reject team</button>
           </div>
@@ -1593,34 +1605,78 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function scheduleLeaguePairs(pairs, courtNames, baseDate) {
     const matchDurationMs = 2 * 60 * 60 * 1000;
+    const courts = [...new Set((courtNames || []).filter(Boolean))];
+    const usableCourts = courts.length ? courts : ["Court 1"];
     const teamNext = new Map();
     const courtNext = new Map();
+    const teamCourtHistory = new Map();
+    const teamLastCourt = new Map();
+    const courtUsageCounts = new Map();
     const baseTs = baseDate.getTime();
-    courtNames.forEach((court) => courtNext.set(court, baseTs));
+
+    usableCourts.forEach((court) => {
+      courtNext.set(court, baseTs);
+      courtUsageCounts.set(court, 0);
+    });
 
     return pairs.map((pair, index) => {
-      let bestCourt = courtNames[0];
-      let bestStart = Number.MAX_SAFE_INTEGER;
+      let bestChoice = null;
 
-      courtNames.forEach((court) => {
+      usableCourts.forEach((court, courtIdx) => {
         const start = Math.max(
           baseTs,
           teamNext.get(pair.home) || baseTs,
           teamNext.get(pair.away) || baseTs,
           courtNext.get(court) || baseTs
         );
-        if (start < bestStart) {
-          bestStart = start;
-          bestCourt = court;
+
+        const homeHistory = teamCourtHistory.get(pair.home) || new Set();
+        const awayHistory = teamCourtHistory.get(pair.away) || new Set();
+        const homeLastCourt = teamLastCourt.get(pair.home) || "";
+        const awayLastCourt = teamLastCourt.get(pair.away) || "";
+
+        let penalty = 0;
+        if (homeHistory.has(court)) penalty += 2;
+        if (awayHistory.has(court)) penalty += 2;
+        if (homeLastCourt === court) penalty += 1;
+        if (awayLastCourt === court) penalty += 1;
+
+        const candidate = {
+          court,
+          start,
+          penalty,
+          usage: courtUsageCounts.get(court) || 0,
+          courtIdx,
+        };
+
+        if (
+          !bestChoice ||
+          candidate.penalty < bestChoice.penalty ||
+          (candidate.penalty === bestChoice.penalty && candidate.start < bestChoice.start) ||
+          (candidate.penalty === bestChoice.penalty && candidate.start === bestChoice.start && candidate.usage < bestChoice.usage) ||
+          (candidate.penalty === bestChoice.penalty && candidate.start === bestChoice.start && candidate.usage === bestChoice.usage && candidate.courtIdx < bestChoice.courtIdx)
+        ) {
+          bestChoice = candidate;
         }
       });
 
-      const end = bestStart + matchDurationMs;
+      const chosenCourt = bestChoice?.court || usableCourts[0];
+      const chosenStart = bestChoice?.start || baseTs;
+      const end = chosenStart + matchDurationMs;
+
       teamNext.set(pair.home, end);
       teamNext.set(pair.away, end);
-      courtNext.set(bestCourt, end);
+      courtNext.set(chosenCourt, end);
+      courtUsageCounts.set(chosenCourt, (courtUsageCounts.get(chosenCourt) || 0) + 1);
 
-      const dt = new Date(bestStart);
+      if (!teamCourtHistory.has(pair.home)) teamCourtHistory.set(pair.home, new Set());
+      if (!teamCourtHistory.has(pair.away)) teamCourtHistory.set(pair.away, new Set());
+      teamCourtHistory.get(pair.home).add(chosenCourt);
+      teamCourtHistory.get(pair.away).add(chosenCourt);
+      teamLastCourt.set(pair.home, chosenCourt);
+      teamLastCourt.set(pair.away, chosenCourt);
+
+      const dt = new Date(chosenStart);
       return ensureMatchMeta({
         matchId: makeMatchId(),
         matchNo: index + 1,
@@ -1630,7 +1686,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         awayPlayers: [pair.away],
         date: formatDateInputValue(dt),
         time: formatTimeInputValue(dt),
-        court: bestCourt,
+        court: chosenCourt,
         stage: "league",
         roundLabel: `League Match ${index + 1}`,
       });
@@ -1675,13 +1731,13 @@ document.addEventListener("DOMContentLoaded", async () => {
               ${matches.map((match, index) => {
                 const editing = Boolean(match._editing);
                 const dateCell = editing
-                  ? `<input type="date" data-edit-field="date" data-index="${index}" value="${escapeHtml(match.date || "")}" />`
+                  ? `<input class="schedule-edit-input" type="date" data-edit-field="date" data-index="${index}" value="${escapeHtml(match.date || "")}" />`
                   : escapeHtml(match.date || "—");
                 const timeCell = editing
-                  ? `<input type="time" data-edit-field="time" data-index="${index}" value="${escapeHtml(match.time || "")}" />`
+                  ? `<input class="schedule-edit-input" type="time" data-edit-field="time" data-index="${index}" value="${escapeHtml(match.time || "")}" />`
                   : escapeHtml(match.time || "—");
                 const courtCell = editing
-                  ? `<input type="text" data-edit-field="court" data-index="${index}" value="${escapeHtml(match.court || "")}" placeholder="Court name" />`
+                  ? `<input class="schedule-edit-input" type="text" data-edit-field="court" data-index="${index}" value="${escapeHtml(match.court || "")}" placeholder="Court name" />`
                   : escapeHtml(match.court || "—");
                 return `
                   <tr>

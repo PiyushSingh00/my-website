@@ -676,3 +676,122 @@
   display: grid;
   gap: 12px;
 }
+
+/* team setup polish */
+.team-setup-card {
+  padding: 0;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+.captain-summary-head-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.captain-summary-head-btn:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.captain-summary-head-btn:focus-visible {
+  outline: 2px solid rgba(77, 208, 225, 0.55);
+  outline-offset: -2px;
+}
+
+.team-setup-head-actions {
+  align-items: center;
+  gap: 8px;
+}
+
+.team-toggle-chip {
+  min-width: 42px;
+  text-align: center;
+}
+
+.team-setup-details {
+  width: 100%;
+  padding: 0 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0));
+  box-sizing: border-box;
+}
+
+.team-setup-helper {
+  margin: 12px 0 10px;
+}
+
+.team-player-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-player-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(8, 14, 30, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.team-player-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(77, 208, 225, 0.12);
+  border: 1px solid rgba(77, 208, 225, 0.28);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-player-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.team-setup-empty {
+  margin-top: 0;
+}
+
+.team-setup-actions {
+  margin-top: 12px;
+}
+
+/* dark inputs for schedule editing */
+.schedule-edit-input {
+  width: 100%;
+  min-width: 108px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(5, 11, 24, 0.96);
+  color: var(--text);
+  font: inherit;
+  box-sizing: border-box;
+  color-scheme: dark;
+}
+
+.schedule-edit-input::placeholder {
+  color: var(--muted);
+}
+
+.schedule-edit-input:focus {
+  outline: none;
+  border-color: rgba(77, 208, 225, 0.6);
+  box-shadow: 0 0 0 3px rgba(77, 208, 225, 0.12);
+}
