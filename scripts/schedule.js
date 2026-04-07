@@ -532,6 +532,182 @@ document.addEventListener("DOMContentLoaded", async () => {
     groupsEl.appendChild(wrapper);
   }
 
+
+  function getStatusRank(status) {
+    if (status === "live") return 0;
+    if (status === "completed") return 1;
+    return 2;
+  }
+
+  function getSafeJoinedNames(value, fallback = "") {
+    if (Array.isArray(value)) {
+      const names = value.map((item) => String(item || "").trim()).filter(Boolean);
+      return names.length ? names.join(" + ") : fallback;
+    }
+    const str = String(value || "").trim();
+    return str || fallback;
+  }
+
+  function getSubmatchSnapshot(submatch) {
+    return submatch?.score?.state?.meta?.categorySnapshot || null;
+  }
+
+  function getSubmatchPlayerLabel(submatch, side, fallbackTeam) {
+    const snapshot = getSubmatchSnapshot(submatch) || {};
+    const direct = side === "A"
+      ? [
+          snapshot?.homePlayer,
+          submatch?.homePlayer,
+          submatch?.homeLineup,
+          submatch?.homeName,
+          submatch?.homePlayers,
+          submatch?.home,
+        ]
+      : [
+          snapshot?.awayPlayer,
+          submatch?.awayPlayer,
+          submatch?.awayLineup,
+          submatch?.awayName,
+          submatch?.awayPlayers,
+          submatch?.away,
+        ];
+
+    for (const candidate of direct) {
+      const label = getSafeJoinedNames(candidate, "");
+      if (label) return label;
+    }
+    return fallbackTeam || "-";
+  }
+
+  function getSubmatchLabel(submatch, idx) {
+    const snapshot = getSubmatchSnapshot(submatch) || {};
+    return (
+      String(
+        snapshot?.name ||
+        submatch?.roundLabel ||
+        submatch?.label ||
+        submatch?.name ||
+        `Submatch ${idx + 1}`
+      ).trim() || `Submatch ${idx + 1}`
+    );
+  }
+
+  function buildTeamScheduleLiveCard(entry, match, roundIndex, matchIndex, status) {
+    const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
+    let homeWins = 0;
+    let awayWins = 0;
+    let homePoints = 0;
+    let awayPoints = 0;
+
+    const submatchRows = submatches.length
+      ? submatches.map((submatch, idx) => {
+          const sa = getBucketScore(submatch?.score?.state?.A);
+          const sb = getBucketScore(submatch?.score?.state?.B);
+          const winnerSide = String(
+            submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || ""
+          ).toUpperCase();
+
+          if (winnerSide === "A") homeWins += 1;
+          if (winnerSide === "B") awayWins += 1;
+          if (sa !== null) homePoints += sa;
+          if (sb !== null) awayPoints += sb;
+
+          return `
+            <div class="live-tv-submatch-row">
+              <div class="live-tv-submatch-side live-tv-submatch-side--left">
+                <span class="live-tv-submatch-player">${escapeHtml(getSubmatchPlayerLabel(submatch, "A", match?.home || "Home"))}</span>
+              </div>
+              <div class="live-tv-submatch-center">
+                <span class="live-tv-submatch-title">${escapeHtml(getSubmatchLabel(submatch, idx))}</span>
+                <span class="live-tv-submatch-score">${escapeHtml(String(sa ?? "-"))} - ${escapeHtml(String(sb ?? "-"))}</span>
+              </div>
+              <div class="live-tv-submatch-side live-tv-submatch-side--right">
+                <span class="live-tv-submatch-player">${escapeHtml(getSubmatchPlayerLabel(submatch, "B", match?.away || "Away"))}</span>
+              </div>
+            </div>
+          `;
+        }).join("")
+      : `
+          <div class="live-tv-empty-note">No individual match score available yet.</div>
+        `;
+
+    return `
+      <section class="live-score-card live-tv-card" id="${escapeHtml(`${getSectionId("live", entry.id)}-${match?.matchId || `${roundIndex}-${matchIndex}`}`)}">
+        <div class="live-tv-card-head">
+          <div class="live-tv-badges">
+            <span class="live-badge">${escapeHtml(entry.label)}</span>
+            <span class="live-badge">${escapeHtml(getMatchNumber(match, matchIndex))}</span>
+            ${match?.court ? `<span class="live-badge">${escapeHtml(match.court)}</span>` : ""}
+            ${match?.time ? `<span class="live-badge">${escapeHtml(match.time)}</span>` : ""}
+          </div>
+          <span class="live-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+        </div>
+
+        <div class="live-tv-teams">
+          <div class="live-tv-team">
+            <div class="live-tv-team-name">${escapeHtml(match?.home || "Home")}</div>
+            <div class="live-tv-team-total">Total match points ${escapeHtml(String(homePoints))}</div>
+          </div>
+          <div class="live-tv-tie-score-wrap">
+            <div class="live-tv-tie-score-label">Tie score</div>
+            <div class="live-tv-tie-score">${escapeHtml(String(homeWins))} - ${escapeHtml(String(awayWins))}</div>
+          </div>
+          <div class="live-tv-team live-tv-team--right">
+            <div class="live-tv-team-name">${escapeHtml(match?.away || "Away")}</div>
+            <div class="live-tv-team-total">Total match points ${escapeHtml(String(awayPoints))}</div>
+          </div>
+        </div>
+
+        <div class="live-tv-submatches">
+          ${submatchRows}
+        </div>
+      </section>
+    `;
+  }
+
+  function buildSimpleLiveCard(entry, match, roundIndex, matchIndex, status) {
+    const homeScore = getBucketScore(match?.score?.state?.A);
+    const awayScore = getBucketScore(match?.score?.state?.B);
+    const homePlayers = Array.isArray(match?.homePlayers) && match.homePlayers.length
+      ? match.homePlayers
+      : splitTeamName(match?.home);
+    const awayPlayers = Array.isArray(match?.awayPlayers) && match.awayPlayers.length
+      ? match.awayPlayers
+      : splitTeamName(match?.away);
+
+    return `
+      <section class="live-score-card live-tv-card" id="${escapeHtml(`${getSectionId("live", entry.id)}-${match?.matchId || `${roundIndex}-${matchIndex}`}`)}">
+        <div class="live-tv-card-head">
+          <div class="live-tv-badges">
+            <span class="live-badge">${escapeHtml(entry.label)}</span>
+            <span class="live-badge">${escapeHtml(match?.roundLabel || `Round ${roundIndex + 1}`)}</span>
+            ${match?.court ? `<span class="live-badge">${escapeHtml(match.court)}</span>` : ""}
+            ${match?.time ? `<span class="live-badge">${escapeHtml(match.time)}</span>` : ""}
+          </div>
+          <span class="live-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+        </div>
+
+        <div class="live-tv-simple-main">
+          <div class="live-tv-team-block">
+            <div class="live-tv-team-name">${escapeHtml(match?.home || "Home")}</div>
+            <div class="live-tv-player-list">
+              ${(homePlayers.length ? homePlayers : ["-"]).map((name) => `<span class="live-tv-player-pill">${escapeHtml(name)}</span>`).join("")}
+            </div>
+          </div>
+
+          <div class="live-tv-simple-score">${escapeHtml(String(homeScore ?? "-"))} - ${escapeHtml(String(awayScore ?? "-"))}</div>
+
+          <div class="live-tv-team-block live-tv-team-block--right">
+            <div class="live-tv-team-name">${escapeHtml(match?.away || "Away")}</div>
+            <div class="live-tv-player-list live-tv-player-list--right">
+              ${(awayPlayers.length ? awayPlayers : ["-"]).map((name) => `<span class="live-tv-player-pill">${escapeHtml(name)}</span>`).join("")}
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
   function renderLiveView() {
     liveListEl.innerHTML = "";
 
@@ -550,6 +726,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
+    cards.sort((a, b) => {
+      const byStatus = getStatusRank(a.status) - getStatusRank(b.status);
+      if (byStatus !== 0) return byStatus;
+      if (a.roundIndex !== b.roundIndex) return a.roundIndex - b.roundIndex;
+      return a.matchIndex - b.matchIndex;
+    });
+
     if (!cards.length) {
       liveEmptyEl?.classList.remove("hidden");
       return;
@@ -557,96 +740,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     liveEmptyEl?.classList.add("hidden");
 
-    cards.forEach((item) => {
-      const { entry, roundIndex, match, status, isTeamSchedule } = item;
-
-      let homeScore = getBucketScore(match?.score?.state?.A);
-      let awayScore = getBucketScore(match?.score?.state?.B);
-      let homeAux = null;
-      let awayAux = null;
-      let detailHtml = "";
-
-      if (isTeamSchedule) {
-        const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
-        let homeWins = 0;
-        let awayWins = 0;
-        let homePoints = 0;
-        let awayPoints = 0;
-
-        detailHtml = `
-          <div class="live-submatch-list">
-            ${submatches.map((submatch, idx) => {
-              const sa = getBucketScore(submatch?.score?.state?.A);
-              const sb = getBucketScore(submatch?.score?.state?.B);
-              const winnerSide = String(submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || "").toUpperCase();
-              if (winnerSide === "A") homeWins += 1;
-              if (winnerSide === "B") awayWins += 1;
-              if (sa !== null) homePoints += sa;
-              if (sb !== null) awayPoints += sb;
-              return `
-                <div class="live-submatch-row">
-                  <span class="live-submatch-label">${escapeHtml(submatch?.roundLabel || `Submatch ${idx + 1}`)}</span>
-                  <span>${escapeHtml(String(sa ?? "-"))} - ${escapeHtml(String(sb ?? "-"))}</span>
-                </div>
-              `;
-            }).join("") || `<div class="muted-small">No submatch scores yet</div>`}
-          </div>
-        `;
-
-        homeScore = homeWins;
-        awayScore = awayWins;
-        homeAux = `${homePoints} pts`;
-        awayAux = `${awayPoints} pts`;
-      } else {
-        const homePlayers = Array.isArray(match?.homePlayers) && match.homePlayers.length ? match.homePlayers : splitTeamName(match?.home);
-        const awayPlayers = Array.isArray(match?.awayPlayers) && match.awayPlayers.length ? match.awayPlayers : splitTeamName(match?.away);
-        const homeRows = homePlayers.map((name) => {
-          const playerScore = getPlayerStateScore(match?.score?.state?.A?.players?.[name]);
-          return `<div class="live-player-row"><span>${escapeHtml(name)}</span><span>${playerScore ?? ""}</span></div>`;
-        }).join("");
-        const awayRows = awayPlayers.map((name) => {
-          const playerScore = getPlayerStateScore(match?.score?.state?.B?.players?.[name]);
-          return `<div class="live-player-row"><span>${escapeHtml(name)}</span><span>${playerScore ?? ""}</span></div>`;
-        }).join("");
-        detailHtml = `
-          <div class="live-player-list">${homeRows || `<div class="muted-small">No player stats</div>`}</div>
-          __VS_SPLIT__
-          <div class="live-player-list">${awayRows || `<div class="muted-small">No player stats</div>`}</div>
-        `;
-      }
-
-      const card = document.createElement("section");
-      card.className = "live-score-card";
-      card.id = getSectionId("live", entry.id);
-      card.innerHTML = `
-        <div class="live-score-top">
-          <span class="live-badge">${escapeHtml(entry.label)}</span>
-          <span class="live-badge">${escapeHtml(match?.roundLabel || `Round ${roundIndex + 1}`)}</span>
-          ${match?.court ? `<span class="live-badge">${escapeHtml(match.court)}</span>` : ""}
-          ${match?.time ? `<span class="live-badge">${escapeHtml(match.time)}</span>` : ""}
-          <span class="live-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
-        </div>
-
-        <div class="live-score-main">
-          <div class="live-team-block">
-            <div class="live-team-name">${escapeHtml(match?.home || "Home")}</div>
-            <div class="live-team-score">${homeScore ?? "-"}</div>
-            ${homeAux ? `<div class="live-team-subline">${escapeHtml(homeAux)}</div>` : ""}
-            ${isTeamSchedule ? detailHtml : detailHtml.split("__VS_SPLIT__")[0]}
-          </div>
-
-          <div class="live-vs">VS</div>
-
-          <div class="live-team-block">
-            <div class="live-team-name">${escapeHtml(match?.away || "Away")}</div>
-            <div class="live-team-score">${awayScore ?? "-"}</div>
-            ${awayAux ? `<div class="live-team-subline">${escapeHtml(awayAux)}</div>` : ""}
-            ${isTeamSchedule ? "" : detailHtml.split("__VS_SPLIT__")[1]}
-          </div>
-        </div>
-      `;
-      liveListEl.appendChild(card);
-    });
+    liveListEl.innerHTML = cards
+      .map(({ entry, roundIndex, matchIndex, match, status, isTeamSchedule }) => {
+        return isTeamSchedule
+          ? buildTeamScheduleLiveCard(entry, match, roundIndex, matchIndex, status)
+          : buildSimpleLiveCard(entry, match, roundIndex, matchIndex, status);
+      })
+      .join("");
   }
 
   async function loadLeaderboardRows(categoryId) {
