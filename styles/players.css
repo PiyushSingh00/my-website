@@ -795,3 +795,87 @@
   border-color: rgba(77, 208, 225, 0.6);
   box-shadow: 0 0 0 3px rgba(77, 208, 225, 0.12);
 }
+
+
+/* collapsible section polish */
+.players-list-section {
+  margin-top: 10px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#players-list-content,
+#leaderboard-content,
+#fixtures-content {
+  width: 100%;
+}
+
+#players-list-content {
+  margin-top: 8px;
+}
+
+.collapse-toggle-btn,
+#players-list-toggle-btn,
+#team-setup-toggle-btn,
+#leaderboard-toggle-btn,
+#fixtures-toggle-btn {
+  min-width: 42px;
+  text-align: center;
+}
+
+/* team player list actions */
+.team-player-row {
+  justify-content: space-between;
+}
+
+.team-player-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.team-player-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.team-player-remove-btn,
+.team-player-add-btn {
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(5, 11, 24, 0.96);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-player-remove-btn:hover,
+.team-player-add-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.team-player-remove-btn {
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.team-player-add-btn {
+  border-color: rgba(77, 208, 225, 0.4);
+}
+
+.team-setup-footer {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.section-head + #fixtures-content,
+.section-head + #leaderboard-content,
+.section-head + #team-setup-content {
+  margin-top: 4px;
+}
