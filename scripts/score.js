@@ -1230,6 +1230,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function buildCategoryNameFromMeta(item = {}, fallback = "") {
+    const explicitName = safeText(
+      item?.eventName ||
+      item?.name ||
+      item?.categoryName ||
+      item?.label ||
+      item?.title,
+      ""
+    );
+
+    if (explicitName) return explicitName;
+
+    const age = String(item?.ageGroup || "").trim();
+    const gender = String(item?.gender || "").trim();
+    const level = String(item?.playingLevel || "").trim();
+
+    const teamSize = Number(item?.teamSize || 1);
+    const exact = Number(item?.exactTeamSize || 0);
+
+    let formatText = "";
+    if (teamSize === 1) formatText = "Singles";
+    else if (teamSize === 2) formatText = "Doubles";
+    else if (teamSize === 3) formatText = "Triples";
+    else if (teamSize >= 4) formatText = exact ? `Team ${exact}` : "Team";
+
+    return [age, gender, level, formatText].filter(Boolean).join(" • ") || fallback;
+  }
+
   function inferCategoryDefinitions(rawFixtures) {
     const sources = [
       rawFixtures?.teamCategories,
@@ -1243,11 +1271,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const extracted = raw.map((item, index) => ({
       id: safeText(item?.id || item?.categoryId || item?.key, `cat-${index + 1}`),
-      name: safeText(
-        item?.name || item?.categoryName || item?.label || item?.title,
-        `Category ${index + 1}`
-      ),
+      name: buildCategoryNameFromMeta(item, `Category ${index + 1}`),
     }));
+
+    if (extracted.length) return extracted;
+
+    const fallbackCount = Math.max(1, Number(params.get("categoryCount") || 3));
+    return Array.from({ length: fallbackCount }, (_, index) => ({
+      id: `cat-${index + 1}`,
+      name: `Category ${index + 1}`,
+    }));
+  }
 
     if (extracted.length) return extracted;
 
@@ -1317,6 +1351,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             const merged = {
               ...fresh.categories[index],
               ...category,
+              name:
+                fresh.categories[index]?.name ||
+                category?.name ||
+                `Category ${index + 1}`,
               sportKey:
                 fresh.categories[index]?.sportKey ||
                 category?.sportKey ||
