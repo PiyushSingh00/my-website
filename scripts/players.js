@@ -515,10 +515,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getTeamAssignablePlayers(captain) {
-    const existingNames = new Set(getCaptainSubmittedPlayers(captain).map((name) => String(name || "").trim().toLowerCase()));
+    const existingNames = new Set(
+      getCaptainSubmittedPlayers(captain).map((name) => String(name || "").trim().toLowerCase())
+    );
+    const confirmedCaptainIds = new Set(
+      (captainState.confirmedCaptains || [])
+        .map((item) => String(item?.playerId || "").trim())
+        .filter(Boolean)
+    );
+
     return getAcceptedPlayers().filter((player) => {
       const name = String(getPlayerDisplayName(player) || "").trim().toLowerCase();
-      return name && !existingNames.has(name);
+      const playerId = String(getPlayerId(player) || "").trim();
+      return name && !existingNames.has(name) && !confirmedCaptainIds.has(playerId);
     });
   }
 
@@ -800,15 +809,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       createPoolsBtn?.classList.toggle("hidden", !hasConfirmed);
     }
 
-    captainsSummarySection?.classList.remove("hidden");
-    fixturesEmbed?.classList.remove("hidden");
-
     if (leaderboardSection) {
-      const stageFormat = String(tournamentMetaCache?.stageFormat || "").toLowerCase();
       const shouldShow =
-        stageFormat === "round_robin" ||
-        stageFormat === "round_robin_knockout" ||
-        stageFormat === "group_knockout" ||
+        tournamentMetaCache?.stageFormat === "round_robin" ||
         isGroupKnockoutFormat() ||
         isLeagueKnockoutFormat();
       leaderboardSection.classList.toggle("hidden", !shouldShow);
@@ -1987,36 +1990,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         roundLabel: `League Match ${index + 1}`,
       });
     });
-  }
-
-  function getFlattenedTeamScheduleRows(cat) {
-    if (!cat) return [];
-
-    if (Array.isArray(cat.matches) && cat.matches.length) {
-      return cat.matches.map((match, index) => ({
-        match,
-        roundIndex: 0,
-        matchIndex: index,
-        roundLabel: match?.roundLabel || "League match",
-        categoryId: TEAM_EVENT_CATEGORY_ID,
-        stage: String(cat?.stage || "league"),
-      }));
-    }
-
-    if (Array.isArray(cat.rounds) && cat.rounds.length) {
-      return cat.rounds.flatMap((round, roundIndex) =>
-        (Array.isArray(round) ? round : []).map((match, matchIndex) => ({
-          match,
-          roundIndex,
-          matchIndex,
-          roundLabel: getDisplayRoundLabel(cat, round, roundIndex),
-          categoryId: TEAM_EVENT_CATEGORY_ID,
-          stage: String(cat?.stage || "league"),
-        }))
-      );
-    }
-
-    return [];
   }
 
   function renderTeamEventScheduleTable(cat) {
