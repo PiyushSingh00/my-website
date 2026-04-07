@@ -92,20 +92,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const codeEl = document.getElementById("players-tournament-code");
 
   const playersTabs = document.getElementById("players-tabs");
-  const playersListToggleBtn = document.getElementById("players-list-toggle-btn");
-  const playersListContent = document.getElementById("players-list-content");
 
   const addPlayerBtn = document.getElementById("add-player-btn");
   const addPlayerModal = document.getElementById("host-add-player-modal");
   const addPlayerClose = document.getElementById("host-add-player-close");
   const addPlayerForm = document.getElementById("host-add-player-form");
   const addPlayerCategory = document.getElementById("host-player-category");
-
-  const teamPlayerModal = document.getElementById("team-player-modal");
-  const teamPlayerClose = document.getElementById("team-player-close");
-  const teamPlayerForm = document.getElementById("team-player-form");
-  const teamPlayerExisting = document.getElementById("team-player-existing");
-  const teamPlayerCustom = document.getElementById("team-player-custom");
 
   const makeCaptainsBtn = document.getElementById("make-captains-btn");
   const createPoolsBtn = document.getElementById("create-pools-btn");
@@ -137,13 +129,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const randomizePoolsBtn = document.getElementById("randomize-pools-btn");
 
   const leaderboardSection = document.getElementById("leaderboard-section");
-  const leaderboardToggleBtn = document.getElementById("leaderboard-toggle-btn");
-  const leaderboardContent = document.getElementById("leaderboard-content");
   const leaderboardTableBody = document.getElementById("leaderboard-table-body");
 
   const fixturesEmbed = document.getElementById("fixtures-embed");
-  const fixturesCollapseToggleBtn = document.getElementById("fixtures-toggle-btn");
-  const fixturesContent = document.getElementById("fixtures-content");
   const fixturesGenerateBtn = document.getElementById("fixtures-generate-btn");
   const fixturesConfigureBtn = document.getElementById("fixtures-configure-fields-btn");
   const fixturesEditBtn = document.getElementById("fixtures-edit-btn");
@@ -151,7 +139,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fixturesGroups = document.getElementById("fixtures-groups");
   const fixturesNoneSelected = document.getElementById("fixtures-none-selected");
   const fixturesToast = document.getElementById("fixtures-toast");
-  const createFixturesBtn = document.getElementById("create-fixtures-btn");
+  const addPlayersExcelBtn = document.getElementById("add-players-excel-btn");
   const fixturesTournamentNameEl = document.getElementById("fixtures-tournament-name");
   const fixturesTournamentSportEl = document.getElementById("fixtures-tournament-sport");
   const fixturesTournamentDatesEl = document.getElementById("fixtures-tournament-dates");
@@ -162,11 +150,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let activeFilter = "all";
   let tournamentCategories = [];
   let tournamentMetaCache = null;
-  let isPlayersListCollapsed = true;
-  let isTeamSetupCollapsed = true;
-  let isLeaderboardCollapsed = false;
-  let isFixturesCollapsed = false;
-  let pendingTeamPlayerCaptainId = null;
+  let isTeamSetupCollapsed = false;
 
   let captainState = {
     selectedCaptainIds: [],
@@ -478,14 +462,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return `${h}:${m}`;
   }
 
-  function syncPlayersListUi() {
-    if (playersListContent) playersListContent.classList.toggle("hidden", isPlayersListCollapsed);
-    if (playersListToggleBtn) {
-      playersListToggleBtn.textContent = isPlayersListCollapsed ? "▸" : "▾";
-      playersListToggleBtn.setAttribute("aria-expanded", String(!isPlayersListCollapsed));
-    }
-  }
-
   function syncTeamSetupUi() {
     if (teamSetupContent) teamSetupContent.classList.toggle("hidden", isTeamSetupCollapsed);
     if (teamSetupToggleBtn) {
@@ -493,186 +469,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       teamSetupToggleBtn.setAttribute("aria-expanded", String(!isTeamSetupCollapsed));
     }
   }
-
-  function syncLeaderboardUi() {
-    if (leaderboardContent) leaderboardContent.classList.toggle("hidden", isLeaderboardCollapsed);
-    if (leaderboardToggleBtn) {
-      leaderboardToggleBtn.textContent = isLeaderboardCollapsed ? "▸" : "▾";
-      leaderboardToggleBtn.setAttribute("aria-expanded", String(!isLeaderboardCollapsed));
-    }
-  }
-
-  function syncFixturesUi() {
-    if (fixturesContent) fixturesContent.classList.toggle("hidden", isFixturesCollapsed);
-    if (fixturesCollapseToggleBtn) {
-      fixturesCollapseToggleBtn.textContent = isFixturesCollapsed ? "▸" : "▾";
-      fixturesCollapseToggleBtn.setAttribute("aria-expanded", String(!isFixturesCollapsed));
-    }
-  }
-
-  function getCaptainById(playerId) {
-    return captainState.confirmedCaptains.find((c) => String(c.playerId) === String(playerId)) || null;
-  }
-
-  function getTeamAssignablePlayers(captain) {
-    const existingNames = new Set(
-      getCaptainSubmittedPlayers(captain).map((name) => String(name || "").trim().toLowerCase())
-    );
-    const confirmedCaptainIds = new Set(
-      (captainState.confirmedCaptains || [])
-        .map((item) => String(item?.playerId || "").trim())
-        .filter(Boolean)
-    );
-
-    return getAcceptedPlayers().filter((player) => {
-      const name = String(getPlayerDisplayName(player) || "").trim().toLowerCase();
-      const playerId = String(getPlayerId(player) || "").trim();
-      return name && !existingNames.has(name) && !confirmedCaptainIds.has(playerId);
-    });
-  }
-
-  function openTeamPlayerModal(captainId) {
-    pendingTeamPlayerCaptainId = String(captainId || "");
-    const captain = getCaptainById(pendingTeamPlayerCaptainId);
-    if (!captain) {
-      alert("Team not found.");
-      return;
-    }
-
-    if (teamPlayerExisting) {
-      const options = getTeamAssignablePlayers(captain);
-      teamPlayerExisting.innerHTML = `<option value="">Select player</option>`;
-      options.forEach((player) => {
-        const option = document.createElement("option");
-        option.value = String(getPlayerId(player) || "");
-        option.textContent = getPlayerDisplayName(player);
-        teamPlayerExisting.appendChild(option);
-      });
-      teamPlayerExisting.value = "";
-    }
-
-    if (teamPlayerCustom) teamPlayerCustom.value = "";
-    teamPlayerModal?.classList.remove("hidden");
-    teamPlayerModal?.setAttribute("aria-hidden", "false");
-  }
-
-  function closeTeamPlayerModal() {
-    pendingTeamPlayerCaptainId = null;
-    teamPlayerModal?.classList.add("hidden");
-    teamPlayerModal?.setAttribute("aria-hidden", "true");
-  }
-
-  function upsertCaptainTeamPlayer(captainId, entry) {
-    const captain = getCaptainById(captainId);
-    if (!captain || !entry?.playerName) return false;
-
-    const nextName = String(entry.playerName || "").trim();
-    if (!nextName) return false;
-
-    const teamPlayers = Array.isArray(captain.teamPlayers) ? [...captain.teamPlayers] : getCaptainSubmittedPlayers(captain);
-    const teamRoster = Array.isArray(captain.teamRoster) ? captain.teamRoster.map((item) => ({ ...item })) : [];
-
-    const exists = teamPlayers.some((name) => String(name || "").trim().toLowerCase() === nextName.toLowerCase());
-    if (!exists) teamPlayers.push(nextName);
-
-    const rosterExists = teamRoster.some((item) => String(item?.playerName || "").trim().toLowerCase() === nextName.toLowerCase());
-    if (!rosterExists) {
-      teamRoster.push({
-        playerId: entry.playerId || `manual-team-${Date.now().toString(36)}`,
-        playerName: nextName,
-        age: entry.age ?? null,
-        gender: entry.gender || "",
-        phone: entry.phone || "",
-        addedByHost: true,
-      });
-    }
-
-    captain.teamPlayers = teamPlayers;
-    captain.teamRoster = teamRoster;
-    return true;
-  }
-
-  function removeCaptainTeamPlayer(captainId, playerName) {
-    const captain = getCaptainById(captainId);
-    if (!captain) return false;
-    const needle = String(playerName || "").trim().toLowerCase();
-    captain.teamPlayers = (Array.isArray(captain.teamPlayers) ? captain.teamPlayers : getCaptainSubmittedPlayers(captain))
-      .filter((name) => String(name || "").trim().toLowerCase() !== needle);
-    captain.teamRoster = (Array.isArray(captain.teamRoster) ? captain.teamRoster : [])
-      .filter((item) => String(item?.playerName || "").trim().toLowerCase() !== needle);
-    return true;
-  }
-
-  playersListToggleBtn?.addEventListener("click", () => {
-    isPlayersListCollapsed = !isPlayersListCollapsed;
-    syncPlayersListUi();
-  });
-
-  teamSetupToggleBtn?.addEventListener("click", () => {
-    isTeamSetupCollapsed = !isTeamSetupCollapsed;
-    syncTeamSetupUi();
-  });
-
-  leaderboardToggleBtn?.addEventListener("click", () => {
-    isLeaderboardCollapsed = !isLeaderboardCollapsed;
-    syncLeaderboardUi();
-  });
-
-  fixturesCollapseToggleBtn?.addEventListener("click", () => {
-    isFixturesCollapsed = !isFixturesCollapsed;
-    syncFixturesUi();
-  });
-
-  teamPlayerClose?.addEventListener("click", closeTeamPlayerModal);
-  teamPlayerModal?.addEventListener("click", (e) => {
-    if (e.target === teamPlayerModal) closeTeamPlayerModal();
-  });
-
-  teamPlayerForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const captain = getCaptainById(pendingTeamPlayerCaptainId);
-    if (!captain) {
-      alert("Team not found.");
-      return;
-    }
-
-    const selectedId = String(teamPlayerExisting?.value || "").trim();
-    const selectedPlayer = getAcceptedPlayers().find((player) => String(getPlayerId(player) || "") === selectedId) || null;
-    const customName = String(teamPlayerCustom?.value || "").trim();
-
-    const entry = selectedPlayer
-      ? {
-          playerId: getPlayerId(selectedPlayer),
-          playerName: getPlayerDisplayName(selectedPlayer),
-          age: selectedPlayer?.age ?? null,
-          gender: selectedPlayer?.gender || "",
-          phone: selectedPlayer?.phone || selectedPlayer?.playerPhone || "",
-        }
-      : customName
-        ? {
-            playerId: `manual-team-${Date.now().toString(36)}`,
-            playerName: customName,
-          }
-        : null;
-
-    if (!entry) {
-      alert("Select a registered player or enter a player name.");
-      return;
-    }
-
-    if (!upsertCaptainTeamPlayer(pendingTeamPlayerCaptainId, entry)) {
-      alert("Could not add player to team.");
-      return;
-    }
-
-    try {
-      await saveCaptainStateToDb();
-      closeTeamPlayerModal();
-      renderCaptainsSummary();
-    } catch (err) {
-      alert(err.message || "Could not save team player.");
-    }
-  });
 
   function syncAddPlayerCategoryUi() {
     if (!addPlayerCategory) return;
@@ -686,6 +482,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       wrap?.classList.remove("hidden");
     }
   }
+
+  teamSetupToggleBtn?.addEventListener("click", () => {
+    isTeamSetupCollapsed = !isTeamSetupCollapsed;
+    syncTeamSetupUi();
+  });
 
   function getCaptainSubmittedPlayers(captain) {
     const raw = captain?.teamPlayers || captain?.players || captain?.members || captain?.submittedPlayers || captain?.roster || [];
@@ -702,10 +503,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       captainId: captain.playerId,
       captainName: captain.playerName,
       teamName: captain.teamName || captain.playerName,
-      categoryId: isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : captain.categoryId,
+      categoryId: captain.categoryId,
       teamStatus: captain.teamStatus || "pending",
-      teamPlayers: Array.isArray(captain.teamPlayers) ? [...captain.teamPlayers] : getCaptainSubmittedPlayers(captain),
-      teamRoster: Array.isArray(captain.teamRoster) ? captain.teamRoster.map((item) => ({ ...item })) : [],
+      teamPlayers: getCaptainSubmittedPlayers(captain),
     }));
   }
 
@@ -816,9 +616,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         isLeagueKnockoutFormat();
       leaderboardSection.classList.toggle("hidden", !shouldShow);
     }
-
-    syncLeaderboardUi();
-    syncFixturesUi();
   }
 
   function renderPlayerTabs() {
@@ -1216,11 +1013,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         ...existing,
         playerId,
         playerName: getPlayerDisplayName(player),
-        categoryId: isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : getPlayerCategoryId(player),
+        categoryId: getPlayerCategoryId(player),
         teamName: teamNameInput?.value?.trim() || existing.teamName || `Team ${index + 1}`,
         teamStatus: existing.teamStatus || "pending",
-        teamPlayers: Array.isArray(existing.teamPlayers) ? [...existing.teamPlayers] : [],
-        teamRoster: Array.isArray(existing.teamRoster) ? existing.teamRoster.map((item) => ({ ...item })) : [],
       };
     });
 
@@ -1240,19 +1035,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     captainsSummaryList.innerHTML = "";
     syncTeamSetupUi();
 
-    const teams = getConfirmedTeams();
-
-    if (!teams.length) {
+    if (!captainState.confirmedCaptains.length) {
       captainsSummaryEmpty?.classList.remove("hidden");
       return;
     }
 
     captainsSummaryEmpty?.classList.add("hidden");
 
-    teams.forEach((captain) => {
-      const playerId = String(captain.captainId || captain.playerId || "");
+    captainState.confirmedCaptains.forEach((captain) => {
+      const playerId = String(captain.playerId || "");
       const expanded = expandedTeamIds.has(playerId);
-      const teamPlayers = Array.isArray(captain.teamPlayers) ? captain.teamPlayers : getCaptainSubmittedPlayers(captain);
+      const teamPlayers = getCaptainSubmittedPlayers(captain);
       const teamStatus = String(captain.teamStatus || "pending");
       const statusChipClass = teamStatus === "accepted"
         ? "status-pill status-pill--accepted"
@@ -1271,7 +1064,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <button type="button" class="captain-summary-head-btn" data-team-card-toggle="${escapeHtml(playerId)}">
           <div class="captain-summary-left">
             <div class="captain-summary-name">${escapeHtml(captain.teamName || captain.playerName || "Team")}</div>
-            <div class="captain-summary-meta">Captain: ${escapeHtml(captain.captainName || captain.playerName || "—")}</div>
+            <div class="captain-summary-meta">Captain: ${escapeHtml(captain.playerName || "—")}</div>
           </div>
           <div class="row-actions team-setup-head-actions">
             <span class="${statusChipClass}">${escapeHtml(statusChipText)}</span>
@@ -1279,23 +1072,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
         </button>
         <div class="team-setup-details${expanded ? "" : " hidden"}" data-team-card-body="${escapeHtml(playerId)}">
-          <div class="helper-text team-setup-helper">Players currently in this team</div>
+          <div class="helper-text team-setup-helper">Players submitted by captain</div>
           ${teamPlayers.length
-            ? `<div class="team-player-list">${teamPlayers.map((name, idx) => `
-                <div class="team-player-row">
-                  <div class="team-player-main">
-                    <span class="team-player-index">${idx + 1}</span>
-                    <span class="team-player-name">${escapeHtml(name)}</span>
-                  </div>
-                  <div class="team-player-actions">
-                    <button type="button" class="team-player-remove-btn" data-remove-team-player="${escapeHtml(playerId)}" data-player-name="${escapeHtml(name)}">Remove</button>
-                  </div>
-                </div>
-              `).join("")}</div>`
-            : `<div class="empty-state compact-empty team-setup-empty"><div class="feature-icon">👥</div><h3>No team list yet</h3><p class="muted">Use the button below to add players manually into this team.</p></div>`}
-          <div class="team-setup-footer">
-            <button type="button" class="team-player-add-btn" data-add-team-player="${escapeHtml(playerId)}">+ Add player manually</button>
-          </div>
+            ? `<div class="team-player-list">${teamPlayers.map((name, idx) => `<div class="team-player-row"><span class="team-player-index">${idx + 1}</span><span class="team-player-name">${escapeHtml(name)}</span></div>`).join("")}</div>`
+            : `<div class="empty-state compact-empty team-setup-empty"><div class="feature-icon">👥</div><h3>No team list yet</h3><p class="muted">Team players from captain submission on join mode will appear here once linked.</p></div>`}
           <div class="row-actions team-setup-actions">
             <button type="button" class="action-btn accept" data-team-status="accepted" data-team-player-id="${escapeHtml(playerId)}">Accept team</button>
             <button type="button" class="action-btn reject" data-team-status="rejected" data-team-player-id="${escapeHtml(playerId)}">Reject team</button>
@@ -1312,32 +1092,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (expandedTeamIds.has(playerId)) expandedTeamIds.delete(playerId);
         else expandedTeamIds.add(playerId);
         renderCaptainsSummary();
-      });
-    });
-
-    captainsSummaryList.querySelectorAll("[data-add-team-player]").forEach((btn) => {
-      btn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const playerId = String(btn.getAttribute("data-add-team-player") || "");
-        if (!playerId) return;
-        if (!expandedTeamIds.has(playerId)) expandedTeamIds.add(playerId);
-        openTeamPlayerModal(playerId);
-      });
-    });
-
-    captainsSummaryList.querySelectorAll("[data-remove-team-player]").forEach((btn) => {
-      btn.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        const captainId = String(btn.getAttribute("data-remove-team-player") || "");
-        const playerName = String(btn.getAttribute("data-player-name") || "");
-        if (!captainId || !playerName) return;
-        removeCaptainTeamPlayer(captainId, playerName);
-        try {
-          await saveCaptainStateToDb();
-          renderCaptainsSummary();
-        } catch (err) {
-          alert(err.message || "Could not remove team player.");
-        }
       });
     });
 
@@ -2366,10 +2120,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  createFixturesBtn?.addEventListener("click", async () => {
-    isFixturesCollapsed = false;
-    syncFixturesUi();
-    await openAndLoadFixtures();
+  addPlayersExcelBtn?.addEventListener("click", () => {
+    alert("Excel player upload button added. Bulk upload wiring is not connected yet.");
   });
 
   await loadTournamentMeta();
@@ -2382,10 +2134,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCaptainsSummary();
   renderLeaderboard();
   refreshStageSpecificUi();
-  syncPlayersListUi();
   syncAddPlayerCategoryUi();
   syncTeamSetupUi();
-  syncLeaderboardUi();
-  syncFixturesUi();
-  await openAndLoadFixtures();
 });

@@ -70,62 +70,47 @@
             Create Pools
           </button>
 
-          <button class="btn-primary" type="button" id="create-fixtures-btn">
-            View tournament fixtures
+          <button class="btn-primary" type="button" id="add-players-excel-btn">
+            Add players via excel
           </button>
         </div>
 
-        <section id="players-list-section" class="players-list-section">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">Players</p>
-              <h2 class="section-title">All registered players</h2>
-            </div>
+        <div class="players-tabs" id="players-tabs"></div>
 
-            <button type="button" class="btn-dark" id="players-list-toggle-btn" aria-expanded="false">
-              ▸
-            </button>
-          </div>
+        <div id="players-empty-state" class="empty-state">
+          <div class="feature-icon">👥</div>
+          <h3>No players yet</h3>
+          <p class="muted">Once players join this tournament, they will appear here.</p>
+        </div>
 
-          <div id="players-list-content" class="hidden">
-            <div class="players-tabs" id="players-tabs"></div>
-
-            <div id="players-empty-state" class="empty-state">
-              <div class="feature-icon">👥</div>
-              <h3>No players yet</h3>
-              <p class="muted">Once players join this tournament, they will appear here.</p>
-            </div>
-
-            <div id="players-table-wrapper" class="players-table-wrapper" style="display: none;">
-              <table class="players-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Age</th>
-                    <th>Gender</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="players-table-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+        <div id="players-table-wrapper" class="players-table-wrapper" style="display: none;">
+          <table class="players-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Age</th>
+                <th>Gender</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="players-table-body"></tbody>
+          </table>
+        </div>
 
         <section id="captains-summary-section" class="captains-summary-section hidden">
           <div class="section-head">
             <div>
               <p class="eyebrow">Team setup</p>
-              <h2 class="section-title">Team list</h2>
+              <h2 class="section-title">Teams</h2>
             </div>
 
-            <button type="button" class="btn-dark" id="team-setup-toggle-btn" aria-expanded="false">
-              ▸
+            <button type="button" class="btn-dark" id="team-setup-toggle-btn" aria-expanded="true">
+              ▾
             </button>
           </div>
 
-          <div id="team-setup-content" class="hidden">
+          <div id="team-setup-content">
             <div id="captains-summary-empty" class="empty-state compact-empty">
               <div class="feature-icon">🧢</div>
               <h3>No captains confirmed yet</h3>
@@ -165,20 +150,41 @@
           <div id="pools-grid" class="pools-grid"></div>
         </section>
 
-        <section id="fixtures-embed" class="fixtures-embed">
+        <section id="leaderboard-section" class="captains-summary-section hidden">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Tournament fixtures</p>
-              <h2 class="section-title">Fixtures</h2>
+              <p class="eyebrow">League stage</p>
+              <h2 class="section-title">Leaderboard</h2>
             </div>
-
-            <button type="button" class="btn-dark" id="fixtures-toggle-btn" aria-expanded="true">
-              ▾
-            </button>
           </div>
 
-          <div id="fixtures-content">
-            <header class="fixtures-header">
+          <p class="helper-text" id="leaderboard-helper-text">
+            Match points = cumulative actual points scored by a team across all submatches played so far.
+          </p>
+
+          <div class="players-table-wrapper">
+            <table class="players-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Team</th>
+                  <th>Match points</th>
+                  <th>Ties won</th>
+                  <th>Head-to-head</th>
+                  <th>Qualified</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-table-body">
+                <tr>
+                  <td colspan="6" class="muted">No leaderboard data yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="fixtures-embed" class="fixtures-embed hidden">
+          <header class="fixtures-header">
             <p class="eyebrow">Tournament fixtures</p>
             <h2 id="fixtures-tournament-name">Tournament name</h2>
             <p class="helper-text players-meta">
@@ -219,49 +225,7 @@
           </div>
 
           <div id="fixtures-groups"></div>
-          </div>
         </section>
-
-        <section id="leaderboard-section" class="captains-summary-section hidden">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">League stage</p>
-              <h2 class="section-title">Leaderboard</h2>
-            </div>
-
-            <button type="button" class="btn-dark" id="leaderboard-toggle-btn" aria-expanded="true">
-              ▾
-            </button>
-          </div>
-
-          <div id="leaderboard-content">
-            <p class="helper-text" id="leaderboard-helper-text">
-              Match points = cumulative actual points scored by a team across all submatches played so far.
-            </p>
-
-            <div class="players-table-wrapper">
-            <table class="players-table">
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Team</th>
-                  <th>Match points</th>
-                  <th>Ties won</th>
-                  <th>Head-to-head</th>
-                  <th>Qualified</th>
-                </tr>
-              </thead>
-              <tbody id="leaderboard-table-body">
-                <tr>
-                  <td colspan="6" class="muted">No leaderboard data yet.</td>
-                </tr>
-              </tbody>
-            </table>
-            </div>
-          </div>
-        </section>
-
-        
       </section>
     </main>
 
@@ -361,35 +325,6 @@
             <button type="button" class="btn-dark" id="confirm-captains-cancel-btn">Cancel</button>
             <button type="submit" class="btn-primary">Confirm captains</button>
           </div>
-        </form>
-      </div>
-    </div>
-
-    <div class="modal-overlay hidden" id="team-player-modal" aria-hidden="true">
-      <div class="modal">
-        <button class="modal-close" type="button" id="team-player-close">&times;</button>
-
-        <h2>Add player to team</h2>
-        <p class="helper-text">
-          Select a registered player or type a custom player name to add them to this team list.
-        </p>
-
-        <form id="team-player-form">
-          <div class="field-group">
-            <label for="team-player-existing">Choose registered player</label>
-            <select id="team-player-existing">
-              <option value="">Select player</option>
-            </select>
-          </div>
-
-          <div class="field-group">
-            <label for="team-player-custom">Or enter player name manually</label>
-            <input id="team-player-custom" type="text" placeholder="Enter player name" />
-          </div>
-
-          <button type="submit" class="btn-primary full-width">
-            Add to team
-          </button>
         </form>
       </div>
     </div>
