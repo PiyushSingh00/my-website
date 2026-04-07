@@ -599,6 +599,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     syncPlayersListUi();
   });
 
+  playersListToggleBtn?.addEventListener("click", () => {
+    isPlayersListCollapsed = !isPlayersListCollapsed;
+    syncPlayersListUi();
+  });
+
+
   leaderboardToggleBtn?.addEventListener("click", () => {
     isLeaderboardCollapsed = !isLeaderboardCollapsed;
     syncLeaderboardUi();
