@@ -71,8 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "host.html";
   });
 
-  const backBtn = document.getElementById("back-to-join");
-  backBtn?.addEventListener("click", () => {
+  document.getElementById("back-to-join")?.addEventListener("click", () => {
     window.location.href = "join.html";
   });
 
@@ -252,86 +251,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     return anyNumeric ? Number(anyNumeric[1]) : null;
   }
 
-  function getMatchSimpleSummary(match) {
+  function getSimpleStatus(match) {
     const score = match?.score || {};
+    const computedStatus = String(score?.computed?.status || "").toLowerCase();
+    if (["completed", "live", "pending"].includes(computedStatus)) return computedStatus;
+
     const a = getBucketScore(score?.state?.A);
     const b = getBucketScore(score?.state?.B);
-    const hasAnyScore = a !== null || b !== null;
-    const status = String(score?.computed?.status || (hasAnyScore ? "live" : "pending")).toLowerCase();
-    return {
-      mode: "simple",
-      homeScore: a,
-      awayScore: b,
-      homeAux: null,
-      awayAux: null,
-      status,
-      hasAnyScore,
-      rows: [],
-    };
+    if (a !== null || b !== null) return "live";
+    return "pending";
   }
 
-  function getMatchTeamSummary(match) {
+  function getTeamScheduleStatus(match) {
     const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
-    if (submatches.length) {
-      let homeWins = 0;
-      let awayWins = 0;
-      let homePoints = 0;
-      let awayPoints = 0;
-      const rows = [];
-      let anyStarted = false;
-      let anyCompleted = false;
+    if (!submatches.length) return getSimpleStatus(match);
 
-      submatches.forEach((submatch, index) => {
-        const score = submatch?.score || {};
-        const home = getBucketScore(score?.state?.A);
-        const away = getBucketScore(score?.state?.B);
-        const hasRowScore = home !== null || away !== null;
-        if (hasRowScore) anyStarted = true;
-        const winnerSide = String(score?.computed?.winnerSide || score?.winnerSide || "").toUpperCase();
-        const status = String(score?.computed?.status || (hasRowScore ? "live" : "pending")).toLowerCase();
-        if (winnerSide === "A") {
-          homeWins += 1;
-          anyCompleted = true;
-        }
-        if (winnerSide === "B") {
-          awayWins += 1;
-          anyCompleted = true;
-        }
-        if (home !== null) homePoints += home;
-        if (away !== null) awayPoints += away;
-        rows.push({
-          label: submatch?.roundLabel || submatch?.name || submatch?.label || `Submatch ${index + 1}`,
-          homeDisplay: home ?? "-",
-          awayDisplay: away ?? "-",
-          status,
-        });
-      });
+    let anyStarted = false;
+    let allCompleted = true;
 
-      return {
-        mode: "team",
-        homeScore: homeWins,
-        awayScore: awayWins,
-        homeAux: `${homePoints} pts`,
-        awayAux: `${awayPoints} pts`,
-        status: anyStarted ? (rows.every((row) => row.status === "completed") ? "completed" : "live") : "pending",
-        hasAnyScore: anyStarted,
-        rows,
-      };
-    }
+    submatches.forEach((submatch) => {
+      const score = submatch?.score || {};
+      const hasPoints = getBucketScore(score?.state?.A) !== null || getBucketScore(score?.state?.B) !== null;
+      const status = String(score?.computed?.status || (hasPoints ? "live" : "pending")).toLowerCase();
+      if (status !== "pending") anyStarted = true;
+      if (status !== "completed") allCompleted = false;
+    });
 
-    const simple = getMatchSimpleSummary(match);
-    return {
-      ...simple,
-      mode: "team",
-      homeAux: simple.homeScore !== null ? `${simple.homeScore} pts` : null,
-      awayAux: simple.awayScore !== null ? `${simple.awayScore} pts` : null,
-    };
+    if (!anyStarted) return "pending";
+    if (allCompleted) return "completed";
+    return "live";
   }
 
-  function summarizeMatch(match, cat) {
-    const displayMode = String(cat?.displayMode || "").toLowerCase();
-    const isTeamSchedule = displayMode === "team_schedule" || String(cat?.categoryId || "") === TEAM_EVENT_CATEGORY_ID;
-    return isTeamSchedule ? getMatchTeamSummary(match) : getMatchSimpleSummary(match);
+  function getStatusClass(status) {
+    if (status === "completed") return "final";
+    if (status === "pending") return "pending";
+    return "live";
+  }
+
+  function getMatchNumber(match, idx) {
+    return match?.matchNo || match?.matchNumber || match?.roundLabel || `Match ${idx + 1}`;
   }
 
   function getCategoryMetaLabel(categoryId) {
@@ -401,8 +359,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           renderBracketView();
         }
 
-        const target = document.getElementById(getSectionId(state.activeView, entry.id));
-        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById(getSectionId(state.activeView, entry.id))?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
       });
       categoryToggle.appendChild(btn);
     });
@@ -424,31 +384,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     entries.forEach((entry) => {
       const rounds = getRounds(entry.cat);
       const displayMode = String(entry.cat?.displayMode || "").toLowerCase();
+      const isTeamSchedule = displayMode === "team_schedule";
 
-      if (displayMode === "team_schedule") {
+      if (isTeamSchedule) {
         const matches = Array.isArray(entry.cat?.matches) && entry.cat.matches.length
           ? entry.cat.matches
           : rounds.flat();
 
         const rowsHtml = matches.length
           ? matches.map((match, idx) => {
-              const summary = summarizeMatch(match, entry.cat);
-              const statusClass = summary.status === "completed" ? "final" : summary.status === "pending" ? "pending" : "";
+              const status = getTeamScheduleStatus(match);
               return `
                 <tr>
-                  <td>${escapeHtml(match?.roundLabel || `Match ${idx + 1}`)}</td>
+                  <td>${escapeHtml(getMatchNumber(match, idx))}</td>
+                  <td>${escapeHtml(match?.home || "BYE")}</td>
+                  <td>${escapeHtml(match?.away || "BYE")}</td>
                   <td>${escapeHtml(match?.date || "-")}</td>
                   <td>${escapeHtml(match?.time || "-")}</td>
                   <td>${escapeHtml(match?.court || "-")}</td>
-                  <td>${escapeHtml(match?.home || "BYE")}</td>
-                  <td>${escapeHtml(match?.away || "BYE")}</td>
-                  <td>${summary.homeScore ?? "-"} - ${summary.awayScore ?? "-"}</td>
-                  <td>${escapeHtml(summary.homeAux && summary.awayAux ? `${summary.homeAux} • ${summary.awayAux}` : "-")}</td>
-                  <td><span class="schedule-badge ${statusClass}">${escapeHtml(summary.status || "pending")}</span></td>
+                  <td><span class="schedule-badge ${getStatusClass(status)}">${escapeHtml(status)}</span></td>
                 </tr>
               `;
             }).join("")
-          : `<tr><td colspan="9" class="muted-small">No schedule found.</td></tr>`;
+          : `<tr><td colspan="7" class="muted-small">No schedule found.</td></tr>`;
 
         const group = document.createElement("section");
         group.className = "schedule-group";
@@ -457,21 +415,19 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="schedule-group-header">
             <div>
               <h3 class="schedule-group-title">${escapeHtml(entry.label)}</h3>
-              <div class="schedule-group-subtitle">Complete league schedule</div>
+              <div class="schedule-group-subtitle">Fixtures</div>
             </div>
           </div>
           <div class="schedule-team-table-wrap">
             <table class="schedule-team-table">
               <thead>
                 <tr>
-                  <th>Match</th>
+                  <th>Match no</th>
+                  <th>Team 1</th>
+                  <th>Team 2</th>
                   <th>Date</th>
                   <th>Time</th>
                   <th>Court</th>
-                  <th>Home</th>
-                  <th>Away</th>
-                  <th>Category wins</th>
-                  <th>Match points</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -504,21 +460,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const roundsHtml = rounds.map((round, roundIndex) => {
         const matches = (Array.isArray(round) ? round : []).map((match) => {
-          const summary = summarizeMatch(match, entry.cat);
+          const status = getSimpleStatus(match);
+          const a = getBucketScore(match?.score?.state?.A);
+          const b = getBucketScore(match?.score?.state?.B);
           const metaBadges = [match?.date, match?.time, match?.court]
             .filter(Boolean)
             .map((value) => `<span class="schedule-badge">${escapeHtml(value)}</span>`)
             .join("");
           return `
             <div class="bk-card">
-              <div class="schedule-match-meta">${metaBadges}</div>
+              <div class="schedule-match-meta">
+                ${metaBadges}
+                <span class="schedule-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+              </div>
               <div class="fixture-line">
                 <span>${escapeHtml(match?.home ?? "BYE")}</span>
-                <span class="fixture-score">${summary.homeScore ?? ""}</span>
+                <span class="fixture-score">${a ?? ""}</span>
               </div>
               <div class="fixture-line">
                 <span>${escapeHtml(match?.away ?? "BYE")}</span>
-                <span class="fixture-score">${summary.awayScore ?? ""}</span>
+                <span class="fixture-score">${b ?? ""}</span>
               </div>
             </div>
           `;
@@ -555,9 +516,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const rounds = getRounds(entry.cat);
       rounds.forEach((round, roundIndex) => {
         (Array.isArray(round) ? round : []).forEach((match, matchIndex) => {
-          const summary = summarizeMatch(match, entry.cat);
-          if (!summary.hasAnyScore) return;
-          cards.push({ entry, roundIndex, matchIndex, match, summary });
+          const displayMode = String(entry.cat?.displayMode || "").toLowerCase();
+          const isTeamSchedule = displayMode === "team_schedule" || String(entry.id) === TEAM_EVENT_CATEGORY_ID;
+          const status = isTeamSchedule ? getTeamScheduleStatus(match) : getSimpleStatus(match);
+          if (status === "pending") return;
+          cards.push({ entry, roundIndex, matchIndex, match, status, isTeamSchedule });
         });
       });
     });
@@ -570,21 +533,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     liveEmptyEl?.classList.add("hidden");
 
     cards.forEach((item) => {
-      const { entry, roundIndex, match, summary } = item;
-      const statusClass = summary.status === "completed" ? "final" : summary.status === "pending" ? "pending" : "";
+      const { entry, roundIndex, match, status, isTeamSchedule } = item;
 
+      let homeScore = getBucketScore(match?.score?.state?.A);
+      let awayScore = getBucketScore(match?.score?.state?.B);
+      let homeAux = null;
+      let awayAux = null;
       let detailHtml = "";
-      if (summary.mode === "team" && summary.rows.length) {
+
+      if (isTeamSchedule) {
+        const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
+        let homeWins = 0;
+        let awayWins = 0;
+        let homePoints = 0;
+        let awayPoints = 0;
+
         detailHtml = `
           <div class="live-submatch-list">
-            ${summary.rows.map((row) => `
-              <div class="live-submatch-row">
-                <span class="live-submatch-label">${escapeHtml(row.label)}</span>
-                <span>${escapeHtml(String(row.homeDisplay))} - ${escapeHtml(String(row.awayDisplay))}</span>
-              </div>
-            `).join("")}
+            ${submatches.map((submatch, idx) => {
+              const sa = getBucketScore(submatch?.score?.state?.A);
+              const sb = getBucketScore(submatch?.score?.state?.B);
+              const winnerSide = String(submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || "").toUpperCase();
+              if (winnerSide === "A") homeWins += 1;
+              if (winnerSide === "B") awayWins += 1;
+              if (sa !== null) homePoints += sa;
+              if (sb !== null) awayPoints += sb;
+              return `
+                <div class="live-submatch-row">
+                  <span class="live-submatch-label">${escapeHtml(submatch?.roundLabel || `Submatch ${idx + 1}`)}</span>
+                  <span>${escapeHtml(String(sa ?? "-"))} - ${escapeHtml(String(sb ?? "-"))}</span>
+                </div>
+              `;
+            }).join("") || `<div class="muted-small">No submatch scores yet</div>`}
           </div>
         `;
+
+        homeScore = homeWins;
+        awayScore = awayWins;
+        homeAux = `${homePoints} pts`;
+        awayAux = `${awayPoints} pts`;
       } else {
         const homePlayers = Array.isArray(match?.homePlayers) && match.homePlayers.length ? match.homePlayers : splitTeamName(match?.home);
         const awayPlayers = Array.isArray(match?.awayPlayers) && match.awayPlayers.length ? match.awayPlayers : splitTeamName(match?.away);
@@ -612,24 +599,24 @@ document.addEventListener("DOMContentLoaded", async () => {
           <span class="live-badge">${escapeHtml(match?.roundLabel || `Round ${roundIndex + 1}`)}</span>
           ${match?.court ? `<span class="live-badge">${escapeHtml(match.court)}</span>` : ""}
           ${match?.time ? `<span class="live-badge">${escapeHtml(match.time)}</span>` : ""}
-          <span class="live-badge ${statusClass}">${escapeHtml(summary.status || "live")}</span>
+          <span class="live-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
         </div>
 
         <div class="live-score-main">
           <div class="live-team-block">
             <div class="live-team-name">${escapeHtml(match?.home || "Home")}</div>
-            <div class="live-team-score">${summary.homeScore ?? "-"}</div>
-            ${summary.homeAux ? `<div class="live-team-subline">${escapeHtml(summary.homeAux)}</div>` : ""}
-            ${summary.mode === "team" ? detailHtml : detailHtml.split("__VS_SPLIT__")[0]}
+            <div class="live-team-score">${homeScore ?? "-"}</div>
+            ${homeAux ? `<div class="live-team-subline">${escapeHtml(homeAux)}</div>` : ""}
+            ${isTeamSchedule ? detailHtml : detailHtml.split("__VS_SPLIT__")[0]}
           </div>
 
           <div class="live-vs">VS</div>
 
           <div class="live-team-block">
             <div class="live-team-name">${escapeHtml(match?.away || "Away")}</div>
-            <div class="live-team-score">${summary.awayScore ?? "-"}</div>
-            ${summary.awayAux ? `<div class="live-team-subline">${escapeHtml(summary.awayAux)}</div>` : ""}
-            ${summary.mode === "team" ? detailHtml : detailHtml.split("__VS_SPLIT__")[1]}
+            <div class="live-team-score">${awayScore ?? "-"}</div>
+            ${awayAux ? `<div class="live-team-subline">${escapeHtml(awayAux)}</div>` : ""}
+            ${isTeamSchedule ? "" : detailHtml.split("__VS_SPLIT__")[1]}
           </div>
         </div>
       `;
