@@ -301,11 +301,36 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function getFixtureCategoryEntries() {
     const categories = state.fixtures?.categories || {};
-    return Object.entries(categories).map(([id, cat]) => ({
+    const rawEntries = Object.entries(categories).map(([id, cat]) => ({
       id,
       cat,
       label: cat?.label || getCategoryMetaLabel(id) || (id === TEAM_EVENT_CATEGORY_ID ? "Team event" : id),
     }));
+
+    const seenTeamSchedule = new Set();
+    const seenLabels = new Set();
+    const finalEntries = [];
+
+    rawEntries.forEach((entry) => {
+      const displayMode = String(entry?.cat?.displayMode || "").toLowerCase();
+      const isTeamSchedule =
+        displayMode === "team_schedule" || String(entry.id) === TEAM_EVENT_CATEGORY_ID;
+
+      const labelKey = String(entry.label || "").trim().toLowerCase();
+
+      if (isTeamSchedule) {
+        if (seenTeamSchedule.has("team_schedule")) return;
+        seenTeamSchedule.add("team_schedule");
+        finalEntries.push(entry);
+        return;
+      }
+
+      if (seenLabels.has(labelKey)) return;
+      seenLabels.add(labelKey);
+      finalEntries.push(entry);
+    });
+
+    return finalEntries;
   }
 
   function getRounds(cat) {
