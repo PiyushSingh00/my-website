@@ -565,7 +565,7 @@ body {
 
 .lineup-two-col {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
@@ -608,4 +608,45 @@ body {
   background: rgba(5, 11, 24, 0.96);
   color: var(--text);
   font: inherit;
+}
+
+.lineup-match-summary {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.lineup-saved-preview {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(77, 208, 225, 0.08);
+  border: 1px solid rgba(77, 208, 225, 0.18);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.lineup-saved-preview strong {
+  color: var(--accent-2);
+}
+
+.lineup-saved-preview.is-empty {
+  background: rgba(5, 11, 24, 0.72);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
+.team-name-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 208, 225, 0.25);
+  background: rgba(77, 208, 225, 0.1);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }

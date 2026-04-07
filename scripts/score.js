@@ -1451,10 +1451,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (away && Array.isArray(away.players) && away.players.length) {
         category.awayPlayer = away.players.map((p) => safeText(p)).filter(Boolean).join(" + ");
       }
-      if (approvals.home === "approved" && approvals.away === "approved" && category.homePlayer && category.awayPlayer) {
+
+      const hasSubmittedHome = Boolean(category.homePlayer);
+      const hasSubmittedAway = Boolean(category.awayPlayer);
+      if (approvals.home === "approved" && approvals.away === "approved" && hasSubmittedHome && hasSubmittedAway) {
         if (category.lineupStatus !== "accepted") category.lineupStatus = "accepted";
+      } else if ((hasSubmittedHome || hasSubmittedAway) && category.lineupStatus !== "accepted" && category.lineupStatus !== "rejected") {
+        category.lineupStatus = "pending";
       }
     });
+  }
+
+  function hasAssignments(lineupSide) {
+    return Array.isArray(lineupSide?.assignments) && lineupSide.assignments.some((item) => Array.isArray(item?.players) && item.players.length);
+  }
+
+  function getLineupSubmissionSummary(matchObj) {
+    const lineups = matchObj?.lineups || {};
+    return {
+      homeSubmitted: hasAssignments(lineups?.home),
+      awaySubmitted: hasAssignments(lineups?.away),
+      homeSubmittedAt: safeText(lineups?.home?.submittedAt, ""),
+      awaySubmittedAt: safeText(lineups?.away?.submittedAt, ""),
+    };
   }
 
   function computeTeamTieSummary(teamState) {
@@ -1726,6 +1745,38 @@ document.addEventListener("DOMContentLoaded", async () => {
       toggleLineupReviewBtn.textContent = teamTieState.lineupCollapsed ? "Expand lineup" : "Collapse lineup";
     }
 
+    async function refreshMatchLineupsFromServer() {
+      try {
+        const latestFixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+        const latestFixtures = latestFixturesResp?.ok ? latestFixturesResp.data : latestFixturesResp;
+        if (!latestFixtures) return false;
+
+        const latestResolved = findFirstMatch(latestFixtures, resolvedCategoryId, roundIndex, matchIndex);
+        const latestMatch = latestResolved?.match || null;
+        if (!latestMatch) return false;
+
+        match.lineups = latestMatch.lineups || match.lineups || {};
+        match.lineupApproval = latestMatch.lineupApproval || match.lineupApproval || {};
+        match.homePlayers = latestMatch.homePlayers || match.homePlayers || [];
+        match.awayPlayers = latestMatch.awayPlayers || match.awayPlayers || [];
+        match.submatches = latestMatch.submatches || match.submatches || [];
+        return true;
+      } catch (err) {
+        console.warn("Could not refresh match lineups.", err);
+        return false;
+      }
+    }
+
+    function updateLineupToolbarUi() {
+      const summary = getLineupSubmissionSummary(match);
+      if (receiveLineupBtn) {
+        receiveLineupBtn.textContent = summary.homeSubmitted || summary.awaySubmitted ? "Refresh lineup" : "Receive lineup";
+      }
+      if (summary.homeSubmitted || summary.awaySubmitted) {
+        lineupReviewPanel?.classList.remove("hidden");
+      }
+    }
+
     function syncTeamSummaryUi() {
       const summary = computeTeamTieSummary(teamTieState);
       if (teamOverallHomeScore) teamOverallHomeScore.textContent = String(summary.homeWins);
@@ -1746,9 +1797,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       
       if (!lineupStatePill) return;
 
+      const submissionSummary = getLineupSubmissionSummary(match);
       lineupStatePill.className = getStatusChipClass(summary.allAccepted ? "accepted" : "pending");
       if (summary.allAccepted) {
         lineupStatePill.textContent = `All ${summary.total} category lineups accepted`;
+      } else if (submissionSummary.homeSubmitted || submissionSummary.awaySubmitted) {
+        lineupStatePill.textContent = `${summary.acceptedCount}/${summary.total} category lineups accepted • ${submissionSummary.homeSubmitted ? homeLabel : "Home"} submitted / ${submissionSummary.awaySubmitted ? awayLabel : "Away"} ${submissionSummary.awaySubmitted ? "submitted" : "pending"}`;
       } else {
         lineupStatePill.textContent = `${summary.acceptedCount}/${summary.total} category lineups accepted`;
       }
@@ -1779,24 +1833,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         row.className = "lineup-row";
         const statusClass = getStatusChipClass(category.lineupStatus);
 
+        const homeSubmissionTime = safeText(match?.lineups?.home?.submittedAt, "");
+        const awaySubmissionTime = safeText(match?.lineups?.away?.submittedAt, "");
+
         row.innerHTML = `
           <div class="lineup-row-head">
             <div>
               <div class="lineup-row-title">${escapeHtml(category.name)}</div>
-              <div class="helper-text">Review submitted lineup for this category</div>
+              <div class="helper-text">Saved captain lineup for this category. Host can review, accept, reject, or edit it here.</div>
+              <div class="lineup-row-meta">
+                ${escapeHtml(homeLabel)}${homeSubmissionTime ? ` submitted ${escapeHtml(new Date(homeSubmissionTime).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }))}` : " not submitted yet"}
+                •
+                ${escapeHtml(awayLabel)}${awaySubmissionTime ? ` submitted ${escapeHtml(new Date(awaySubmissionTime).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }))}` : " not submitted yet"}
+              </div>
             </div>
             <div class="${statusClass}">${escapeHtml(category.lineupStatus)}</div>
           </div>
           <div class="lineup-row-body">
             <div class="lineup-entry-grid">
               <div class="field-stack">
-                <label>${escapeHtml(homeLabel)} player</label>
-                <input type="text" data-role="homePlayer" value="${escapeHtml(category.homePlayer)}" placeholder="Enter player name" />
+                <label>${escapeHtml(homeLabel)} lineup</label>
+                <input type="text" data-role="homePlayer" value="${escapeHtml(category.homePlayer)}" placeholder="Enter lineup" />
               </div>
               <div class="lineup-vs">VS</div>
               <div class="field-stack">
-                <label>${escapeHtml(awayLabel)} player</label>
-                <input type="text" data-role="awayPlayer" value="${escapeHtml(category.awayPlayer)}" placeholder="Enter player name" />
+                <label>${escapeHtml(awayLabel)} lineup</label>
+                <input type="text" data-role="awayPlayer" value="${escapeHtml(category.awayPlayer)}" placeholder="Enter lineup" />
               </div>
             </div>
 
@@ -1997,12 +2059,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    receiveLineupBtn?.addEventListener("click", () => {
+    receiveLineupBtn?.addEventListener("click", async () => {
+      await refreshMatchLineupsFromServer();
       applyMatchLineupsToTeamState(match, teamTieState);
       lineupReviewPanel?.classList.remove("hidden");
       saveTeamTieState(teamTieState);
       renderLineupReview();
       renderTeamCategoryBars();
+      updateLineupToolbarUi();
       syncTeamSummaryUi();
     });
 
@@ -2016,6 +2080,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       saveTeamTieState(teamTieState);
       renderLineupReview();
       renderTeamCategoryBars();
+      updateLineupToolbarUi();
       syncTeamSummaryUi();
     });
 
@@ -2024,6 +2089,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       saveTeamTieState(teamTieState);
       syncLineupCollapseUi();
     });
+
+    const initialSubmissionSummary = getLineupSubmissionSummary(match);
+    if (initialSubmissionSummary.homeSubmitted || initialSubmissionSummary.awaySubmitted) {
+      lineupReviewPanel?.classList.remove("hidden");
+      teamTieState.categories.forEach((category) => {
+        if ((category.homePlayer || category.awayPlayer) && category.lineupStatus !== "accepted" && category.lineupStatus !== "rejected") {
+          category.lineupStatus = "pending";
+        }
+      });
+    }
 
     async function saveTeamEventAggregate() {
       const summary = computeTeamTieSummary(teamTieState);
@@ -2111,7 +2186,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     saveBtn?.addEventListener("click", saveTeamEventAggregate);
+    renderLineupReview();
     renderTeamCategoryBars();
+    updateLineupToolbarUi();
     syncTeamSummaryUi();
     return;
   }

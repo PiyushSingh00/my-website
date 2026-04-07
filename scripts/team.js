@@ -1191,6 +1191,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
+  function formatPlayersInline(players) {
+    const cleaned = (Array.isArray(players) ? players : [])
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    return cleaned.length ? cleaned.join(" + ") : "Not submitted yet";
+  }
+
+  function formatSubmittedAt(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const dt = new Date(raw);
+    if (Number.isNaN(dt.getTime())) return "";
+    return dt.toLocaleString([], {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   function renderParticipationSummary(ties, rosterNames) {
     if (!lineupParticipationSummaryEl) return;
 
@@ -1265,10 +1285,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       const tieId = String(tie.tieId || tie.matchId || `tie-${tieIndex + 1}`);
       const categoryDefs = getTieCategoryDefs(tie);
       const savedAssignments = getSavedAssignmentsForTie(tie);
+      const savedAssignmentCount = savedAssignments.filter((item) => extractPlayersFromAssignment(item).length > 0).length;
+      const mySide = getMySideForTie(tie);
+      const submittedAt = formatSubmittedAt(tie?.lineups?.[mySide]?.submittedAt);
 
       const slotCards = categoryDefs.map((categoryDef, idx) => {
         const requiredSlots = getRequiredSlotsForCategory(categoryDef);
-        const savedPlayers = extractPlayersFromAssignment(savedAssignments[idx] || {});
+        const savedAssignment = savedAssignments.find((item) => Number(item?.scoreIndex) === idx) || savedAssignments[idx] || {};
+        const savedPlayers = extractPlayersFromAssignment(savedAssignment);
         const selectsHtml = Array.from({ length: requiredSlots }, (_, slotIndex) => {
           return buildPlayerSelectHtml(
             rosterNames,
@@ -1280,7 +1304,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         return `
           <div class="lineup-slot-card" data-submatch-index="${idx}">
             <div class="lineup-slot-title">${escapeHtml(categoryLabel(categoryDef) || categoryDef.eventName || `Submatch ${idx + 1}`)}</div>
-            <div class="helper-text">Pick ${requiredSlots} player(s) for this category.</div>
+            <div class="helper-text">Pick exactly ${requiredSlots} player(s) for this category.</div>
+            <div class="lineup-saved-preview ${savedPlayers.length ? '' : 'is-empty'}">
+              <strong>Saved lineup:</strong> ${escapeHtml(formatPlayersInline(savedPlayers))}
+            </div>
             <div class="lineup-two-col">${selectsHtml}</div>
           </div>
         `;
@@ -1297,8 +1324,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                 ${tie.time ? ` • ${escapeHtml(tie.time)}` : ""}
                 ${tie.court ? ` • ${escapeHtml(tie.court)}` : ""}
               </p>
+              <div class="lineup-match-summary">
+                ${savedAssignmentCount}/${categoryDefs.length} submatch lineups saved
+                ${submittedAt ? ` • Saved ${escapeHtml(submittedAt)}` : ""}
+              </div>
             </div>
-            <div class="team-name-chip">${tie.lineupLocked ? "Locked" : "Open"}</div>
+            <div class="team-name-chip">${tie.lineupLocked ? "Locked" : savedAssignmentCount ? "Saved" : "Open"}</div>
           </div>
 
           <div class="lineup-builder-wrap">
@@ -1365,7 +1396,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (lineupStatusEl) {
-          lineupStatusEl.textContent = "Lineup saved successfully.";
+          lineupStatusEl.textContent = `Lineup saved for ${tie.home || "Home"} vs ${tie.away || "Away"}.`;
         }
         await renderLineupTab();
       });
