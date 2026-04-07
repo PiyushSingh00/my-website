@@ -599,11 +599,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     syncPlayersListUi();
   });
 
-  playersListToggleBtn?.addEventListener("click", () => {
-    isPlayersListCollapsed = !isPlayersListCollapsed;
-    syncPlayersListUi();
+  teamSetupToggleBtn?.addEventListener("click", () => {
+    isTeamSetupCollapsed = !isTeamSetupCollapsed;
+    syncTeamSetupUi();
   });
-
 
   leaderboardToggleBtn?.addEventListener("click", () => {
     isLeaderboardCollapsed = !isLeaderboardCollapsed;
