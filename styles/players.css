@@ -144,6 +144,12 @@
   color: #bbf7d0;
 }
 
+.status-pill--live {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #bfdbfe;
+}
+
 .status-pill--rejected {
   background: rgba(248, 113, 113, 0.14);
   border-color: rgba(248, 113, 113, 0.45);

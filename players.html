@@ -75,28 +75,43 @@
           </button>
         </div>
 
-        <div class="players-tabs" id="players-tabs"></div>
+        <section id="players-list-section" class="players-list-section">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Players</p>
+              <h2 class="section-title">All registered players</h2>
+            </div>
 
-        <div id="players-empty-state" class="empty-state">
-          <div class="feature-icon">👥</div>
-          <h3>No players yet</h3>
-          <p class="muted">Once players join this tournament, they will appear here.</p>
-        </div>
+            <button type="button" class="btn-dark" id="players-list-toggle-btn" aria-expanded="false">
+              ▸
+            </button>
+          </div>
 
-        <div id="players-table-wrapper" class="players-table-wrapper" style="display: none;">
-          <table class="players-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Age</th>
-                <th>Gender</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="players-table-body"></tbody>
-          </table>
-        </div>
+          <div id="players-list-content" class="hidden">
+            <div class="players-tabs" id="players-tabs"></div>
+
+            <div id="players-empty-state" class="empty-state">
+              <div class="feature-icon">👥</div>
+              <h3>No players yet</h3>
+              <p class="muted">Once players join this tournament, they will appear here.</p>
+            </div>
+
+            <div id="players-table-wrapper" class="players-table-wrapper" style="display: none;">
+              <table class="players-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Gender</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="players-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
 
         <section id="captains-summary-section" class="captains-summary-section hidden">
           <div class="section-head">
@@ -105,12 +120,12 @@
               <h2 class="section-title">Teams</h2>
             </div>
 
-            <button type="button" class="btn-dark" id="team-setup-toggle-btn" aria-expanded="true">
-              ▾
+            <button type="button" class="btn-dark" id="team-setup-toggle-btn" aria-expanded="false">
+              ▸
             </button>
           </div>
 
-          <div id="team-setup-content">
+          <div id="team-setup-content" class="hidden">
             <div id="captains-summary-empty" class="empty-state compact-empty">
               <div class="feature-icon">🧢</div>
               <h3>No captains confirmed yet</h3>
@@ -156,75 +171,97 @@
               <p class="eyebrow">League stage</p>
               <h2 class="section-title">Leaderboard</h2>
             </div>
+
+            <button type="button" class="btn-dark" id="leaderboard-toggle-btn" aria-expanded="false">
+              ▸
+            </button>
           </div>
 
-          <p class="helper-text" id="leaderboard-helper-text">
-            Match points = cumulative actual points scored by a team across all submatches played so far.
-          </p>
+          <div id="leaderboard-content" class="hidden">
+            <p class="helper-text" id="leaderboard-helper-text">
+              Match points = cumulative actual points scored by a team across all submatches played so far.
+            </p>
 
-          <div class="players-table-wrapper">
-            <table class="players-table">
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Team</th>
-                  <th>Match points</th>
-                  <th>Ties won</th>
-                  <th>Head-to-head</th>
-                  <th>Qualified</th>
-                </tr>
-              </thead>
-              <tbody id="leaderboard-table-body">
-                <tr>
-                  <td colspan="6" class="muted">No leaderboard data yet.</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="players-table-wrapper">
+              <table class="players-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Team</th>
+                    <th>Match points</th>
+                    <th>Ties won</th>
+                    <th>Head-to-head</th>
+                    <th>Qualified</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-table-body">
+                  <tr>
+                    <td colspan="6" class="muted">No leaderboard data yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
         <section id="fixtures-embed" class="fixtures-embed hidden">
-          <header class="fixtures-header">
-            <p class="eyebrow">Tournament fixtures</p>
-            <h2 id="fixtures-tournament-name">Tournament name</h2>
-            <p class="helper-text players-meta">
-              <span id="fixtures-tournament-sport"></span>
-              <span id="fixtures-tournament-dates"></span>
-              <span>Code: <span id="fixtures-tournament-code"></span></span>
-            </p>
-          </header>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Tournament fixtures</p>
+              <h2 class="section-title">Fixtures</h2>
+            </div>
 
-          <div class="fixtures-toolbar">
-            <button type="button" class="btn-primary" id="fixtures-generate-btn">
-              Regenerate fixtures
-            </button>
-
-            <button type="button" class="btn-dark" id="fixtures-configure-fields-btn">
-              Configure scoring fields
-            </button>
-
-            <button type="button" class="btn-dark" id="fixtures-edit-btn" style="display:none;">
-              Edit fixtures
+            <button type="button" class="btn-dark" id="fixtures-toggle-btn" aria-expanded="false">
+              ▸
             </button>
           </div>
 
-          <div id="fixtures-toast" class="fixtures-toast" style="display:none;">✓ Done</div>
+          <div id="fixtures-content" class="hidden">
+            <header class="fixtures-header">
+              <h2 id="fixtures-tournament-name">Tournament name</h2>
+              <p class="helper-text players-meta">
+                <span id="fixtures-tournament-sport"></span>
+                <span id="fixtures-tournament-dates"></span>
+                <span>Code: <span id="fixtures-tournament-code"></span></span>
+              </p>
+            </header>
 
-          <p class="helper-text" id="embedded-fixtures-helper-text">
-            View generated fixtures here.
-          </p>
+            <div class="fixtures-toolbar">
+              <button type="button" class="btn-primary" id="fixtures-generate-btn">
+                Regenerate fixtures
+              </button>
 
-          <div class="fixtures-toggle" id="fixtures-toggle"></div>
+              <button type="button" class="btn-dark hidden" id="fixtures-go-knockout-btn">
+                Go to knockout
+              </button>
 
-          <div id="fixtures-none-selected" class="empty-state" style="display:flex;">
-            <div class="feature-icon">🎯</div>
-            <h3>Choose which fixtures to view</h3>
-            <p class="muted">
-              Select a <strong>Category</strong> above to see the tournament fixtures.
+              <button type="button" class="btn-dark" id="fixtures-configure-fields-btn">
+                Configure scoring fields
+              </button>
+
+              <button type="button" class="btn-dark" id="fixtures-edit-btn" style="display:none;">
+                Edit fixtures
+              </button>
+            </div>
+
+            <div id="fixtures-toast" class="fixtures-toast" style="display:none;">✓ Done</div>
+
+            <p class="helper-text" id="embedded-fixtures-helper-text">
+              View generated fixtures here.
             </p>
-          </div>
 
-          <div id="fixtures-groups"></div>
+            <div class="fixtures-toggle" id="fixtures-toggle"></div>
+
+            <div id="fixtures-none-selected" class="empty-state" style="display:flex;">
+              <div class="feature-icon">🎯</div>
+              <h3>Choose which fixtures to view</h3>
+              <p class="muted">
+                Select a <strong>Category</strong> above to see the tournament fixtures.
+              </p>
+            </div>
+
+            <div id="fixtures-groups"></div>
+          </div>
         </section>
       </section>
     </main>

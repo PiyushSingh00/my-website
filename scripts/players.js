@@ -92,6 +92,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const codeEl = document.getElementById("players-tournament-code");
 
   const playersTabs = document.getElementById("players-tabs");
+  const playersListToggleBtn = document.getElementById("players-list-toggle-btn");
+  const playersListContent = document.getElementById("players-list-content");
 
   const addPlayerBtn = document.getElementById("add-player-btn");
   const addPlayerModal = document.getElementById("host-add-player-modal");
@@ -129,12 +131,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const randomizePoolsBtn = document.getElementById("randomize-pools-btn");
 
   const leaderboardSection = document.getElementById("leaderboard-section");
+  const leaderboardToggleBtn = document.getElementById("leaderboard-toggle-btn");
+  const leaderboardContent = document.getElementById("leaderboard-content");
   const leaderboardTableBody = document.getElementById("leaderboard-table-body");
 
   const fixturesEmbed = document.getElementById("fixtures-embed");
   const fixturesGenerateBtn = document.getElementById("fixtures-generate-btn");
+  const fixturesGoKnockoutBtn = document.getElementById("fixtures-go-knockout-btn");
   const fixturesConfigureBtn = document.getElementById("fixtures-configure-fields-btn");
   const fixturesEditBtn = document.getElementById("fixtures-edit-btn");
+  const fixturesCollapseToggleBtn = document.getElementById("fixtures-toggle-btn");
+  const fixturesContent = document.getElementById("fixtures-content");
   const fixturesToggle = document.getElementById("fixtures-toggle");
   const fixturesGroups = document.getElementById("fixtures-groups");
   const fixturesNoneSelected = document.getElementById("fixtures-none-selected");
@@ -150,7 +157,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   let activeFilter = "all";
   let tournamentCategories = [];
   let tournamentMetaCache = null;
-  let isTeamSetupCollapsed = false;
+  let isPlayersListCollapsed = true;
+  let isTeamSetupCollapsed = true;
+  let isLeaderboardCollapsed = true;
+  let isFixturesCollapsed = true;
 
   let captainState = {
     selectedCaptainIds: [],
@@ -462,11 +472,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     return `${h}:${m}`;
   }
 
+  function syncPlayersListUi() {
+    if (playersListContent) playersListContent.classList.toggle("hidden", isPlayersListCollapsed);
+    if (playersListToggleBtn) {
+      playersListToggleBtn.textContent = isPlayersListCollapsed ? "▸" : "▾";
+      playersListToggleBtn.setAttribute("aria-expanded", String(!isPlayersListCollapsed));
+    }
+  }
+
   function syncTeamSetupUi() {
     if (teamSetupContent) teamSetupContent.classList.toggle("hidden", isTeamSetupCollapsed);
     if (teamSetupToggleBtn) {
       teamSetupToggleBtn.textContent = isTeamSetupCollapsed ? "▸" : "▾";
       teamSetupToggleBtn.setAttribute("aria-expanded", String(!isTeamSetupCollapsed));
+    }
+  }
+
+  function syncLeaderboardUi() {
+    if (leaderboardContent) leaderboardContent.classList.toggle("hidden", isLeaderboardCollapsed);
+    if (leaderboardToggleBtn) {
+      leaderboardToggleBtn.textContent = isLeaderboardCollapsed ? "▸" : "▾";
+      leaderboardToggleBtn.setAttribute("aria-expanded", String(!isLeaderboardCollapsed));
+    }
+  }
+
+  function syncFixturesUi() {
+    if (fixturesContent) fixturesContent.classList.toggle("hidden", isFixturesCollapsed);
+    if (fixturesCollapseToggleBtn) {
+      fixturesCollapseToggleBtn.textContent = isFixturesCollapsed ? "▸" : "▾";
+      fixturesCollapseToggleBtn.setAttribute("aria-expanded", String(!isFixturesCollapsed));
     }
   }
 
@@ -483,9 +517,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  playersListToggleBtn?.addEventListener("click", () => {
+    isPlayersListCollapsed = !isPlayersListCollapsed;
+    syncPlayersListUi();
+  });
+
   teamSetupToggleBtn?.addEventListener("click", () => {
     isTeamSetupCollapsed = !isTeamSetupCollapsed;
     syncTeamSetupUi();
+  });
+
+  leaderboardToggleBtn?.addEventListener("click", () => {
+    isLeaderboardCollapsed = !isLeaderboardCollapsed;
+    syncLeaderboardUi();
+  });
+
+  fixturesCollapseToggleBtn?.addEventListener("click", () => {
+    isFixturesCollapsed = !isFixturesCollapsed;
+    syncFixturesUi();
   });
 
   function getCaptainSubmittedPlayers(captain) {
@@ -512,6 +561,187 @@ document.addEventListener("DOMContentLoaded", async () => {
   function getTeamEventFixtureBucket() {
     const categories = fixturesState.fixtures?.categories || {};
     return categories[TEAM_EVENT_CATEGORY_ID] || Object.values(categories)[0] || null;
+  }
+
+  function getTeamTieStorageKeyForMatch(roundIndex, matchIndex) {
+    return `score_team_tie_state::${tournamentId}::${roundIndex}::${matchIndex}`;
+  }
+
+  function readStoredTeamTieState(roundIndex, matchIndex) {
+    try {
+      const raw = localStorage.getItem(getTeamTieStorageKeyForMatch(roundIndex, matchIndex));
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function hasLiveCategoryProgress(category) {
+    if (!category || typeof category !== "object") return false;
+    if (category.lineupStatus === "accepted") return true;
+    if (category.categoryLocked) return true;
+    if (category.winnerSide) return true;
+    if (category.homePlayer || category.awayPlayer) return true;
+
+    const sportData = category.sportData || {};
+    if (sportData.currentSetIndex != null) return true;
+    if (Array.isArray(sportData.sets) && sportData.sets.some((set) => Number(set?.homePoints || 0) > 0 || Number(set?.awayPoints || 0) > 0 || set?.started || set?.completed)) {
+      return true;
+    }
+
+    const preset = category.presetState || category.score || {};
+    return Object.values(preset || {}).some((value) => typeof value === "number" && Number(value) > 0);
+  }
+
+  function getTeamTieStatusFromState(teamTieState) {
+    if (!teamTieState || !Array.isArray(teamTieState.categories) || !teamTieState.categories.length) {
+      return "pending";
+    }
+
+    const categories = teamTieState.categories;
+    const completed = categories.length > 0 && categories.every((category) => category?.categoryLocked || category?.winnerSide);
+    if (completed) return "completed";
+    if (categories.some((category) => hasLiveCategoryProgress(category))) return "live";
+    return "pending";
+  }
+
+  function getMatchStatus(match, roundIndex = 0, matchIndex = 0) {
+    const raw = String(match?.status || match?.score?.computed?.status || "").trim().toLowerCase();
+    if (["completed", "complete", "done", "finished"].includes(raw) || match?.winner) return "completed";
+    if (["live", "in_progress", "in-progress", "ongoing", "started"].includes(raw)) return "live";
+
+    if (isTournamentTeamEvent()) {
+      const stored = readStoredTeamTieState(roundIndex, matchIndex);
+      return getTeamTieStatusFromState(stored);
+    }
+
+    if (match?.score?.state) return "live";
+    return "pending";
+  }
+
+  function getStatusPillMarkup(status) {
+    const key = status === "completed" ? "accepted" : status === "live" ? "live" : "pending";
+    const label = status === "completed" ? "Completed" : status === "live" ? "Live" : "Pending";
+    return `<span class="status-pill status-pill--${key}">${escapeHtml(label)}</span>`;
+  }
+
+  function getSortedLeaderboardRows() {
+    return [...(leaderboardState.rows || [])].sort((a, b) => {
+      const rankA = Number(a?.rank || 9999);
+      const rankB = Number(b?.rank || 9999);
+      return rankA - rankB;
+    });
+  }
+
+  function getQualifiedLeaderboardRows() {
+    const sorted = getSortedLeaderboardRows();
+    const explicitlyQualified = sorted.filter((row) => {
+      const value = row?.qualified;
+      if (value === true) return true;
+      const text = String(value || "").trim().toLowerCase();
+      return text === "yes" || text === "qualified" || text === "true";
+    });
+
+    if (explicitlyQualified.length) return explicitlyQualified;
+
+    const fallbackCount = Number(getAdvancedSettings()?.qualifierCount || 0) || Math.min(4, sorted.length);
+    return sorted.slice(0, fallbackCount);
+  }
+
+  function buildSeededKnockoutRounds(teamNames) {
+    const entrants = [...teamNames].filter(Boolean);
+    if (entrants.length < 2) return null;
+
+    const size = nextPow2(Math.max(2, entrants.length));
+    while (entrants.length < size) entrants.push("BYE");
+
+    const firstRound = [];
+    for (let index = 0; index < size / 2; index += 1) {
+      const home = entrants[index];
+      const away = entrants[size - 1 - index];
+      firstRound.push(ensureMatchMeta({
+        home,
+        away,
+        homePlayers: home && home !== "BYE" ? [home] : [],
+        awayPlayers: away && away !== "BYE" ? [away] : [],
+        stage: "knockout",
+        roundLabel: size / 2 === 1 ? "Final" : null,
+        status: home === "BYE" || away === "BYE" ? "completed" : "pending",
+        winner: home === "BYE" ? away : away === "BYE" ? home : null,
+      }));
+    }
+
+    const rounds = [firstRound];
+    let currentCount = firstRound.length;
+    while (currentCount > 1) {
+      const nextRound = [];
+      for (let index = 0; index < Math.ceil(currentCount / 2); index += 1) {
+        nextRound.push(ensureMatchMeta({
+          home: "TBD",
+          away: "TBD",
+          homePlayers: [],
+          awayPlayers: [],
+          stage: "knockout",
+          status: "pending",
+          winner: null,
+        }));
+      }
+      rounds.push(nextRound);
+      currentCount = nextRound.length;
+    }
+
+    return { rounds, totalRounds: rounds.length };
+  }
+
+  function propagateKnockoutWinnerIntoRounds(knockout, roundIndex, matchIndex, winnerName) {
+    if (!knockout || !Array.isArray(knockout.rounds) || !winnerName || winnerName === "BYE") return;
+    const nextRoundIndex = roundIndex + 1;
+    const nextRound = knockout.rounds[nextRoundIndex];
+    if (!Array.isArray(nextRound)) return;
+
+    const nextMatchIndex = Math.floor(matchIndex / 2);
+    const nextMatch = nextRound[nextMatchIndex];
+    if (!nextMatch) return;
+
+    const targetSlot = matchIndex % 2 === 0 ? "home" : "away";
+    nextMatch[targetSlot] = winnerName;
+    nextMatch[targetSlot === "home" ? "homePlayers" : "awayPlayers"] = [winnerName];
+  }
+
+  function autoAdvanceKnockoutByes(knockout) {
+    if (!knockout || !Array.isArray(knockout.rounds)) return;
+    knockout.rounds.forEach((round, roundIndex) => {
+      round.forEach((match, matchIndex) => {
+        const home = String(match?.home || "").trim();
+        const away = String(match?.away || "").trim();
+        if (match?.winner) {
+          propagateKnockoutWinnerIntoRounds(knockout, roundIndex, matchIndex, match.winner);
+          return;
+        }
+        if (home === "BYE" && away && away !== "BYE" && away !== "TBD") {
+          match.status = "completed";
+          match.winner = away;
+          propagateKnockoutWinnerIntoRounds(knockout, roundIndex, matchIndex, away);
+        } else if (away === "BYE" && home && home !== "BYE" && home !== "TBD") {
+          match.status = "completed";
+          match.winner = home;
+          propagateKnockoutWinnerIntoRounds(knockout, roundIndex, matchIndex, home);
+        }
+      });
+    });
+  }
+
+  function canGenerateKnockout(cat) {
+    if (!cat || !isLeagueKnockoutFormat()) return false;
+    const matches = Array.isArray(cat.matches) ? cat.matches : Array.isArray(cat.rounds?.[0]) ? cat.rounds[0] : [];
+    if (!matches.length || cat.knockout) return false;
+    return matches.every((match, index) => getMatchStatus(match, 0, index) === "completed");
+  }
+
+  function updateGoToKnockoutButton(cat = getTeamEventFixtureBucket()) {
+    if (!fixturesGoKnockoutBtn) return;
+    const show = Boolean(isTournamentTeamEvent() && isLeagueKnockoutFormat() && canGenerateKnockout(cat));
+    fixturesGoKnockoutBtn.classList.toggle("hidden", !show);
   }
 
   function updateFixturesEditButtonState() {
@@ -1329,13 +1559,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     leaderboardTableBody.innerHTML = "";
     if (!leaderboardState.rows.length) {
       leaderboardTableBody.innerHTML = `<tr><td colspan="6" class="muted">No leaderboard data yet.</td></tr>`;
+      updateGoToKnockoutButton();
       return;
     }
     leaderboardState.rows.forEach((row, idx) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(row.teamName || "—")}</td>
+        <td>${escapeHtml(row.rank ?? idx + 1)}</td>
+        <td>${escapeHtml(row.teamName || row.team || "—")}</td>
         <td>${escapeHtml(row.matchPoints ?? 0)}</td>
         <td>${escapeHtml(row.tiesWon ?? 0)}</td>
         <td>${escapeHtml(row.headToHead ?? "—")}</td>
@@ -1343,6 +1574,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
       leaderboardTableBody.appendChild(tr);
     });
+    updateGoToKnockoutButton();
   }
 
   function makeMatchId() {
@@ -1746,6 +1978,37 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function buildKnockoutBracketMarkup(knockout, categoryId = TEAM_EVENT_CATEGORY_ID) {
+    if (!knockout || !Array.isArray(knockout.rounds) || !knockout.rounds.length) return "";
+
+    const roundsHtml = knockout.rounds.map((round, roundIndex) => `
+      <div class="fixtures-round-col">
+        <div class="round-title">${escapeHtml(getRoundLabel(roundIndex, knockout.totalRounds || knockout.rounds.length))}</div>
+        ${(Array.isArray(round) ? round : []).map((match, matchIndex) => `
+          <div class="fixtures-round-match">
+            <div class="bk-card">
+              <div class="fixture-line"><span>${escapeHtml(match?.home || "TBD")}</span></div>
+              <div class="fixture-line"><span>${escapeHtml(match?.away || "TBD")}</span></div>
+              <div class="fixture-line"><span>Status</span><span>${getStatusPillMarkup(getMatchStatus(match, roundIndex + 1, matchIndex))}</span></div>
+              <div class="fixture-actions">
+                ${(String(match?.home || '').toUpperCase() !== 'BYE' && String(match?.away || '').toUpperCase() !== 'BYE' && String(match?.home || '').toUpperCase() !== 'TBD' && String(match?.away || '').toUpperCase() !== 'TBD')
+                  ? `<button type="button" class="action-btn accept start-scoring-btn" data-tournament-id="${escapeHtml(tournamentId)}" data-category-id="${escapeHtml(categoryId)}" data-round="${roundIndex + 1}" data-match="${matchIndex}">Start scoring</button>`
+                  : ''}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+
+    return `
+      <div class="fixtures-group" style="margin-top: 18px;">
+        <h3 class="fixtures-group-title">Knockout schedule</h3>
+        <div class="fixtures-rounds">${roundsHtml}</div>
+      </div>
+    `;
+  }
+
   function renderTeamEventScheduleTable(cat) {
     const matches = Array.isArray(cat?.matches)
       ? cat.matches
@@ -1762,14 +2025,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       `;
       updateFixturesEditButtonState();
+      updateGoToKnockoutButton(cat);
       return;
     }
 
     const editing = Boolean(fixturesState.bulkEditMode);
+    const knockoutMarkup = buildKnockoutBracketMarkup(cat?.knockout, TEAM_EVENT_CATEGORY_ID);
 
     fixturesUi.groupsEl.innerHTML = `
       <div class="fixtures-group">
-        <h3 class="fixtures-group-title">${escapeHtml(cat?.label || "Team fixtures")}</h3>
+        <h3 class="fixtures-group-title">${escapeHtml(cat?.label || "League schedule")}</h3>
         <div class="players-table-wrapper">
           <table class="players-table">
             <thead>
@@ -1780,6 +2045,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <th>Date</th>
                 <th>Time</th>
                 <th>Court</th>
+                <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -1800,6 +2066,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const courtCell = editing
                   ? `<input class="schedule-edit-input" type="text" data-edit-field="court" data-index="${index}" value="${escapeHtml(match.court || "")}" placeholder="Court name" />`
                   : escapeHtml(match.court || "—");
+                const status = getMatchStatus(match, 0, index);
+                const canScore = !editing && String(match.home || '').toUpperCase() !== 'BYE' && String(match.away || '').toUpperCase() !== 'BYE' && String(match.home || '').toUpperCase() !== 'TBD' && String(match.away || '').toUpperCase() !== 'TBD';
                 return `
                   <tr>
                     <td>${escapeHtml(match.matchNo || index + 1)}</td>
@@ -1808,11 +2076,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <td>${dateCell}</td>
                     <td>${timeCell}</td>
                     <td>${courtCell}</td>
+                    <td>${getStatusPillMarkup(status)}</td>
                     <td>
                       <div class="row-actions">
                         ${editing
                           ? `<span class="captain-summary-meta">Editing…</span>`
-                          : `<button type="button" class="action-btn accept start-scoring-btn" data-tournament-id="${escapeHtml(tournamentId)}" data-category-id="${escapeHtml(TEAM_EVENT_CATEGORY_ID)}" data-round="0" data-match="${index}">Start scoring</button>`}
+                          : canScore
+                            ? `<button type="button" class="action-btn accept start-scoring-btn" data-tournament-id="${escapeHtml(tournamentId)}" data-category-id="${escapeHtml(TEAM_EVENT_CATEGORY_ID)}" data-round="0" data-match="${index}">Start scoring</button>`
+                            : `<span class="captain-summary-meta">—</span>`}
                       </div>
                     </td>
                   </tr>
@@ -1822,8 +2093,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           </table>
         </div>
       </div>
+      ${knockoutMarkup}
     `;
     updateFixturesEditButtonState();
+    updateGoToKnockoutButton(cat);
   }
 
   async function saveAllTeamScheduleEdits() {
@@ -1885,6 +2158,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       `;
       updateFixturesEditButtonState();
+      updateGoToKnockoutButton(cat);
       return;
     }
 
@@ -1918,6 +2192,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     wrapper.appendChild(roundsWrap);
     fixturesUi.groupsEl.appendChild(wrapper);
     updateFixturesEditButtonState();
+    updateGoToKnockoutButton(cat);
   }
 
   function renderCategoryBracket(categoryId) {
@@ -2040,6 +2315,39 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (fixturesState.activeCategoryId) renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
   }
 
+  async function generateKnockoutFromLeaderboard() {
+    const cat = getTeamEventFixtureBucket();
+    if (!cat || !canGenerateKnockout(cat)) {
+      showToast("Complete all league matches first");
+      return;
+    }
+
+    const qualifiedRows = getQualifiedLeaderboardRows();
+    const teamNames = qualifiedRows.map((row) => String(row?.teamName || row?.team || "").trim()).filter(Boolean);
+    if (teamNames.length < 2) {
+      showToast("Not enough qualified teams for knockout");
+      return;
+    }
+
+    const knockout = buildSeededKnockoutRounds(teamNames);
+    if (!knockout) {
+      showToast("Could not generate knockout schedule");
+      return;
+    }
+
+    knockout.label = `Knockout • ${teamNames.length} qualified teams`;
+    knockout.qualifiedTeams = teamNames;
+    autoAdvanceKnockoutByes(knockout);
+
+    cat.knockout = knockout;
+    const leagueMatches = Array.isArray(cat.matches) ? cat.matches : Array.isArray(cat.rounds?.[0]) ? cat.rounds[0] : [];
+    cat.rounds = [leagueMatches, ...knockout.rounds];
+    cat.totalRounds = cat.rounds.length;
+    await persistFixturesState();
+    renderTeamEventFixtures();
+    showToast("Knockout schedule created");
+  }
+
   async function initFixturesIfNeeded() {
     if (fixturesUi.didInit) return;
     fixturesUi.didInit = true;
@@ -2065,6 +2373,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     fixturesUi.generateBtn?.addEventListener("click", async () => {
       await generateAndSaveFixtures();
+    });
+
+    fixturesGoKnockoutBtn?.addEventListener("click", async () => {
+      try {
+        await generateKnockoutFromLeaderboard();
+      } catch (err) {
+        alert(err.message || "Could not create knockout schedule.");
+      }
     });
 
     fixturesUi.editBtn?.addEventListener("click", async () => {
@@ -2102,7 +2418,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
       renderTeamEventFixtures();
       updateFixturesEditButtonState();
-      fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -2117,7 +2432,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     updateFixturesEditButtonState();
-    fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   addPlayersExcelBtn?.addEventListener("click", () => {
@@ -2129,11 +2443,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadCaptainStateFromDb();
   await loadPoolsFromDb();
   await loadLeaderboardFromDb();
+  await openAndLoadFixtures();
 
   renderPlayers();
   renderCaptainsSummary();
   renderLeaderboard();
   refreshStageSpecificUi();
   syncAddPlayerCategoryUi();
+  syncPlayersListUi();
   syncTeamSetupUi();
+  syncLeaderboardUi();
+  syncFixturesUi();
 });
