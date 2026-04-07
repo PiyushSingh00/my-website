@@ -80,7 +80,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   const TEAM_EVENT_CATEGORY_ID = "__team_event__";
-  const TEAM_EVENT_KNOCKOUT_CATEGORY_ID = "__team_event_knockout__";
   const expandedTeamIds = new Set();
 
   const tableWrapper = document.getElementById("players-table-wrapper");
@@ -93,12 +92,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   const codeEl = document.getElementById("players-tournament-code");
 
   const playersTabs = document.getElementById("players-tabs");
+  const playersListToggleBtn = document.getElementById("players-list-toggle-btn");
+  const playersListContent = document.getElementById("players-list-content");
 
   const addPlayerBtn = document.getElementById("add-player-btn");
+  const addPlayerExcelBtn = document.getElementById("add-player-excel-btn");
+  const addPlayerExcelInput = document.getElementById("add-player-excel-input");
   const addPlayerModal = document.getElementById("host-add-player-modal");
   const addPlayerClose = document.getElementById("host-add-player-close");
   const addPlayerForm = document.getElementById("host-add-player-form");
   const addPlayerCategory = document.getElementById("host-player-category");
+
+  const teamPlayerModal = document.getElementById("team-player-modal");
+  const teamPlayerClose = document.getElementById("team-player-close");
+  const teamPlayerForm = document.getElementById("team-player-form");
+  const teamPlayerExisting = document.getElementById("team-player-existing");
 
   const makeCaptainsBtn = document.getElementById("make-captains-btn");
   const createPoolsBtn = document.getElementById("create-pools-btn");
@@ -130,9 +138,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const randomizePoolsBtn = document.getElementById("randomize-pools-btn");
 
   const leaderboardSection = document.getElementById("leaderboard-section");
+  const leaderboardToggleBtn = document.getElementById("leaderboard-toggle-btn");
+  const leaderboardContent = document.getElementById("leaderboard-content");
   const leaderboardTableBody = document.getElementById("leaderboard-table-body");
 
   const fixturesEmbed = document.getElementById("fixtures-embed");
+  const fixturesCollapseToggleBtn = document.getElementById("fixtures-toggle-btn");
+  const fixturesContent = document.getElementById("fixtures-content");
   const fixturesGenerateBtn = document.getElementById("fixtures-generate-btn");
   const fixturesConfigureBtn = document.getElementById("fixtures-configure-fields-btn");
   const fixturesEditBtn = document.getElementById("fixtures-edit-btn");
@@ -140,19 +152,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fixturesGroups = document.getElementById("fixtures-groups");
   const fixturesNoneSelected = document.getElementById("fixtures-none-selected");
   const fixturesToast = document.getElementById("fixtures-toast");
-  const createFixturesBtn = document.getElementById("create-fixtures-btn");
   const fixturesTournamentNameEl = document.getElementById("fixtures-tournament-name");
   const fixturesTournamentSportEl = document.getElementById("fixtures-tournament-sport");
   const fixturesTournamentDatesEl = document.getElementById("fixtures-tournament-dates");
   const fixturesTournamentCodeEl = document.getElementById("fixtures-tournament-code");
   const embeddedFixturesHelperTextEl = document.getElementById("embedded-fixtures-helper-text");
-  const fixturesStageActions = document.getElementById("fixtures-team-stage-actions");
 
   let allPlayers = [];
   let activeFilter = "all";
   let tournamentCategories = [];
   let tournamentMetaCache = null;
-  let isTeamSetupCollapsed = false;
+  let isPlayersListCollapsed = true;
+  let isTeamSetupCollapsed = true;
+  let isFixturesCollapsed = true;
+  let isLeaderboardCollapsed = true;
+  let pendingTeamPlayerCaptainId = null;
 
   let captainState = {
     selectedCaptainIds: [],
@@ -182,7 +196,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     acceptedByCategory: {},
     activeCategoryId: null,
     bulkEditMode: false,
-    teamView: "league",
   };
 
   function escapeHtml(value) {
@@ -465,11 +478,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     return `${h}:${m}`;
   }
 
+  function syncPlayersListUi() {
+    if (playersListContent) playersListContent.classList.toggle("hidden", isPlayersListCollapsed);
+    if (playersListToggleBtn) {
+      playersListToggleBtn.textContent = isPlayersListCollapsed ? "▸" : "▾";
+      playersListToggleBtn.setAttribute("aria-expanded", String(!isPlayersListCollapsed));
+    }
+  }
+
   function syncTeamSetupUi() {
     if (teamSetupContent) teamSetupContent.classList.toggle("hidden", isTeamSetupCollapsed);
     if (teamSetupToggleBtn) {
       teamSetupToggleBtn.textContent = isTeamSetupCollapsed ? "▸" : "▾";
       teamSetupToggleBtn.setAttribute("aria-expanded", String(!isTeamSetupCollapsed));
+    }
+  }
+
+  function syncFixturesUi() {
+    if (fixturesContent) fixturesContent.classList.toggle("hidden", isFixturesCollapsed);
+    if (fixturesCollapseToggleBtn) {
+      fixturesCollapseToggleBtn.textContent = isFixturesCollapsed ? "▸" : "▾";
+      fixturesCollapseToggleBtn.setAttribute("aria-expanded", String(!isFixturesCollapsed));
+    }
+  }
+
+  function syncLeaderboardUi() {
+    if (leaderboardContent) leaderboardContent.classList.toggle("hidden", isLeaderboardCollapsed);
+    if (leaderboardToggleBtn) {
+      leaderboardToggleBtn.textContent = isLeaderboardCollapsed ? "▸" : "▾";
+      leaderboardToggleBtn.setAttribute("aria-expanded", String(!isLeaderboardCollapsed));
     }
   }
 
@@ -486,11 +523,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  teamSetupToggleBtn?.addEventListener("click", () => {
-    isTeamSetupCollapsed = !isTeamSetupCollapsed;
-    syncTeamSetupUi();
-  });
-
   function getCaptainSubmittedPlayers(captain) {
     const raw = captain?.teamPlayers || captain?.players || captain?.members || captain?.submittedPlayers || captain?.roster || [];
     if (!Array.isArray(raw)) return [];
@@ -500,7 +532,179 @@ document.addEventListener("DOMContentLoaded", async () => {
       .filter(Boolean);
   }
 
-  
+  function getCaptainById(playerId) {
+    return captainState.confirmedCaptains.find((c) => String(c.playerId) === String(playerId)) || null;
+  }
+
+  function getNonCaptainPlayerIdSet() {
+    return new Set(captainState.confirmedCaptains.map((captain) => String(captain.playerId || "")));
+  }
+
+  function getAssignedPlayerNameSet(excludeCaptainId = "") {
+    const set = new Set();
+    captainState.confirmedCaptains.forEach((captain) => {
+      if (excludeCaptainId && String(captain.playerId) === String(excludeCaptainId)) return;
+      getCaptainSubmittedPlayers(captain).forEach((name) => {
+        const normalized = String(name || "").trim().toLowerCase();
+        if (normalized) set.add(normalized);
+      });
+    });
+    return set;
+  }
+
+  function getTeamAssignablePlayers(captain) {
+    const captainIds = getNonCaptainPlayerIdSet();
+    const assignedNames = getAssignedPlayerNameSet(captain?.playerId);
+    const currentNames = new Set(getCaptainSubmittedPlayers(captain).map((name) => String(name || "").trim().toLowerCase()));
+
+    return allPlayers.filter((player) => {
+      const playerId = String(getPlayerId(player) || "");
+      const name = String(getPlayerDisplayName(player) || "").trim();
+      const status = normalizeStatusPlayersPage(player);
+      if (!name) return false;
+      if (captainIds.has(playerId)) return false;
+      if (status === "rejected") return false;
+      const lowered = name.toLowerCase();
+      if (currentNames.has(lowered)) return false;
+      if (assignedNames.has(lowered)) return false;
+      return true;
+    });
+  }
+
+  function openTeamPlayerModal(captainId) {
+    pendingTeamPlayerCaptainId = String(captainId || "");
+    const captain = getCaptainById(pendingTeamPlayerCaptainId);
+    if (!captain) {
+      alert("Team not found.");
+      return;
+    }
+
+    if (teamPlayerExisting) {
+      const options = getTeamAssignablePlayers(captain);
+      teamPlayerExisting.innerHTML = `<option value="">Select registered player</option>`;
+      options.forEach((player) => {
+        const option = document.createElement("option");
+        option.value = String(getPlayerId(player) || "");
+        option.textContent = `${getPlayerDisplayName(player)}${player?.phone ? ` • ${player.phone}` : ""}`;
+        teamPlayerExisting.appendChild(option);
+      });
+      teamPlayerExisting.value = "";
+    }
+
+    teamPlayerModal?.classList.remove("hidden");
+    teamPlayerModal?.setAttribute("aria-hidden", "false");
+  }
+
+  function closeTeamPlayerModal() {
+    pendingTeamPlayerCaptainId = null;
+    teamPlayerModal?.classList.add("hidden");
+    teamPlayerModal?.setAttribute("aria-hidden", "true");
+  }
+
+  function upsertCaptainTeamPlayer(captainId, entry) {
+    const captain = getCaptainById(captainId);
+    if (!captain || !entry?.playerName) return false;
+
+    const nextName = String(entry.playerName || "").trim();
+    if (!nextName) return false;
+
+    const teamPlayers = Array.isArray(captain.teamPlayers) ? [...captain.teamPlayers] : getCaptainSubmittedPlayers(captain);
+    const teamRoster = Array.isArray(captain.teamRoster) ? captain.teamRoster.map((item) => ({ ...item })) : [];
+
+    const exists = teamPlayers.some((name) => String(name || "").trim().toLowerCase() === nextName.toLowerCase());
+    if (!exists) teamPlayers.push(nextName);
+
+    const rosterExists = teamRoster.some((item) => String(item?.playerName || "").trim().toLowerCase() === nextName.toLowerCase());
+    if (!rosterExists) {
+      teamRoster.push({
+        playerId: entry.playerId || `manual-team-${Date.now().toString(36)}`,
+        playerName: nextName,
+        age: entry.age ?? null,
+        gender: entry.gender || "",
+        phone: entry.phone || "",
+        addedByHost: true,
+      });
+    }
+
+    captain.teamPlayers = teamPlayers;
+    captain.teamRoster = teamRoster;
+    return true;
+  }
+
+  function removeCaptainTeamPlayer(captainId, playerName) {
+    const captain = getCaptainById(captainId);
+    if (!captain) return false;
+    const needle = String(playerName || "").trim().toLowerCase();
+    captain.teamPlayers = (Array.isArray(captain.teamPlayers) ? captain.teamPlayers : getCaptainSubmittedPlayers(captain))
+      .filter((name) => String(name || "").trim().toLowerCase() !== needle);
+    captain.teamRoster = (Array.isArray(captain.teamRoster) ? captain.teamRoster : [])
+      .filter((item) => String(item?.playerName || "").trim().toLowerCase() !== needle);
+    return true;
+  }
+
+  playersListToggleBtn?.addEventListener("click", () => {
+    isPlayersListCollapsed = !isPlayersListCollapsed;
+    syncPlayersListUi();
+  });
+
+  teamSetupToggleBtn?.addEventListener("click", () => {
+    isTeamSetupCollapsed = !isTeamSetupCollapsed;
+    syncTeamSetupUi();
+  });
+
+  fixturesCollapseToggleBtn?.addEventListener("click", async () => {
+    isFixturesCollapsed = !isFixturesCollapsed;
+    syncFixturesUi();
+    if (!isFixturesCollapsed) await openAndLoadFixtures({ scroll: true });
+  });
+
+  leaderboardToggleBtn?.addEventListener("click", () => {
+    isLeaderboardCollapsed = !isLeaderboardCollapsed;
+    syncLeaderboardUi();
+  });
+
+  teamPlayerClose?.addEventListener("click", closeTeamPlayerModal);
+  teamPlayerModal?.addEventListener("click", (e) => {
+    if (e.target === teamPlayerModal) closeTeamPlayerModal();
+  });
+
+  teamPlayerForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const captain = getCaptainById(pendingTeamPlayerCaptainId);
+    if (!captain) {
+      alert("Team not found.");
+      return;
+    }
+
+    const selectedId = String(teamPlayerExisting?.value || "").trim();
+    const selectedPlayer = allPlayers.find((player) => String(getPlayerId(player) || "") === selectedId) || null;
+    if (!selectedPlayer) {
+      alert("Select a registered non-captain player.");
+      return;
+    }
+
+    const entry = {
+      playerId: getPlayerId(selectedPlayer),
+      playerName: getPlayerDisplayName(selectedPlayer),
+      age: selectedPlayer?.age ?? null,
+      gender: selectedPlayer?.gender || "",
+      phone: selectedPlayer?.phone || selectedPlayer?.playerPhone || "",
+    };
+
+    if (!upsertCaptainTeamPlayer(pendingTeamPlayerCaptainId, entry)) {
+      alert("Could not add player to team.");
+      return;
+    }
+
+    try {
+      await saveCaptainStateToDb();
+      closeTeamPlayerModal();
+      renderCaptainsSummary();
+    } catch (err) {
+      alert(err.message || "Could not save team player.");
+    }
+  });
+
   function getConfirmedTeams() {
     return captainState.confirmedCaptains.map((captain) => ({
       teamKey: `captain:${captain.playerId}`,
@@ -512,21 +716,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       teamPlayers: Array.isArray(captain.teamPlayers) ? [...captain.teamPlayers] : getCaptainSubmittedPlayers(captain),
       teamRoster: Array.isArray(captain.teamRoster) ? captain.teamRoster.map((item) => ({ ...item })) : [],
     }));
-  }
-
-  function getRequestedQualifierCount(teamCount = 0) {
-    const requested = Number(getAdvancedSettings()?.qualifierCount || 0);
-    if (Number.isFinite(requested) && requested >= 2) {
-      return Math.min(Math.max(2, requested), teamCount || requested);
-    }
-
-    const qualifiedFromBackend = leaderboardState.rows.filter((row) => row?.qualified).length;
-    if (qualifiedFromBackend >= 2) {
-      return Math.min(qualifiedFromBackend, teamCount || qualifiedFromBackend);
-    }
-
-    if (teamCount >= 4) return 4;
-    return Math.max(2, Math.min(teamCount || 2, 2));
   }
 
   function getTeamEventFixtureBucket(stagePreference = null) {
@@ -541,383 +730,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     return categories[TEAM_EVENT_CATEGORY_ID] || categories[TEAM_EVENT_KNOCKOUT_CATEGORY_ID] || Object.values(categories)[0] || null;
   }
 
-  function getLeagueFixtureBucket() {
-    return getTeamEventFixtureBucket("league");
-  }
-
-  function getKnockoutFixtureBucket() {
-    return getTeamEventFixtureBucket("knockout");
-  }
-
-  function getTeamFixtureStatusKey(match) {
-    const raw = String(
-      match?.status ||
-      match?.score?.computed?.status ||
-      match?.computed?.status ||
-      ""
-    ).toLowerCase();
-
-    if (String(match?.home || "").toUpperCase() === "BYE" || String(match?.away || "").toUpperCase() === "BYE") {
-      return "completed";
-    }
-    if (match?.winner || ["completed", "complete", "done", "finished"].includes(raw)) {
-      return "completed";
-    }
-    if (["live", "in_progress", "in-progress", "ongoing", "started"].includes(raw)) {
-      return "live";
-    }
-    return "pending";
-  }
-
-  function getTeamFixtureStatusMeta(match) {
-    const key = getTeamFixtureStatusKey(match);
-    return {
-      key,
-      text: key === "completed" ? "Completed" : key === "live" ? "Live" : "Pending",
-    };
-  }
-
-  function isRealTeamName(value) {
-    const text = String(value || "").trim().toUpperCase();
-    return Boolean(text) && text !== "BYE" && text !== "TBD";
-  }
-
-  function isLeagueMatchCountedAsPlayed(match) {
-    const status = getTeamFixtureStatusKey(match);
-    return status === "completed" || status === "live";
-  }
-
-  function getLeagueScheduleRows(cat = getLeagueFixtureBucket()) {
-    if (!cat) return [];
-    return Array.isArray(cat?.matches)
-      ? cat.matches
-      : Array.isArray(cat?.rounds?.[0])
-        ? cat.rounds[0]
-        : [];
-  }
-
-  function getMatchesPlayedMap() {
-    const counts = {};
-    const leagueMatches = getLeagueScheduleRows();
-
-    leagueMatches.forEach((match) => {
-      if (!isLeagueMatchCountedAsPlayed(match)) return;
-      const home = String(match?.home || "").trim();
-      const away = String(match?.away || "").trim();
-      if (isRealTeamName(home)) counts[home] = (counts[home] || 0) + 1;
-      if (isRealTeamName(away)) counts[away] = (counts[away] || 0) + 1;
-    });
-
-    return counts;
-  }
-
-  function getLeaderboardDisplayRows() {
-    const playedMap = getMatchesPlayedMap();
-    const fallbackTeams = getConfirmedTeams().map((team) => team.teamName).filter(Boolean);
-
-    const baseRows = leaderboardState.rows.length
-      ? leaderboardState.rows
-      : fallbackTeams.map((teamName) => ({ teamName, matchPoints: 0 }));
-
-    const rows = baseRows.map((row, index) => {
-      const teamName = String(row?.teamName || row?.name || "—").trim();
-      return {
-        ...row,
-        rank: index + 1,
-        teamName,
-        matchPoints: Number(row?.matchPoints ?? 0) || 0,
-        matchesPlayed: Number(
-          row?.matchesPlayed ??
-          row?.matches ??
-          row?.played ??
-          playedMap[teamName] ??
-          0
-        ) || 0,
-      };
-    });
-
-    const qualifierCount = getRequestedQualifierCount(rows.length);
-    return rows.map((row, index) => ({
-      ...row,
-      qualified: index < qualifierCount,
-    }));
-  }
-
-  function getQualifiedTeamNamesFromLeaderboard() {
-    return getLeaderboardDisplayRows()
-      .filter((row) => row.qualified && row.teamName && row.teamName !== "—")
-      .map((row) => row.teamName);
-  }
-
-  function areAllLeagueMatchesCompleted() {
-    const matches = getLeagueScheduleRows();
-    return Boolean(matches.length) && matches.every((match) => getTeamFixtureStatusKey(match) === "completed");
-  }
-
-  function getKnockoutBaseDate() {
-    const leagueMatches = getLeagueScheduleRows();
-    const latestMs = leagueMatches.reduce((maxMs, match) => {
-      if (!match?.date) return maxMs;
-      const dt = new Date(`${match.date}T${match.time || "09:00"}:00`);
-      const ms = dt.getTime();
-      return Number.isNaN(ms) ? maxMs : Math.max(maxMs, ms);
-    }, 0);
-
-    const base = latestMs ? new Date(latestMs + 2 * 60 * 60 * 1000) : getTournamentStartDate();
-    base.setMinutes(0, 0, 0);
-    return base;
-  }
-
-  function setSeedMatchParticipants(match, home, away) {
-    match.home = home;
-    match.away = away;
-    match.homePlayers = isRealTeamName(home) ? [home] : [];
-    match.awayPlayers = isRealTeamName(away) ? [away] : [];
-  }
-
-  function propagateWinnerToNextRound(rounds, roundIndex, matchIndex, winnerName) {
-    const nextRound = rounds?.[roundIndex + 1];
-    if (!nextRound || !winnerName) return;
-
-    const targetMatch = nextRound[Math.floor(matchIndex / 2)];
-    if (!targetMatch) return;
-
-    if (matchIndex % 2 === 0) {
-      targetMatch.home = winnerName;
-      targetMatch.homePlayers = [winnerName];
-    } else {
-      targetMatch.away = winnerName;
-      targetMatch.awayPlayers = [winnerName];
-    }
-  }
-
-  function autoAdvanceByeWinners(rounds) {
-    if (!Array.isArray(rounds)) return;
-    rounds.forEach((round, roundIndex) => {
-      round.forEach((match, matchIndex) => {
-        const home = String(match?.home || "").trim();
-        const away = String(match?.away || "").trim();
-        const homeReal = isRealTeamName(home);
-        const awayReal = isRealTeamName(away);
-        const hasBye = String(home || "").toUpperCase() === "BYE" || String(away || "").toUpperCase() === "BYE";
-
-        if (!hasBye) return;
-        if (!(homeReal || awayReal)) return;
-
-        const winnerName = homeReal ? home : away;
-        match.status = "completed";
-        match.winner = winnerName;
-        propagateWinnerToNextRound(rounds, roundIndex, matchIndex, winnerName);
-      });
-    });
-  }
-
-  function createSeededKnockoutBracket(seedNames) {
-    const seeds = seedNames.filter(Boolean).map((name) => String(name).trim());
-    if (seeds.length < 2) return null;
-
-    const bracketSize = nextPow2(seeds.length);
-    while (seeds.length < bracketSize) seeds.push("BYE");
-
-    const totalRounds = Math.log2(bracketSize);
-    const rounds = [];
-    const firstRound = [];
-    const courts = getAvailableCourtNames();
-    const baseDate = getKnockoutBaseDate();
-
-    for (let i = 0; i < seeds.length / 2; i += 1) {
-      const home = seeds[i];
-      const away = seeds[seeds.length - 1 - i];
-      const dt = new Date(baseDate.getTime() + i * 2 * 60 * 60 * 1000);
-      const match = ensureMatchMeta({
-        matchId: makeMatchId(),
-        matchNo: i + 1,
-        stage: "knockout",
-        roundLabel: getRoundLabel(0, totalRounds),
-        date: isRealTeamName(home) && isRealTeamName(away) ? formatDateInputValue(dt) : "",
-        time: isRealTeamName(home) && isRealTeamName(away) ? formatTimeInputValue(dt) : "",
-        court: isRealTeamName(home) && isRealTeamName(away) ? courts[i % courts.length] : "",
-        status: "pending",
-        winner: null,
-      });
-      setSeedMatchParticipants(match, home, away);
-      firstRound.push(match);
-    }
-
-    rounds.push(firstRound);
-
-    for (let roundIndex = 1; roundIndex < totalRounds; roundIndex += 1) {
-      const prev = rounds[roundIndex - 1];
-      const nextRound = [];
-      for (let i = 0; i < prev.length / 2; i += 1) {
-        nextRound.push(ensureMatchMeta({
-          matchId: makeMatchId(),
-          matchNo: i + 1,
-          stage: "knockout",
-          roundLabel: getRoundLabel(roundIndex, totalRounds),
-          home: "TBD",
-          away: "TBD",
-          homePlayers: [],
-          awayPlayers: [],
-          date: "",
-          time: "",
-          court: "",
-          status: "pending",
-          winner: null,
-        }));
-      }
-      rounds.push(nextRound);
-    }
-
-    autoAdvanceByeWinners(rounds);
-    return { rounds, totalRounds };
-  }
-
-  function getFlattenedTeamScheduleRows(cat) {
-    if (!cat) return [];
-
-    if (String(cat?.stage || "") === "knockout" && Array.isArray(cat?.rounds)) {
-      return cat.rounds.flatMap((round, roundIndex) =>
-        (Array.isArray(round) ? round : []).map((match, matchIndex) => ({
-          match,
-          roundIndex,
-          matchIndex,
-          roundLabel: getDisplayRoundLabel(cat, round, roundIndex),
-          categoryId: TEAM_EVENT_KNOCKOUT_CATEGORY_ID,
-          stage: "knockout",
-        }))
-      );
-    }
-
-    const leagueMatches = getLeagueScheduleRows(cat);
-    return leagueMatches.map((match, index) => ({
-      match,
-      roundIndex: 0,
-      matchIndex: index,
-      roundLabel: match?.roundLabel || "League match",
-      categoryId: TEAM_EVENT_CATEGORY_ID,
-      stage: "league",
-    }));
-  }
-
-  function renderTeamStageTabs() {
-    if (!fixturesUi.toggleWrap) return;
-
-    if (!(isTournamentTeamEvent() && isLeagueKnockoutFormat())) {
-      fixturesUi.toggleWrap.innerHTML = "";
-      fixturesUi.toggleWrap.classList.add("hidden");
-      return;
-    }
-
-    const knockoutExists = Boolean(getKnockoutFixtureBucket());
-    fixturesUi.toggleWrap.classList.remove("hidden");
-    fixturesUi.toggleWrap.innerHTML = "";
-
-    const tabs = [
-      { key: "league", label: "League schedule", disabled: false },
-      { key: "knockout", label: "Knockout", disabled: !knockoutExists },
-    ];
-
-    tabs.forEach((tab) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `toggle-btn ${fixturesState.teamView === tab.key ? "active" : ""}`;
-      btn.textContent = tab.label;
-      btn.disabled = tab.disabled;
-      btn.addEventListener("click", () => {
-        if (tab.disabled) return;
-        fixturesState.teamView = tab.key;
-        renderTeamEventFixtures();
-      });
-      fixturesUi.toggleWrap.appendChild(btn);
-    });
-  }
-
-  function renderTeamStageActions() {
-    if (!fixturesStageActions) return;
-
-    fixturesStageActions.innerHTML = "";
-    fixturesStageActions.classList.add("hidden");
-
-    if (!(isTournamentTeamEvent() && isLeagueKnockoutFormat())) return;
-
-    const knockoutExists = Boolean(getKnockoutFixtureBucket());
-    const canCreateKnockout = fixturesState.teamView === "league" && !knockoutExists && areAllLeagueMatchesCompleted();
-
-    if (canCreateKnockout) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "btn-primary";
-      btn.textContent = "Go to knockout";
-      btn.addEventListener("click", async () => {
-        await createKnockoutFromLeaderboard();
-      });
-      fixturesStageActions.appendChild(btn);
-      fixturesStageActions.classList.remove("hidden");
-      return;
-    }
-
-    if (fixturesState.teamView === "league" && knockoutExists) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "btn-dark";
-      btn.textContent = "View knockout";
-      btn.addEventListener("click", () => {
-        fixturesState.teamView = "knockout";
-        renderTeamEventFixtures();
-      });
-      fixturesStageActions.appendChild(btn);
-      fixturesStageActions.classList.remove("hidden");
-    }
-  }
-
-  async function createKnockoutFromLeaderboard() {
-    const qualifiedNames = getQualifiedTeamNamesFromLeaderboard();
-    if (qualifiedNames.length < 2) {
-      alert("At least 2 qualified teams are required to create knockout fixtures.");
-      return;
-    }
-
-    const bracket = createSeededKnockoutBracket(qualifiedNames);
-    if (!bracket) {
-      alert("Could not create knockout fixtures.");
-      return;
-    }
-
-    fixturesState.fixtures = fixturesState.fixtures || { categories: {} };
-    fixturesState.fixtures.tournamentType = "team";
-    fixturesState.fixtures.teamCategories = tournamentCategories;
-    fixturesState.fixtures.categories = {
-      ...(fixturesState.fixtures.categories || {}),
-      [TEAM_EVENT_KNOCKOUT_CATEGORY_ID]: {
-        categoryId: TEAM_EVENT_KNOCKOUT_CATEGORY_ID,
-        label: `Knockout schedule • Top ${qualifiedNames.length} teams`,
-        displayMode: "team_schedule",
-        stage: "knockout",
-        qualifiedTeamNames: qualifiedNames,
-        ...bracket,
-      },
-    };
-
-    fixturesState.teamView = "knockout";
-    try {
-      await persistFixturesState();
-      renderLeaderboard();
-      renderTeamEventFixtures();
-      showToast("Knockout schedule created");
-    } catch (err) {
-      alert(err.message || "Could not create knockout schedule.");
-    }
-  }
-
   function updateFixturesEditButtonState() {
     if (!fixturesEditBtn) return;
     const cat = getTeamEventFixtureBucket();
     const canEdit = Boolean(
       isTournamentTeamEvent() &&
-      fixturesState.teamView !== "knockout" &&
       cat &&
-      String(cat?.stage || "league") !== "knockout" &&
       cat.displayMode === "team_schedule" &&
       ((Array.isArray(cat.matches) && cat.matches.length) || (Array.isArray(cat.rounds?.[0]) && cat.rounds[0].length))
     );
@@ -936,7 +754,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (isTournamentTeamEvent() && isLeagueKnockoutFormat()) {
       embeddedFixturesHelperTextEl.textContent =
-        "League matches appear first. Once every league match is completed, use “Go to knockout” to seed the qualified teams into the knockout tab.";
+        "For team events, the fixture list shows team vs team ties. Categories act as submatches inside each tie. League schedules are shown as editable match tables.";
       return;
     }
 
@@ -1257,6 +1075,107 @@ document.addEventListener("DOMContentLoaded", async () => {
     alert("Could not add player. Check backend route.");
   });
 
+  function resolveCategoryIdFromImport(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const lowered = raw.toLowerCase();
+    const exact = tournamentCategories.find((c) => String(c.categoryId || c.id || "").toLowerCase() == lowered);
+    if (exact) return exact.categoryId || exact.id || "";
+    const byLabel = tournamentCategories.find((c) => categoryLabel(c).toLowerCase() === lowered);
+    if (byLabel) return byLabel.categoryId || byLabel.id || "";
+    return "";
+  }
+
+  async function submitImportedPlayer(payload) {
+    const attempts = [
+      () => apiPost(`/api/host/tournaments/${tournamentId}/players/add`, payload),
+      () => apiPost(`/api/host/tournaments/${tournamentId}/players`, payload),
+      () => apiPost(`/api/host/tournaments/${tournamentId}/registrations`, payload),
+    ];
+
+    for (const attempt of attempts) {
+      const r = await attempt();
+      if (r.ok) return true;
+    }
+    return false;
+  }
+
+  function pickImportValue(row, keys) {
+    for (const key of keys) {
+      const found = Object.keys(row).find((col) => String(col || "").trim().toLowerCase() === key);
+      if (found != null && row[found] != null && String(row[found]).trim() !== "") return row[found];
+    }
+    return "";
+  }
+
+  async function importPlayersFromWorkbook(file) {
+    if (!file) return;
+    if (!window.XLSX) {
+      alert("Excel import library could not be loaded.");
+      return;
+    }
+
+    const buffer = await file.arrayBuffer();
+    const workbook = window.XLSX.read(buffer, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+    if (!rows.length) {
+      alert("No rows found in the selected file.");
+      return;
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const row of rows) {
+      const playerName = String(pickImportValue(row, ["name", "player name", "playername", "full name", "fullname"])).trim();
+      const ageRaw = pickImportValue(row, ["age"]);
+      const gender = String(pickImportValue(row, ["gender", "sex"])).trim();
+      const phone = String(pickImportValue(row, ["phone", "phone number", "mobile", "mobile number", "contact", "contact number"])).trim();
+      const categoryRaw = pickImportValue(row, ["category", "category id", "category name"]);
+      const age = Number(ageRaw || 0);
+
+      const payload = {
+        playerName,
+        age,
+        gender,
+        phone,
+        categoryId: isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : resolveCategoryIdFromImport(categoryRaw),
+        status: "accepted",
+        addedByHost: true,
+      };
+
+      if (!payload.playerName || !payload.age || !payload.gender || !payload.phone || (!isTournamentTeamEvent() && !payload.categoryId)) {
+        failedCount += 1;
+        continue;
+      }
+
+      const ok = await submitImportedPlayer(payload);
+      if (ok) successCount += 1;
+      else failedCount += 1;
+    }
+
+    await loadPlayers();
+    alert(`Import completed. Added: ${successCount}. Failed: ${failedCount}.`);
+  }
+
+  addPlayerExcelBtn?.addEventListener("click", () => {
+    addPlayerExcelInput?.click();
+  });
+
+  addPlayerExcelInput?.addEventListener("change", async (e) => {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+    try {
+      await importPlayersFromWorkbook(file);
+    } catch (err) {
+      alert(err.message || "Could not import players from file.");
+    } finally {
+      e.target.value = "";
+    }
+  });
+
   function getDefaultCaptainState() {
     return {
       selectedCaptainIds: [],
@@ -1411,9 +1330,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         ...existing,
         playerId,
         playerName: getPlayerDisplayName(player),
-        categoryId: getPlayerCategoryId(player),
+        categoryId: isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : getPlayerCategoryId(player),
         teamName: teamNameInput?.value?.trim() || existing.teamName || `Team ${index + 1}`,
         teamStatus: existing.teamStatus || "pending",
+        teamPlayers: Array.isArray(existing.teamPlayers) ? [...existing.teamPlayers] : getCaptainSubmittedPlayers(existing),
+        teamRoster: Array.isArray(existing.teamRoster) ? existing.teamRoster.map((item) => ({ ...item })) : [],
       };
     });
 
@@ -1433,17 +1354,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     captainsSummaryList.innerHTML = "";
     syncTeamSetupUi();
 
-    if (!captainState.confirmedCaptains.length) {
+    const teams = getConfirmedTeams();
+    if (!teams.length) {
       captainsSummaryEmpty?.classList.remove("hidden");
       return;
     }
 
     captainsSummaryEmpty?.classList.add("hidden");
 
-    captainState.confirmedCaptains.forEach((captain) => {
-      const playerId = String(captain.playerId || "");
+    teams.forEach((captain) => {
+      const playerId = String(captain.captainId || captain.playerId || "");
       const expanded = expandedTeamIds.has(playerId);
-      const teamPlayers = getCaptainSubmittedPlayers(captain);
+      const teamPlayers = Array.isArray(captain.teamPlayers) ? captain.teamPlayers : getCaptainSubmittedPlayers(captain);
       const teamStatus = String(captain.teamStatus || "pending");
       const statusChipClass = teamStatus === "accepted"
         ? "status-pill status-pill--accepted"
@@ -1462,7 +1384,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <button type="button" class="captain-summary-head-btn" data-team-card-toggle="${escapeHtml(playerId)}">
           <div class="captain-summary-left">
             <div class="captain-summary-name">${escapeHtml(captain.teamName || captain.playerName || "Team")}</div>
-            <div class="captain-summary-meta">Captain: ${escapeHtml(captain.playerName || "—")}</div>
+            <div class="captain-summary-meta">Captain: ${escapeHtml(captain.captainName || captain.playerName || "—")}</div>
           </div>
           <div class="row-actions team-setup-head-actions">
             <span class="${statusChipClass}">${escapeHtml(statusChipText)}</span>
@@ -1470,10 +1392,23 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
         </button>
         <div class="team-setup-details${expanded ? "" : " hidden"}" data-team-card-body="${escapeHtml(playerId)}">
-          <div class="helper-text team-setup-helper">Players submitted by captain</div>
+          <div class="helper-text team-setup-helper">Players currently in this team</div>
           ${teamPlayers.length
-            ? `<div class="team-player-list">${teamPlayers.map((name, idx) => `<div class="team-player-row"><span class="team-player-index">${idx + 1}</span><span class="team-player-name">${escapeHtml(name)}</span></div>`).join("")}</div>`
-            : `<div class="empty-state compact-empty team-setup-empty"><div class="feature-icon">👥</div><h3>No team list yet</h3><p class="muted">Team players from captain submission on join mode will appear here once linked.</p></div>`}
+            ? `<div class="team-player-list">${teamPlayers.map((name, idx) => `
+                <div class="team-player-row">
+                  <div class="team-player-main">
+                    <span class="team-player-index">${idx + 1}</span>
+                    <span class="team-player-name">${escapeHtml(name)}</span>
+                  </div>
+                  <div class="team-player-actions">
+                    <button type="button" class="team-player-remove-btn" data-remove-team-player="${escapeHtml(playerId)}" data-player-name="${escapeHtml(name)}">Remove</button>
+                  </div>
+                </div>
+              `).join("")}</div>`
+            : `<div class="empty-state compact-empty team-setup-empty"><div class="feature-icon">👥</div><h3>No team list yet</h3><p class="muted">Use the button below to add registered non-captain players into this team.</p></div>`}
+          <div class="team-setup-footer">
+            <button type="button" class="team-player-add-btn" data-add-team-player="${escapeHtml(playerId)}">+ Add player manually</button>
+          </div>
           <div class="row-actions team-setup-actions">
             <button type="button" class="action-btn accept" data-team-status="accepted" data-team-player-id="${escapeHtml(playerId)}">Accept team</button>
             <button type="button" class="action-btn reject" data-team-status="rejected" data-team-player-id="${escapeHtml(playerId)}">Reject team</button>
@@ -1490,6 +1425,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (expandedTeamIds.has(playerId)) expandedTeamIds.delete(playerId);
         else expandedTeamIds.add(playerId);
         renderCaptainsSummary();
+      });
+    });
+
+    captainsSummaryList.querySelectorAll("[data-add-team-player]").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const playerId = String(btn.getAttribute("data-add-team-player") || "");
+        if (!playerId) return;
+        if (!expandedTeamIds.has(playerId)) expandedTeamIds.add(playerId);
+        openTeamPlayerModal(playerId);
+      });
+    });
+
+    captainsSummaryList.querySelectorAll("[data-remove-team-player]").forEach((btn) => {
+      btn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const captainId = String(btn.getAttribute("data-remove-team-player") || "");
+        const playerName = String(btn.getAttribute("data-player-name") || "");
+        if (!captainId || !playerName) return;
+        removeCaptainTeamPlayer(captainId, playerName);
+        try {
+          await saveCaptainStateToDb();
+          renderCaptainsSummary();
+        } catch (err) {
+          alert(err.message || "Could not remove team player.");
+        }
       });
     });
 
@@ -1702,7 +1663,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  
   async function loadLeaderboardFromDb() {
     const categoryId = isTournamentTeamEvent()
       ? TEAM_EVENT_CATEGORY_ID
@@ -1721,35 +1681,27 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? r.data
           : []
       : [];
-
-    renderTeamStageActions();
   }
 
   function renderLeaderboard() {
     if (!leaderboardSection || !leaderboardTableBody) return;
-
-    const rows = getLeaderboardDisplayRows();
     leaderboardTableBody.innerHTML = "";
-
-    if (!rows.length) {
-      leaderboardTableBody.innerHTML = `<tr><td colspan="5" class="muted">No leaderboard data yet.</td></tr>`;
-      renderTeamStageActions();
+    if (!leaderboardState.rows.length) {
+      leaderboardTableBody.innerHTML = `<tr><td colspan="6" class="muted">No leaderboard data yet.</td></tr>`;
       return;
     }
-
-    rows.forEach((row, idx) => {
+    leaderboardState.rows.forEach((row, idx) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${idx + 1}</td>
         <td>${escapeHtml(row.teamName || "—")}</td>
         <td>${escapeHtml(row.matchPoints ?? 0)}</td>
-        <td>${escapeHtml(row.matchesPlayed ?? 0)}</td>
+        <td>${escapeHtml(row.tiesWon ?? 0)}</td>
+        <td>${escapeHtml(row.headToHead ?? "—")}</td>
         <td>${escapeHtml(row.qualified ? "Yes" : "No")}</td>
       `;
       leaderboardTableBody.appendChild(tr);
     });
-
-    renderTeamStageActions();
   }
 
   function makeMatchId() {
@@ -2153,7 +2105,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  
+  function buildTeamNameSelect(field, index, currentValue) {
+    const teams = getConfirmedTeams().map((team) => String(team.teamName || "").trim()).filter(Boolean);
+    const values = [];
+    if (currentValue && !teams.includes(currentValue)) values.push(currentValue);
+    values.push(...teams.filter((name) => name !== currentValue));
+    const options = [`<option value="">Select team</option>`]
+      .concat(values.map((name) => `<option value="${escapeHtml(name)}" ${name === currentValue ? "selected" : ""}>${escapeHtml(name)}</option>`));
+    return `<select class="schedule-edit-input" data-edit-field="${field}" data-index="${index}">${options.join("")}</select>`;
+  }
+
   function renderTeamEventScheduleTable(cat) {
     const rows = getFlattenedTeamScheduleRows(cat);
     const stage = String(cat?.stage || (fixturesState.teamView === "knockout" ? "knockout" : "league"));
@@ -2211,10 +2172,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     : "Start scoring";
 
                 const team1Cell = editing
-                  ? `<input class="schedule-edit-input" type="text" data-edit-field="home" data-index="${index}" value="${escapeHtml(match.home || "")}" placeholder="Team 1" />`
+                  ? buildTeamNameSelect("home", index, String(match.home || ""))
                   : escapeHtml(match.home || "—");
                 const team2Cell = editing
-                  ? `<input class="schedule-edit-input" type="text" data-edit-field="away" data-index="${index}" value="${escapeHtml(match.away || "")}" placeholder="Team 2" />`
+                  ? buildTeamNameSelect("away", index, String(match.away || ""))
                   : escapeHtml(match.away || "—");
                 const dateCell = editing
                   ? `<input class="schedule-edit-input" type="date" data-edit-field="date" data-index="${index}" value="${escapeHtml(match.date || "")}" />`
@@ -2228,10 +2189,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 return `
                   <tr>
-                    <td>
-                      ${escapeHtml(match.matchNo || index + 1)}
-                      <div class="table-subtext">${escapeHtml(row.roundLabel || "")}</div>
-                    </td>
+                    <td>${index + 1}</td>
                     <td>${team1Cell}</td>
                     <td>${team2Cell}</td>
                     <td>${dateCell}</td>
@@ -2269,14 +2227,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function saveAllTeamScheduleEdits() {
-    const cat = getLeagueFixtureBucket();
+    const cat = getTeamEventFixtureBucket();
     if (!cat) return;
 
-    const matches = getLeagueScheduleRows(cat);
+    const matches = Array.isArray(cat.matches)
+      ? cat.matches
+      : Array.isArray(cat.rounds?.[0])
+        ? cat.rounds[0]
+        : [];
+
     matches.forEach((match, index) => {
       const root = fixturesUi.groupsEl;
-      const home = root?.querySelector(`input[data-edit-field="home"][data-index="${index}"]`)?.value?.trim() || match.home || "";
-      const away = root?.querySelector(`input[data-edit-field="away"][data-index="${index}"]`)?.value?.trim() || match.away || "";
+      const home = root?.querySelector(`[data-edit-field="home"][data-index="${index}"]`)?.value?.trim() || match.home || "";
+      const away = root?.querySelector(`[data-edit-field="away"][data-index="${index}"]`)?.value?.trim() || match.away || "";
       const date = root?.querySelector(`input[data-edit-field="date"][data-index="${index}"]`)?.value || match.date || "";
       const time = root?.querySelector(`input[data-edit-field="time"][data-index="${index}"]`)?.value || match.time || "";
       const court = root?.querySelector(`input[data-edit-field="court"][data-index="${index}"]`)?.value?.trim() || match.court || "";
@@ -2295,7 +2258,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await persistFixturesState();
     fixturesState.bulkEditMode = false;
-    renderTeamEventScheduleTable(getLeagueFixtureBucket());
+    renderTeamEventScheduleTable(getTeamEventFixtureBucket());
     showToast("Fixtures updated");
   }
 
@@ -2311,30 +2274,50 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderTeamEventFixtures() {
     fixturesUi.groupsEl.innerHTML = "";
-    renderTeamStageTabs();
-    renderTeamStageActions();
-
     const cat = getTeamEventFixtureBucket();
     if (!cat) {
       const teams = getConfirmedTeams().filter((team) => team.teamStatus !== "rejected");
-      const emptyMessage = fixturesState.teamView === "knockout"
-        ? "Complete league matches and click “Go to knockout” to create the knockout schedule."
-        : (teams.length < 2
-            ? "Not enough confirmed teams to generate fixtures."
-            : "Click “Regenerate fixtures” to create the team fixtures.");
-
       fixturesUi.groupsEl.innerHTML = `
         <div class="empty-state" style="display:flex;">
           <div class="feature-icon">🧩</div>
           <h3>No fixtures yet</h3>
-          <p class="muted">${emptyMessage}</p>
+          <p class="muted">${teams.length < 2 ? "Not enough confirmed teams to generate fixtures." : "Click “Regenerate fixtures” to create the team fixtures."}</p>
         </div>
       `;
       updateFixturesEditButtonState();
       return;
     }
 
-    renderTeamEventScheduleTable(cat);
+    if (cat.displayMode === "team_schedule") {
+      renderTeamEventScheduleTable(cat);
+      return;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "fixtures-group";
+    const title = document.createElement("h3");
+    title.className = "fixtures-group-title";
+    title.textContent = cat.label || "Team fixtures";
+    wrapper.appendChild(title);
+
+    const roundsWrap = document.createElement("div");
+    roundsWrap.className = "fixtures-rounds";
+    (cat.rounds || []).forEach((round, roundIndex) => {
+      const col = document.createElement("div");
+      col.className = "fixtures-round-col";
+      col.innerHTML = `<div class="round-title">${escapeHtml(getDisplayRoundLabel(cat, round, roundIndex))}</div>`;
+      round.forEach((match, matchIndex) => {
+        const item = document.createElement("div");
+        item.className = "fixtures-round-match";
+        item.innerHTML = buildFixtureCard(match, roundIndex, matchIndex, TEAM_EVENT_CATEGORY_ID);
+        col.appendChild(item);
+      });
+      roundsWrap.appendChild(col);
+    });
+
+    wrapper.appendChild(roundsWrap);
+    fixturesUi.groupsEl.appendChild(wrapper);
+    updateFixturesEditButtonState();
   }
 
   function renderCategoryBracket(categoryId) {
@@ -2345,7 +2328,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderIndividualCategoryFixtures(categoryId);
   }
 
-  
   async function generateAndSaveFixtures() {
     if (isTournamentTeamEvent()) {
       const teams = getConfirmedTeams().filter((team) => team.teamStatus !== "rejected");
@@ -2365,8 +2347,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const scheduledMatches = scheduleLeaguePairs(pairs, shuffle(getAvailableCourtNames()), getTournamentStartDate());
         fixturesState.bulkEditMode = false;
-        fixturesState.teamView = "league";
-        fixturesState.fixtures = migrateFixtures({
+        fixturesState.bulkEditMode = false;
+      fixturesState.fixtures = migrateFixtures({
           tournamentType: "team",
           teamCategories: tournamentCategories,
           categories: {
@@ -2374,7 +2356,6 @@ document.addEventListener("DOMContentLoaded", async () => {
               categoryId: TEAM_EVENT_CATEGORY_ID,
               label: `League schedule • ${matchesPerTeam} matches per team`,
               displayMode: "team_schedule",
-              stage: "league",
               rounds: [scheduledMatches],
               matches: scheduledMatches,
               totalRounds: 1,
@@ -2385,8 +2366,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         try {
           await persistFixturesState();
           showToast("League fixtures generated");
-          await loadLeaderboardFromDb();
-          renderLeaderboard();
           renderTeamEventFixtures();
         } catch (err) {
           alert(err.message || "Could not save league fixtures.");
@@ -2489,8 +2468,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     fixturesUi.editBtn?.addEventListener("click", async () => {
-      const cat = getLeagueFixtureBucket();
-      if (!cat || cat.displayMode !== "team_schedule" || fixturesState.teamView === "knockout") {
+      const cat = getTeamEventFixtureBucket();
+      if (!cat || cat.displayMode !== "team_schedule") {
         showToast("Edit fixtures is available for the team schedule table.");
         return;
       }
@@ -2506,9 +2485,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  
-  async function openAndLoadFixtures() {
-    fixturesUi.wrap?.classList.remove("hidden");
+  async function openAndLoadFixtures(options = {}) {
+    const shouldScroll = Boolean(options?.scroll);
     await initFixturesIfNeeded();
     updateEmbeddedFixturesHeader();
 
@@ -2519,14 +2497,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     fixturesState.fixtures = existing ? migrateFixtures(existing) : { categories: {} };
 
     if (isTournamentTeamEvent()) {
-      fixturesState.teamView = getKnockoutFixtureBucket() ? fixturesState.teamView : "league";
       fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
       renderCategoryToggles();
       if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
       renderTeamEventFixtures();
       updateFixturesEditButtonState();
-      renderLeaderboard();
-      fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (shouldScroll) fixturesEmbed?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -2541,22 +2517,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     updateFixturesEditButtonState();
-    renderLeaderboard();
-    fixturesUi.wrap?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (shouldScroll) fixturesEmbed?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-createFixturesBtn?.addEventListener("click", openAndLoadFixtures);
-
+  
   await loadTournamentMeta();
   await loadPlayers();
   await loadCaptainStateFromDb();
   await loadPoolsFromDb();
   await loadLeaderboardFromDb();
+  await openAndLoadFixtures();
 
   renderPlayers();
   renderCaptainsSummary();
   renderLeaderboard();
   refreshStageSpecificUi();
   syncAddPlayerCategoryUi();
+  syncPlayersListUi();
   syncTeamSetupUi();
+  syncFixturesUi();
+  syncLeaderboardUi();
 });
