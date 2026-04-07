@@ -1731,6 +1731,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (teamOverallHomeScore) teamOverallHomeScore.textContent = String(summary.homeWins);
       if (teamOverallAwayScore) teamOverallAwayScore.textContent = String(summary.awayWins);
 
+      if (teamOverallHomePoints) {
+        teamOverallHomePoints.textContent = String(summary.homeMatchPoints);
+      }
+      if (teamOverallAwayPoints) {
+        teamOverallAwayPoints.textContent = String(summary.awayMatchPoints);
+      }
+      if (teamOverallHomePointsLabel) {
+        teamOverallHomePointsLabel.textContent = homeLabel;
+      }
+      if (teamOverallAwayPointsLabel) {
+        teamOverallAwayPointsLabel.textContent = awayLabel;
+      }
+      
       if (!lineupStatePill) return;
 
       lineupStatePill.className = getStatusChipClass(summary.allAccepted ? "accepted" : "pending");
