@@ -103,9 +103,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const individualScoreShell = document.getElementById("individual-score-shell");
   const teamEventShell = document.getElementById("team-event-shell");
-  const receiveLineupBtn = document.getElementById("receive-lineup-btn");
-  const manualLineupBtn = document.getElementById("manual-lineup-btn");
-  const lineupStatePill = document.getElementById("lineup-state-pill");
   const lineupReviewPanel = document.getElementById("lineup-review-panel");
   const lineupReviewList = document.getElementById("lineup-review-list");
   const teamCategoryBars = document.getElementById("team-category-bars");
@@ -114,56 +111,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const teamOverallAwayName = document.getElementById("team-overall-away-name");
   const teamOverallHomeScore = document.getElementById("team-overall-home-score");
   const teamOverallAwayScore = document.getElementById("team-overall-away-score");
+  const teamOverallHomePoints = document.getElementById("team-overall-home-points");
+  const teamOverallAwayPoints = document.getElementById("team-overall-away-points");
   const teamOverallSub = document.getElementById("team-overall-sub");
   const toggleLineupReviewBtn = document.getElementById("toggle-lineup-review");
-
-  function ensureTeamOverallPointsUi() {
-    const board = document.querySelector(".team-overall-board");
-    if (!board) {
-      return {
-        homePointsLabelEl: null,
-        awayPointsLabelEl: null,
-        homePointsEl: null,
-        awayPointsEl: null,
-      };
-    }
-
-    let row = board.querySelector('[data-team-points-row="1"]');
-    if (!row) {
-      row = document.createElement("div");
-      row.className = "status-row";
-      row.style.marginTop = "14px";
-      row.style.justifyContent = "center";
-      row.dataset.teamPointsRow = "1";
-      row.innerHTML = `
-        <div class="status-chip">
-          <span id="team-overall-home-points-label">Home</span>
-          <strong id="team-overall-home-points">0</strong>
-          <span>match points</span>
-        </div>
-        <div class="status-chip">
-          <span id="team-overall-away-points-label">Away</span>
-          <strong id="team-overall-away-points">0</strong>
-          <span>match points</span>
-        </div>
-      `;
-      board.appendChild(row);
-    }
-
-    return {
-      homePointsLabelEl: row.querySelector("#team-overall-home-points-label"),
-      awayPointsLabelEl: row.querySelector("#team-overall-away-points-label"),
-      homePointsEl: row.querySelector("#team-overall-home-points"),
-      awayPointsEl: row.querySelector("#team-overall-away-points"),
-    };
-  }
-
-  const {
-    homePointsLabelEl: teamOverallHomePointsLabel,
-    awayPointsLabelEl: teamOverallAwayPointsLabel,
-    homePointsEl: teamOverallHomePoints,
-    awayPointsEl: teamOverallAwayPoints,
-  } = ensureTeamOverallPointsUi();
+  const teamLineupToggleText = document.getElementById("team-lineup-toggle-text");
+  const lockTeamScoresBtn = document.getElementById("lock-team-scores-btn");
 
   const params = new URLSearchParams(window.location.search);
   const tournamentId = params.get("tournamentId");
@@ -203,6 +156,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       throw new Error(`GET ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`);
     }
     return data;
+  }
+
+  function debounce(fn, wait = 500) {
+    let timer = null;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), wait);
+    };
   }
 
   async function apiPut(url, body) {
@@ -363,6 +324,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       started: Boolean(set.started),
       completed: Boolean(set.completed),
       currentServer: set.currentServer || null,
+      currentServerName: set.currentServerName || null,
       homePoints: Number(set.homePoints || 0),
       awayPoints: Number(set.awayPoints || 0),
       winnerSide: set.winnerSide || null,
@@ -378,6 +340,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       totalSets,
       tossWinner: null,
       startingServer: null,
+      startingServerPlayer: null,
+      nextServerIndex: { A: 0, B: 0 },
       currentSetIndex: null,
       categoryLocked: false,
       sets: Array.from({ length: totalSets }, (_, index) => ({
@@ -385,6 +349,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         started: false,
         completed: false,
         currentServer: null,
+        currentServerName: null,
         homePoints: 0,
         awayPoints: 0,
         winnerSide: null,
@@ -407,6 +372,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         started: false,
         completed: false,
         currentServer: null,
+        currentServerName: null,
         homePoints: 0,
         awayPoints: 0,
         winnerSide: null,
@@ -425,6 +391,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       totalSets: safeTotalSets,
       tossWinner: existing.tossWinner || null,
       startingServer: existing.startingServer || null,
+      startingServerPlayer: existing.startingServerPlayer || null,
+      nextServerIndex: existing.nextServerIndex || { A: 0, B: 0 },
       currentSetIndex,
       categoryLocked: Boolean(existing.categoryLocked),
       sets,
@@ -500,11 +468,61 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   }
 
+  function getSelectedPlayers(category, side) {
+    const direct = side === "A" ? category?.homePlayersSelected : category?.awayPlayersSelected;
+    if (Array.isArray(direct) && direct.length) return direct.map((p) => safeText(p)).filter(Boolean);
+
+    const textValue = side === "A" ? category?.homePlayer : category?.awayPlayer;
+    return splitTeamLabel(textValue).map((p) => safeText(p)).filter(Boolean);
+  }
+
+  function syncCategoryPlayerStrings(category) {
+    category.homePlayersSelected = getSelectedPlayers(category, "A");
+    category.awayPlayersSelected = getSelectedPlayers(category, "B");
+    category.homePlayer = category.homePlayersSelected.join(" + ");
+    category.awayPlayer = category.awayPlayersSelected.join(" + ");
+    return category;
+  }
+
+  function getCategorySlotCount(category) {
+    const exact = Number(category?.slotCount || category?.teamSize || 1);
+    return Number.isFinite(exact) && exact > 0 ? exact : 1;
+  }
+
+  function isCategoryLineupComplete(category) {
+    const slotCount = getCategorySlotCount(category);
+    return getSelectedPlayers(category, "A").length >= slotCount && getSelectedPlayers(category, "B").length >= slotCount;
+  }
+
+  function getCategoryFormatLabel(category) {
+    const count = getCategorySlotCount(category);
+    if (count === 1) return "Singles";
+    if (count === 2) return "Doubles";
+    if (count === 3) return "Triples";
+    return `${count} players`;
+  }
+
   function getPickleballPlayerLabels(category, homeTeamLabel, awayTeamLabel) {
+    const homePlayers = getSelectedPlayers(category, "A");
+    const awayPlayers = getSelectedPlayers(category, "B");
     return {
-      homePlayerLabel: safeText(category?.homePlayer, homeTeamLabel),
-      awayPlayerLabel: safeText(category?.awayPlayer, awayTeamLabel),
+      homePlayerLabel: homePlayers.length ? homePlayers.join(" + ") : safeText(category?.homePlayer, homeTeamLabel),
+      awayPlayerLabel: awayPlayers.length ? awayPlayers.join(" + ") : safeText(category?.awayPlayer, awayTeamLabel),
+      homePlayers,
+      awayPlayers,
     };
+  }
+
+  function getNextServerForSide(category, pickleballData, side) {
+    const labels = getPickleballPlayerLabels(category, "Home", "Away");
+    const players = side === "A" ? labels.homePlayers : labels.awayPlayers;
+    if (!players.length) return side === "A" ? labels.homePlayerLabel : labels.awayPlayerLabel;
+
+    pickleballData.nextServerIndex = pickleballData.nextServerIndex || { A: 0, B: 0 };
+    const nextIndex = Number(pickleballData.nextServerIndex[side] || 0) % players.length;
+    const nextPlayer = players[nextIndex];
+    pickleballData.nextServerIndex[side] = (nextIndex + 1) % players.length;
+    return nextPlayer;
   }
 
   function hasAnyPickleballSetStarted(pickleballData) {
@@ -529,6 +547,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
     }
 
+    if (!isCategoryLineupComplete(category)) {
+      return { chipClass: "category-result-chip pending", text: "Complete lineup" };
+    }
+
     if (category.sportKey === "pickleball") {
       const pb = ensurePickleballTeamData(category.sportData, fixtures);
       const currentSet =
@@ -536,10 +558,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? pb.sets[pb.currentSetIndex]
           : null;
 
-      const { homePlayerLabel, awayPlayerLabel } = getPickleballPlayerLabels(category, homeTeamLabel, awayTeamLabel);
-
       if (currentSet && currentSet.started && !currentSet.completed) {
-        const servingName = currentSet.currentServer === "A" ? homePlayerLabel : awayPlayerLabel;
+        const servingName = safeText(currentSet.currentServerName, currentSet.currentServer === "A" ? homeTeamLabel : awayTeamLabel);
         return {
           chipClass: "category-result-chip pending",
           text: `Set ${currentSet.number} live • Serve ${servingName}`,
@@ -549,26 +569,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       const completedSets = pb.sets.filter((set) => set.completed).length;
       if (completedSets > 0) {
         const { aWins, bWins } = getPickleballSetWins(pb);
-        return {
-          chipClass: "category-result-chip pending",
-          text: `Sets ${aWins}-${bWins}`,
-        };
+        return { chipClass: "category-result-chip pending", text: `Sets ${aWins}-${bWins}` };
       }
 
-      if (pb.tossWinner || pb.startingServer) {
-        return {
-          chipClass: "category-result-chip pending",
-          text: "Ready to start 1st set",
-        };
+      if (pb.tossWinner || pb.startingServer || pb.startingServerPlayer) {
+        return { chipClass: "category-result-chip pending", text: "Ready to start 1st set" };
       }
 
-      return {
-        chipClass: "category-result-chip pending",
-        text: "Awaiting toss & first server",
-      };
+      return { chipClass: "category-result-chip pending", text: "Awaiting toss & first server" };
     }
 
-    return { chipClass: "category-result-chip pending", text: "Result pending" };
+    return { chipClass: "category-result-chip pending", text: "Ready to score" };
   }
 
   function buildPresetScoringMarkup(category, homeTeamLabel, awayTeamLabel) {
@@ -795,7 +806,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function buildPickleballScoringMarkup(category, homeTeamLabel, awayTeamLabel) {
     const pb = ensurePickleballTeamData(category.sportData, fixtures);
     const anySetStarted = hasAnyPickleballSetStarted(pb);
-    const setupLocked = anySetStarted;
+    const setupLocked = anySetStarted || category.categoryLocked;
     const nextSetIndex = getNextUnstartedPickleballSetIndex(pb);
     const currentSet =
       Number.isInteger(pb.currentSetIndex) && pb.sets[pb.currentSetIndex]
@@ -804,7 +815,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const { aWins, bWins } = getPickleballSetWins(pb);
     const neededWins = setsNeededToWin(pb.totalSets);
-    const { homePlayerLabel, awayPlayerLabel } = getPickleballPlayerLabels(category, homeTeamLabel, awayTeamLabel);
+    const { homePlayerLabel, awayPlayerLabel, homePlayers, awayPlayers } = getPickleballPlayerLabels(category, homeTeamLabel, awayTeamLabel);
+    const allServerOptions = [
+      ...homePlayers.map((name) => ({ side: "A", name })),
+      ...awayPlayers.map((name) => ({ side: "B", name })),
+    ];
 
     const declareWinnerRow =
       !pb.categoryLocked && (aWins >= neededWins || bWins >= neededWins)
@@ -823,6 +838,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
         `
         : "";
+
+    const serverSelectOptions = allServerOptions.length
+      ? allServerOptions
+          .map((option) => {
+            const value = `${option.side}::${option.name}`;
+            const selected = pb.startingServer === option.side && pb.startingServerPlayer === option.name ? "selected" : "";
+            return `<option value="${escapeHtml(value)}" ${selected}>${escapeHtml(option.name)}</option>`;
+          })
+          .join("")
+      : `<option value="">Select server</option>`;
 
     return `
       <div class="preset-sport-tag">Team Event Pickleball</div>
@@ -861,28 +886,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
           </div>
 
-          <div class="pickle-choice-group">
+          <div class="pickle-choice-group pickle-server-picker">
             <div class="pickle-choice-label">Who is serving first?</div>
-            <div class="pickle-choice-row">
-              <button
-                type="button"
-                class="pickle-choice-btn ${pb.startingServer === "A" ? "active" : ""}"
-                data-pickle-action="pick-server"
-                data-side="A"
-                ${setupLocked ? "disabled" : ""}
-              >
-                ${escapeHtml(homePlayerLabel)}
-              </button>
-              <button
-                type="button"
-                class="pickle-choice-btn ${pb.startingServer === "B" ? "active" : ""}"
-                data-pickle-action="pick-server"
-                data-side="B"
-                ${setupLocked ? "disabled" : ""}
-              >
-                ${escapeHtml(awayPlayerLabel)}
-              </button>
-            </div>
+            <select class="pickle-server-select" data-pickle-action="pick-server-name" ${setupLocked ? "disabled" : ""}>
+              <option value="">Select player</option>
+              ${serverSelectOptions}
+            </select>
           </div>
         </div>
 
@@ -892,9 +901,9 @@ document.addEventListener("DOMContentLoaded", async () => {
               ? `<div class="pickle-locked-note">Category locked after winner declaration.</div>`
               : currentSet && currentSet.started && !currentSet.completed
                 ? `<div class="pickle-note">${escapeHtml(ordinal(currentSet.number))} set is live.</div>`
-                : pb.tossWinner && pb.startingServer && nextSetIndex !== -1
+                : pb.tossWinner && pb.startingServer && pb.startingServerPlayer && nextSetIndex !== -1
                   ? `<button type="button" class="pickle-start-set-btn" data-pickle-action="start-set" data-set-index="${nextSetIndex}">Start ${escapeHtml(ordinal(nextSetIndex + 1))} Set</button>`
-                  : `<div class="pickle-note">Select toss winner and first server to begin.</div>`
+                  : `<div class="pickle-note">Select toss winner and the exact first server to begin.</div>`
           }
         </div>
       </div>
@@ -912,7 +921,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   </div>
                 </div>
                 <div class="pickle-current-server">
-                  Serve: <strong>${escapeHtml(currentSet.currentServer === "A" ? homePlayerLabel : awayPlayerLabel)}</strong>
+                  Serve: <strong>${escapeHtml(safeText(currentSet.currentServerName, currentSet.currentServer === "A" ? homePlayerLabel : awayPlayerLabel))}</strong>
                 </div>
               </div>
 
@@ -951,7 +960,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               const statusText = set.completed
                 ? `${set.winnerSide === "A" ? homePlayerLabel : awayPlayerLabel} won`
                 : set.started
-                  ? "Live"
+                  ? `Live • Serve ${escapeHtml(safeText(set.currentServerName, set.currentServer === "A" ? homePlayerLabel : awayPlayerLabel))}`
                   : "Not started";
 
               const canUndo = set.started && (set.history?.length > 0 || set.completed);
@@ -961,7 +970,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <div class="pickle-set-chip ${statusClass}">
                   <div class="pickle-set-top">
                     <div class="pickle-set-name">${escapeHtml(ordinal(index + 1))} set</div>
-                    <div class="pickle-set-status">${escapeHtml(statusText)}</div>
+                    <div class="pickle-set-status">${statusText}</div>
                   </div>
                   <div class="pickle-set-scoreline">
                     ${escapeHtml(homePlayerLabel)} ${escapeHtml(set.homePoints)} - ${escapeHtml(set.awayPoints)} ${escapeHtml(awayPlayerLabel)}
@@ -983,212 +992,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
-  function bindPresetHandlers(card, category, rerender, teamTieState) {
-    const sportKey = category?.sportKey || "";
-
-    if (sportKey === "cricket" || sportKey === "football") {
-      card.querySelectorAll("[data-preset-field]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const field = btn.dataset.presetField;
-          const step = Number(btn.dataset.step || 0);
-          category.sportData[field] = Math.max(0, Number(category.sportData?.[field] || 0) + step);
-          rerender();
-        });
-      });
-
-      card.querySelectorAll("[data-preset-input]").forEach((input) => {
-        input.addEventListener("input", (event) => {
-          const field = event.target.dataset.presetInput;
-          category.sportData[field] = event.target.value;
-          saveTeamTieState(teamTieState);
-        });
-      });
-
-      return;
-    }
-
-    if (sportKey === "badminton" || sportKey === "tennis") {
-      card.querySelectorAll("[data-preset-collection]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const collection = btn.dataset.presetCollection;
-          const index = Number(btn.dataset.index);
-          const side = btn.dataset.side;
-          const step = Number(btn.dataset.step || 0);
-
-          if (!Array.isArray(category.sportData?.[collection])) return;
-          const row = category.sportData[collection][index];
-          if (!row) return;
-
-          row[side] = Math.max(0, Number(row[side] || 0) + step);
-          rerender();
-        });
-      });
-
-      return;
-    }
-
-    card.querySelector('[data-action="home-minus"]')?.addEventListener("click", () => {
-      category.homeScore = Math.max(0, Number(category.homeScore || 0) - 1);
-      rerender();
-    });
-
-    card.querySelector('[data-action="home-plus"]')?.addEventListener("click", () => {
-      category.homeScore = Number(category.homeScore || 0) + 1;
-      rerender();
-    });
-
-    card.querySelector('[data-action="away-minus"]')?.addEventListener("click", () => {
-      category.awayScore = Math.max(0, Number(category.awayScore || 0) - 1);
-      rerender();
-    });
-
-    card.querySelector('[data-action="away-plus"]')?.addEventListener("click", () => {
-      category.awayScore = Number(category.awayScore || 0) + 1;
-      rerender();
-    });
-  }
-
-
-  function clearPickleballSet(set) {
-    set.started = false;
-    set.completed = false;
-    set.currentServer = null;
-    set.homePoints = 0;
-    set.awayPoints = 0;
-    set.winnerSide = null;
-    set.history = [];
-  }
-
-  function clearPickleballFromSetIndex(pb, startIndex) {
-    for (let i = startIndex; i < pb.sets.length; i += 1) {
-      clearPickleballSet(pb.sets[i]);
-    }
-    pb.currentSetIndex = null;
-    pb.categoryLocked = false;
-  }
-
-  function unlockNextCategory(teamTieState, currentIndex) {
-    const nextIndex = teamTieState.categories.findIndex(
-      (item, idx) => idx > currentIndex && item.lineupStatus === "accepted" && !item.categoryLocked
-    );
-    if (nextIndex !== -1) {
-      teamTieState.categories[nextIndex].isScoringOpen = true;
-    }
-  }
-
-  function lockPickleballCategory(category, winnerSide) {
-    const pb = ensurePickleballTeamData(category.sportData, fixtures);
-    pb.categoryLocked = true;
-    pb.currentSetIndex = null;
-    category.sportData = pb;
-    category.winnerSide = winnerSide;
-    category.categoryLocked = true;
-    category.isScoringOpen = false;
-  }
-
-  function startPickleballSet(category, setIndex) {
-    const pb = ensurePickleballTeamData(category.sportData, fixtures);
-    const set = pb.sets[setIndex];
-    if (!set || set.started || pb.categoryLocked) return;
-    if (!pb.tossWinner || !pb.startingServer) return;
-
-    set.started = true;
-    set.completed = false;
-    set.currentServer = pb.startingServer;
-    set.homePoints = 0;
-    set.awayPoints = 0;
-    set.winnerSide = null;
-    set.history = [];
-    pb.currentSetIndex = setIndex;
-    category.sportData = pb;
-    category.isScoringOpen = true;
-  }
-
-  function applyPickleballRally(category, winnerSide) {
-    const pb = ensurePickleballTeamData(category.sportData, fixtures);
-    const currentSet =
-      Number.isInteger(pb.currentSetIndex) && pb.sets[pb.currentSetIndex]
-        ? pb.sets[pb.currentSetIndex]
-        : null;
-
-    if (!currentSet || !currentSet.started || currentSet.completed || pb.categoryLocked) return;
-
-    currentSet.history.push(capturePickleballSetSnapshot(currentSet));
-
-    if (currentSet.currentServer === winnerSide) {
-      if (winnerSide === "A") currentSet.homePoints += 1;
-      if (winnerSide === "B") currentSet.awayPoints += 1;
-    } else {
-      currentSet.currentServer = winnerSide;
-    }
-
-    const targetPoints = Number(pb.targetPoints || 11);
-    if (currentSet.homePoints >= targetPoints || currentSet.awayPoints >= targetPoints) {
-      currentSet.completed = true;
-      currentSet.winnerSide = currentSet.homePoints > currentSet.awayPoints ? "A" : "B";
-      pb.currentSetIndex = null;
-    }
-
-    category.sportData = pb;
-  }
-
-  function declarePickleballCategoryWinner(category, winnerSide, categoryIndex, teamTieState) {
-    lockPickleballCategory(category, winnerSide);
-    unlockNextCategory(teamTieState, categoryIndex);
-  }
-
-  function undoPickleballSet(category, setIndex) {
-    const pb = ensurePickleballTeamData(category.sportData, fixtures);
-    const set = pb.sets[setIndex];
-    if (!set || !set.started) return;
-
-    clearPickleballFromSetIndex(pb, setIndex + 1);
-
-    if (set.history.length > 0) {
-      const snapshot = set.history.pop();
-      set.started = snapshot.started;
-      set.completed = snapshot.completed;
-      set.currentServer = snapshot.currentServer;
-      set.homePoints = snapshot.homePoints;
-      set.awayPoints = snapshot.awayPoints;
-      set.winnerSide = snapshot.winnerSide;
-      pb.currentSetIndex = set.started && !set.completed ? setIndex : null;
-    } else {
-      clearPickleballSet(set);
-      pb.currentSetIndex = null;
-    }
-
-    category.winnerSide = null;
-    category.categoryLocked = false;
-    category.isScoringOpen = true;
-    category.sportData = pb;
-  }
-
-  function resetPickleballSet(category, setIndex) {
-    const pb = ensurePickleballTeamData(category.sportData, fixtures);
-    clearPickleballFromSetIndex(pb, setIndex);
-    category.winnerSide = null;
-    category.categoryLocked = false;
-    category.isScoringOpen = true;
-    category.sportData = pb;
-  }
-
   function bindPickleballHandlers(card, category, categoryIndex, teamTieState, rerender) {
     card.querySelectorAll('[data-pickle-action="pick-toss"]').forEach((btn) => {
       btn.addEventListener("click", () => {
         const pb = ensurePickleballTeamData(category.sportData, fixtures);
-        if (hasAnyPickleballSetStarted(pb)) return;
+        if (hasAnyPickleballSetStarted(pb) || teamTieState.tieLocked) return;
         pb.tossWinner = btn.dataset.side;
         category.sportData = pb;
         rerender();
       });
     });
 
-    card.querySelectorAll('[data-pickle-action="pick-server"]').forEach((btn) => {
-      btn.addEventListener("click", () => {
+    card.querySelectorAll('[data-pickle-action="pick-server-name"]').forEach((select) => {
+      select.addEventListener("change", () => {
+        const raw = String(select.value || "");
         const pb = ensurePickleballTeamData(category.sportData, fixtures);
-        if (hasAnyPickleballSetStarted(pb)) return;
-        pb.startingServer = btn.dataset.side;
+        if (hasAnyPickleballSetStarted(pb) || teamTieState.tieLocked) return;
+        const [side, ...rest] = raw.split("::");
+        const name = rest.join("::");
+        pb.startingServer = side || null;
+        pb.startingServerPlayer = name || null;
+        pb.nextServerIndex = pb.nextServerIndex || { A: 0, B: 0 };
+        const labels = getPickleballPlayerLabels(category, "Home", "Away");
+        const players = side === "A" ? labels.homePlayers : labels.awayPlayers;
+        const idx = Math.max(0, players.indexOf(name));
+        pb.nextServerIndex[side || "A"] = players.length ? (idx + 1) % players.length : 0;
         category.sportData = pb;
         rerender();
       });
@@ -1230,34 +1058,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  function buildCategoryNameFromMeta(item = {}, fallback = "") {
-    const explicitName = safeText(
-      item?.eventName ||
-      item?.name ||
-      item?.categoryName ||
-      item?.label ||
-      item?.title,
-      ""
-    );
-
-    if (explicitName) return explicitName;
-
-    const age = String(item?.ageGroup || "").trim();
-    const gender = String(item?.gender || "").trim();
-    const level = String(item?.playingLevel || "").trim();
-
-    const teamSize = Number(item?.teamSize || 1);
-    const exact = Number(item?.exactTeamSize || 0);
-
-    let formatText = "";
-    if (teamSize === 1) formatText = "Singles";
-    else if (teamSize === 2) formatText = "Doubles";
-    else if (teamSize === 3) formatText = "Triples";
-    else if (teamSize >= 4) formatText = exact ? `Team ${exact}` : "Team";
-
-    return [age, gender, level, formatText].filter(Boolean).join(" • ") || fallback;
-  }
-
   function inferCategoryDefinitions(rawFixtures) {
     const sources = [
       rawFixtures?.teamCategories,
@@ -1269,10 +1069,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const raw = sources.find((list) => Array.isArray(list) && list.length) || [];
 
-    const extracted = raw.map((item, index) => ({
-      id: safeText(item?.id || item?.categoryId || item?.key, `cat-${index + 1}`),
-      name: buildCategoryNameFromMeta(item, `Category ${index + 1}`),
-    }));
+    const extracted = raw.map((item, index) => {
+      const slotCount = Math.max(1, Number(item?.exactTeamSize || item?.teamSize || 1));
+      const age = safeText(item?.ageGroup, "");
+      const gender = safeText(item?.gender, "");
+      const level = safeText(item?.playingLevel, "");
+      const explicit = safeText(item?.eventName || item?.name || item?.categoryName || item?.label || item?.title, "");
+      const generatedName = [age, gender, level, slotCount === 1 ? "Singles" : slotCount === 2 ? "Doubles" : `${slotCount} players`]
+        .filter(Boolean)
+        .join(" • ");
+      return {
+        id: safeText(item?.id || item?.categoryId || item?.key, `cat-${index + 1}`),
+        name: explicit || generatedName || `Category ${index + 1}`,
+        slotCount,
+      };
+    });
 
     if (extracted.length) return extracted;
 
@@ -1280,9 +1091,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     return Array.from({ length: fallbackCount }, (_, index) => ({
       id: `cat-${index + 1}`,
       name: `Category ${index + 1}`,
+      slotCount: 1,
     }));
   }
-
 
   function inferTeamRoster(matchObj, side) {
     const rosterFromMatch = side === "A" ? matchObj?.homePlayers : matchObj?.awayPlayers;
@@ -1306,11 +1117,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       homeRoster,
       awayRoster,
       tournamentSportKey,
+      tieLocked: false,
       categories: categories.map((category, index) => ({
         id: category.id,
         name: category.name,
-        homePlayer: homeRoster[index] || "",
-        awayPlayer: awayRoster[index] || "",
+        slotCount: category.slotCount,
+        homePlayersSelected: [],
+        awayPlayersSelected: [],
+        homePlayer: "",
+        awayPlayer: "",
         lineupStatus: "pending",
         notes: "",
         homeScore: 0,
@@ -1336,23 +1151,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (saved && Array.isArray(saved.categories)) {
         saved.homeRoster = Array.isArray(saved.homeRoster) ? saved.homeRoster : fresh.homeRoster;
         saved.awayRoster = Array.isArray(saved.awayRoster) ? saved.awayRoster : fresh.awayRoster;
-        saved.tournamentSportKey = fresh.tournamentSportKey || saved.tournamentSportKey || "";
+        saved.tournamentSportKey = saved.tournamentSportKey || fresh.tournamentSportKey;
         saved.lineupCollapsed = Boolean(saved.lineupCollapsed);
+        saved.tieLocked = Boolean(saved.tieLocked);
 
         saved.categories = saved.categories.map((category, index) => {
-            const merged = {
-              ...fresh.categories[index],
-              ...category,
-              name:
-                fresh.categories[index]?.name ||
-                category?.name ||
-                `Category ${index + 1}`,
-              sportKey:
-                fresh.categories[index]?.sportKey ||
-                category?.sportKey ||
-                saved.tournamentSportKey ||
-                "",
-            };
+          const merged = {
+            ...fresh.categories[index],
+            ...category,
+            sportKey: category?.sportKey || fresh.categories[index]?.sportKey || saved.tournamentSportKey,
+            slotCount: Number(category?.slotCount || fresh.categories[index]?.slotCount || 1),
+          };
 
           if (merged.sportKey === "pickleball") {
             merged.sportData = ensurePickleballTeamData(category?.sportData, rawFixtures);
@@ -1365,6 +1174,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 : null);
           }
 
+          syncCategoryPlayerStrings(merged);
+          merged.lineupStatus = isCategoryLineupComplete(merged) ? "accepted" : "pending";
           merged.categoryLocked = Boolean(merged.categoryLocked || merged.sportData?.categoryLocked);
           return merged;
         });
@@ -1380,129 +1191,158 @@ document.addEventListener("DOMContentLoaded", async () => {
     localStorage.setItem(getTeamStorageKey(), JSON.stringify(teamState));
   }
 
-  function getCategoryPointTotals(category) {
-    if (!category) return { homePoints: 0, awayPoints: 0 };
-
-    if (category.sportKey === "pickleball") {
-      const pb = ensurePickleballTeamData(category.sportData, fixtures);
-      return toArray(pb.sets).reduce((acc, set) => {
-        acc.homePoints += Number(set?.homePoints || 0);
-        acc.awayPoints += Number(set?.awayPoints || 0);
-        return acc;
-      }, { homePoints: 0, awayPoints: 0 });
+  function mergeCategorySnapshot(target, snapshot, rawFixtures) {
+    if (!snapshot || typeof snapshot !== "object") return target;
+    Object.assign(target, snapshot);
+    target.slotCount = Number(snapshot.slotCount || target.slotCount || 1);
+    if (target.sportKey === "pickleball") {
+      target.sportData = ensurePickleballTeamData(snapshot.sportData, rawFixtures);
     }
-
-    if (category.sportKey === "football") {
-      return {
-        homePoints: Number(category?.sportData?.homeGoals || 0),
-        awayPoints: Number(category?.sportData?.awayGoals || 0),
-      };
-    }
-
-    if (category.sportKey === "cricket") {
-      return {
-        homePoints: Number(category?.sportData?.homeRuns || 0),
-        awayPoints: Number(category?.sportData?.awayRuns || 0),
-      };
-    }
-
-    if (category.sportKey === "badminton") {
-      return toArray(category?.sportData?.games).reduce((acc, row) => {
-        acc.homePoints += Number(row?.a || 0);
-        acc.awayPoints += Number(row?.b || 0);
-        return acc;
-      }, { homePoints: 0, awayPoints: 0 });
-    }
-
-    if (category.sportKey === "tennis") {
-      return toArray(category?.sportData?.sets).reduce((acc, row) => {
-        acc.homePoints += Number(row?.a || 0);
-        acc.awayPoints += Number(row?.b || 0);
-        return acc;
-      }, { homePoints: 0, awayPoints: 0 });
-    }
-
-    return {
-      homePoints: Number(category?.homeScore || 0),
-      awayPoints: Number(category?.awayScore || 0),
-    };
+    syncCategoryPlayerStrings(target);
+    target.lineupStatus = isCategoryLineupComplete(target) ? "accepted" : "pending";
+    return target;
   }
 
-  function applyMatchLineupsToTeamState(matchObj, teamState) {
-    const lineups = matchObj?.lineups || {};
-    const approvals = matchObj?.lineupApproval || {};
+  function hydrateTeamTieStateFromMatch(matchObj, teamTieState, rawFixtures) {
+    if (!matchObj || !teamTieState) return;
 
-    const homeAssignments = Array.isArray(lineups?.home?.assignments) ? lineups.home.assignments : [];
-    const awayAssignments = Array.isArray(lineups?.away?.assignments) ? lineups.away.assignments : [];
+    const homeUsage = toArray(matchObj?.lineups?.home?.usage).map((item) => safeText(item?.playerName || item?.name)).filter(Boolean);
+    const awayUsage = toArray(matchObj?.lineups?.away?.usage).map((item) => safeText(item?.playerName || item?.name)).filter(Boolean);
+    if (homeUsage.length) teamTieState.homeRoster = homeUsage;
+    if (awayUsage.length) teamTieState.awayRoster = awayUsage;
 
-    if (Array.isArray(lineups?.home?.usage)) {
-      teamState.homeRoster = lineups.home.usage.map((u) => safeText(u?.playerName || u?.name)).filter(Boolean) || teamState.homeRoster;
-    }
-    if (Array.isArray(lineups?.away?.usage)) {
-      teamState.awayRoster = lineups.away.usage.map((u) => safeText(u?.playerName || u?.name)).filter(Boolean) || teamState.awayRoster;
-    }
+    const homeAssignments = toArray(matchObj?.lineups?.home?.assignments);
+    const awayAssignments = toArray(matchObj?.lineups?.away?.assignments);
 
-    teamState.categories.forEach((category, index) => {
-      const home = homeAssignments.find((item) => Number(item?.scoreIndex) === index);
-      const away = awayAssignments.find((item) => Number(item?.scoreIndex) === index);
-      if (home && Array.isArray(home.players) && home.players.length) {
-        category.homePlayer = home.players.map((p) => safeText(p)).filter(Boolean).join(" + ");
+    teamTieState.categories.forEach((category, index) => {
+      const homeAssignment = homeAssignments.find((item) => Number(item?.scoreIndex) === index);
+      const awayAssignment = awayAssignments.find((item) => Number(item?.scoreIndex) === index);
+      if (homeAssignment && Array.isArray(homeAssignment.players)) {
+        category.homePlayersSelected = homeAssignment.players.map((p) => safeText(p)).filter(Boolean);
       }
-      if (away && Array.isArray(away.players) && away.players.length) {
-        category.awayPlayer = away.players.map((p) => safeText(p)).filter(Boolean).join(" + ");
+      if (awayAssignment && Array.isArray(awayAssignment.players)) {
+        category.awayPlayersSelected = awayAssignment.players.map((p) => safeText(p)).filter(Boolean);
       }
+      syncCategoryPlayerStrings(category);
+    });
 
-      const hasSubmittedHome = Boolean(category.homePlayer);
-      const hasSubmittedAway = Boolean(category.awayPlayer);
-      if (approvals.home === "approved" && approvals.away === "approved" && hasSubmittedHome && hasSubmittedAway) {
-        if (category.lineupStatus !== "accepted") category.lineupStatus = "accepted";
-      } else if ((hasSubmittedHome || hasSubmittedAway) && category.lineupStatus !== "accepted" && category.lineupStatus !== "rejected") {
-        category.lineupStatus = "pending";
+    toArray(matchObj?.submatches).forEach((submatch, index) => {
+      const snapshot = submatch?.score?.state?.meta?.categorySnapshot;
+      if (teamTieState.categories[index] && snapshot) {
+        mergeCategorySnapshot(teamTieState.categories[index], snapshot, rawFixtures);
+      }
+    });
+
+    const aggregateTie = matchObj?.score?.state?.meta?.teamTieState;
+    if (aggregateTie && typeof aggregateTie === "object") {
+      teamTieState.tieLocked = Boolean(aggregateTie.tieLocked || teamTieState.tieLocked);
+    }
+
+    teamTieState.categories.forEach((category) => {
+      syncCategoryPlayerStrings(category);
+      category.lineupStatus = isCategoryLineupComplete(category) ? "accepted" : "pending";
+      if (teamTieState.tieLocked) {
+        category.categoryLocked = true;
+        category.isScoringOpen = false;
       }
     });
   }
 
-  function hasAssignments(lineupSide) {
-    return Array.isArray(lineupSide?.assignments) && lineupSide.assignments.some((item) => Array.isArray(item?.players) && item.players.length);
+  function getPickleballCategoryMatchPoints(category) {
+    const pb = ensurePickleballTeamData(category?.sportData, fixtures);
+    return toArray(pb?.sets).reduce(
+      (acc, set) => {
+        acc.home += Number(set?.homePoints || 0);
+        acc.away += Number(set?.awayPoints || 0);
+        return acc;
+      },
+      { home: 0, away: 0 }
+    );
   }
 
-  function getLineupSubmissionSummary(matchObj) {
-    const lineups = matchObj?.lineups || {};
+  function getPresetCategoryMatchPoints(category) {
+    const sportKey = category?.sportKey || "";
+    const data = category?.sportData || {};
+
+    if (sportKey === "pickleball") {
+      return getPickleballCategoryMatchPoints(category);
+    }
+
+    if (sportKey === "cricket") {
+      return {
+        home: Number(data.homeRuns || 0),
+        away: Number(data.awayRuns || 0),
+      };
+    }
+
+    if (sportKey === "football") {
+      return {
+        home: Number(data.homeGoals || 0),
+        away: Number(data.awayGoals || 0),
+      };
+    }
+
+    if (sportKey === "badminton") {
+      return toArray(data.games).reduce(
+        (acc, game) => {
+          acc.home += Number(game?.a || 0);
+          acc.away += Number(game?.b || 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    if (sportKey === "tennis") {
+      return toArray(data.sets).reduce(
+        (acc, setRow) => {
+          acc.home += Number(setRow?.a || 0);
+          acc.away += Number(setRow?.b || 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
     return {
-      homeSubmitted: hasAssignments(lineups?.home),
-      awaySubmitted: hasAssignments(lineups?.away),
-      homeSubmittedAt: safeText(lineups?.home?.submittedAt, ""),
-      awaySubmittedAt: safeText(lineups?.away?.submittedAt, ""),
+      home: Number(category?.homeScore || 0),
+      away: Number(category?.awayScore || 0),
     };
+  }
+
+  function getCategoryMatchPoints(category) {
+    return getPresetCategoryMatchPoints(category);
+  }
+
+  function formatCategoryPointsText(category) {
+    const points = getCategoryMatchPoints(category);
+    return `${Number(points.home || 0)}-${Number(points.away || 0)} pts`;
   }
 
   function computeTeamTieSummary(teamState) {
-    let homeWins = 0;
-    let awayWins = 0;
-    let homeMatchPoints = 0;
-    let awayMatchPoints = 0;
+    const homeWins = teamState.categories.filter((c) => c.winnerSide === "A").length;
+    const awayWins = teamState.categories.filter((c) => c.winnerSide === "B").length;
+    const readyLineups = teamState.categories.filter((c) => isCategoryLineupComplete(c)).length;
 
-    teamState.categories.forEach((category) => {
-      if (category.winnerSide === "A") homeWins += 1;
-      if (category.winnerSide === "B") awayWins += 1;
-      const totals = getCategoryPointTotals(category);
-      homeMatchPoints += Number(totals.homePoints || 0);
-      awayMatchPoints += Number(totals.awayPoints || 0);
-    });
-
-    const acceptedCount = teamState.categories.filter((c) => c.lineupStatus === "accepted").length;
-    const rejectedCount = teamState.categories.filter((c) => c.lineupStatus === "rejected").length;
-    const allAccepted = teamState.categories.length > 0 && acceptedCount === teamState.categories.length;
+    const matchPointTotals = teamState.categories.reduce(
+      (acc, category) => {
+        const pts = getCategoryMatchPoints(category);
+        acc.homeMatchPoints += Number(pts.home || 0);
+        acc.awayMatchPoints += Number(pts.away || 0);
+        return acc;
+      },
+      { homeMatchPoints: 0, awayMatchPoints: 0 }
+    );
 
     return {
       homeWins,
       awayWins,
-      homeMatchPoints,
-      awayMatchPoints,
-      acceptedCount,
-      rejectedCount,
+      readyLineups,
       total: teamState.categories.length,
-      allAccepted,
+      allAccepted: teamState.categories.length > 0 && readyLineups === teamState.categories.length,
+      allCompleted: teamState.categories.length > 0 && teamState.categories.every((c) => Boolean(c.winnerSide)),
+      homeMatchPoints: matchPointTotals.homeMatchPoints,
+      awayMatchPoints: matchPointTotals.awayMatchPoints,
     };
   }
 
@@ -1515,8 +1355,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function showTeamEventShell() {
     individualScoreShell?.classList.add("hidden");
     teamEventShell?.classList.remove("hidden");
-    saveBtn?.classList.remove("hidden");
-    if (saveBtn) saveBtn.textContent = "Save";
+    saveBtn?.classList.add("hidden");
     overlay?.classList.remove("show");
     drawer?.classList.remove("open");
   }
@@ -1524,168 +1363,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   function showIndividualEventShell() {
     teamEventShell?.classList.add("hidden");
     individualScoreShell?.classList.remove("hidden");
-    saveBtn?.classList.remove("hidden");
+    saveBtn?.classList.add("hidden");
   }
 
   let fixtures = null;
   let schema = null;
-  let tournamentMeta = null;
 
   try {
-    const fixturesResp = await apiGet(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`
-    );
+    const fixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
     fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
   } catch (e) {
     console.error(e);
     titleEl.textContent = "Failed to load fixtures";
     subEl.textContent = String(e?.message || e);
     return;
-  }
-
-  try {
-    const tournamentResp = await apiGet(
-      `/api/tournaments/${encodeURIComponent(tournamentId)}`
-    );
-    tournamentMeta = tournamentResp?.ok ? tournamentResp.data : tournamentResp;
-  } catch (e) {
-    console.warn("Tournament meta not loaded.", e);
-    tournamentMeta = null;
-  }
-
-  if (fixtures && tournamentMeta) {
-    const metaSportName =
-      safeText(tournamentMeta?.sportName || tournamentMeta?.sport, "");
-
-    const metaTournamentType =
-      safeText(
-        tournamentMeta?.tournamentType || tournamentMeta?.eventType,
-        ""
-      );
-
-    fixtures = {
-      ...(fixtures || {}),
-
-      sportName:
-        safeText(
-          fixtures?.sportName ||
-            fixtures?.meta?.sportName ||
-            fixtures?.tournament?.sportName ||
-            metaSportName,
-          ""
-        ),
-
-      tournamentType:
-        safeText(
-          fixtures?.tournamentType ||
-            fixtures?.meta?.tournamentType ||
-            fixtures?.tournament?.tournamentType ||
-            metaTournamentType,
-          ""
-        ),
-
-      teamCategories:
-        (Array.isArray(fixtures?.teamCategories) && fixtures.teamCategories.length
-          ? fixtures.teamCategories
-          : Array.isArray(tournamentMeta?.categories)
-            ? tournamentMeta.categories
-            : []),
-
-      categoriesMeta:
-        (Array.isArray(fixtures?.categoriesMeta) && fixtures.categoriesMeta.length
-          ? fixtures.categoriesMeta
-          : Array.isArray(tournamentMeta?.categories)
-            ? tournamentMeta.categories
-            : []),
-
-      meta: {
-        ...(fixtures?.meta || {}),
-        sportName:
-          safeText(
-            fixtures?.meta?.sportName ||
-              fixtures?.sportName ||
-              fixtures?.tournament?.sportName ||
-              metaSportName,
-            ""
-          ),
-        sport:
-          safeText(
-            fixtures?.meta?.sport ||
-              fixtures?.sportName ||
-              fixtures?.tournament?.sport ||
-              metaSportName,
-            ""
-          ),
-        tournamentType:
-          safeText(
-            fixtures?.meta?.tournamentType ||
-              fixtures?.tournamentType ||
-              fixtures?.tournament?.tournamentType ||
-              metaTournamentType,
-            ""
-          ),
-        categories:
-          (Array.isArray(fixtures?.meta?.categories) && fixtures.meta.categories.length
-            ? fixtures.meta.categories
-            : Array.isArray(tournamentMeta?.categories)
-              ? tournamentMeta.categories
-              : []),
-      },
-
-      tournament: {
-        ...(fixtures?.tournament || {}),
-        sportName:
-          safeText(
-            fixtures?.tournament?.sportName ||
-              fixtures?.sportName ||
-              metaSportName,
-            ""
-          ),
-        sport:
-          safeText(
-            fixtures?.tournament?.sport ||
-              fixtures?.sportName ||
-              metaSportName,
-            ""
-          ),
-        tournamentType:
-          safeText(
-            fixtures?.tournament?.tournamentType ||
-              fixtures?.tournamentType ||
-              metaTournamentType,
-            ""
-          ),
-        eventType:
-          safeText(
-            fixtures?.tournament?.eventType ||
-              metaTournamentType,
-            ""
-          ),
-        categories:
-          (Array.isArray(fixtures?.tournament?.categories) && fixtures.tournament.categories.length
-            ? fixtures.tournament.categories
-            : Array.isArray(tournamentMeta?.categories)
-              ? tournamentMeta.categories
-              : []),
-
-        // so pickleball UI also uses host form rules instead of default 11 / best-of-3
-        pickleballTargetPoints:
-          Number(
-            fixtures?.tournament?.pickleballTargetPoints ||
-            fixtures?.meta?.pickleballTargetPoints ||
-            tournamentMeta?.tournamentRules?.pointsPerSet ||
-            0
-          ) || null,
-
-        pickleballTotalSets:
-          Number(
-            fixtures?.tournament?.pickleballTotalSets ||
-            fixtures?.meta?.pickleballTotalSets ||
-            tournamentMeta?.tournamentRules?.bestOfSets ||
-            0
-          ) || null,
-      },
-    };
   }
 
   try {
@@ -1708,7 +1399,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!match) {
     titleEl.textContent = "Match not found";
     subEl.textContent = "Invalid round / match or category data missing.";
-    saveBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
     return;
   }
 
@@ -1720,7 +1411,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (statusPill) statusPill.innerHTML = `Status: <strong>BYE</strong>`;
     if (winnerPill) winnerPill.innerHTML = `Winner: <strong>-</strong>`;
     if (reasonPill) reasonPill.innerHTML = `Reason: <strong>BYE match — no scoring needed.</strong>`;
-    saveBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
     return;
   }
 
@@ -1733,92 +1424,65 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (teamOverallHomeName) teamOverallHomeName.textContent = homeLabel;
     if (teamOverallAwayName) teamOverallAwayName.textContent = awayLabel;
     if (teamOverallSub) {
-      teamOverallSub.textContent = "Shows both category wins and cumulative actual points scored across all submatches.";
+      teamOverallSub.textContent = "Cumulative match points are shown prominently. Category wins are shown below.";
     }
 
     const teamTieState = loadTeamTieState(match, fixtures);
-    applyMatchLineupsToTeamState(match, teamTieState);
+    hydrateTeamTieStateFromMatch(match, teamTieState, fixtures);
+
+    let savingTeam = false;
+    const scheduleTeamAutoSave = debounce(() => {
+      saveTeamEventAggregate({ silent: true });
+    }, 550);
+
+    function setCategoryPlayersFromSelects(category, side, row) {
+      const values = Array.from(row.querySelectorAll(`[data-side="${side}"]`))
+        .map((el) => safeText(el.value))
+        .filter(Boolean);
+      if (side === "A") category.homePlayersSelected = Array.from(new Set(values));
+      else category.awayPlayersSelected = Array.from(new Set(values));
+      syncCategoryPlayerStrings(category);
+      category.lineupStatus = isCategoryLineupComplete(category) ? "accepted" : "pending";
+    }
+
+    function buildPlayerOptions(roster, currentValue, selectedValues = []) {
+      return roster
+        .map((name) => {
+          const selected = String(currentValue) === String(name) ? "selected" : "";
+          return `<option value="${escapeHtml(name)}" ${selected}>${escapeHtml(name)}</option>`;
+        })
+        .join("");
+    }
 
     function syncLineupCollapseUi() {
       if (!lineupReviewPanel || !toggleLineupReviewBtn) return;
       lineupReviewPanel.classList.toggle("collapsed", Boolean(teamTieState.lineupCollapsed));
-      toggleLineupReviewBtn.textContent = teamTieState.lineupCollapsed ? "Expand lineup" : "Collapse lineup";
-    }
-
-    async function refreshMatchLineupsFromServer() {
-      try {
-        const latestFixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-        const latestFixtures = latestFixturesResp?.ok ? latestFixturesResp.data : latestFixturesResp;
-        if (!latestFixtures) return false;
-
-        const latestResolved = findFirstMatch(latestFixtures, resolvedCategoryId, roundIndex, matchIndex);
-        const latestMatch = latestResolved?.match || null;
-        if (!latestMatch) return false;
-
-        match.lineups = latestMatch.lineups || match.lineups || {};
-        match.lineupApproval = latestMatch.lineupApproval || match.lineupApproval || {};
-        match.homePlayers = latestMatch.homePlayers || match.homePlayers || [];
-        match.awayPlayers = latestMatch.awayPlayers || match.awayPlayers || [];
-        match.submatches = latestMatch.submatches || match.submatches || [];
-        return true;
-      } catch (err) {
-        console.warn("Could not refresh match lineups.", err);
-        return false;
-      }
-    }
-
-    function updateLineupToolbarUi() {
-      const summary = getLineupSubmissionSummary(match);
-      if (receiveLineupBtn) {
-        receiveLineupBtn.textContent = summary.homeSubmitted || summary.awaySubmitted ? "Refresh lineup" : "Receive lineup";
-      }
-      if (summary.homeSubmitted || summary.awaySubmitted) {
-        lineupReviewPanel?.classList.remove("hidden");
-      }
+      if (teamLineupToggleText) teamLineupToggleText.textContent = teamTieState.lineupCollapsed ? "Expand" : "Collapse";
     }
 
     function syncTeamSummaryUi() {
       const summary = computeTeamTieSummary(teamTieState);
       if (teamOverallHomeScore) teamOverallHomeScore.textContent = String(summary.homeWins);
       if (teamOverallAwayScore) teamOverallAwayScore.textContent = String(summary.awayWins);
-
-      if (teamOverallHomePoints) {
-        teamOverallHomePoints.textContent = String(summary.homeMatchPoints);
-      }
-      if (teamOverallAwayPoints) {
-        teamOverallAwayPoints.textContent = String(summary.awayMatchPoints);
-      }
-      if (teamOverallHomePointsLabel) {
-        teamOverallHomePointsLabel.textContent = homeLabel;
-      }
-      if (teamOverallAwayPointsLabel) {
-        teamOverallAwayPointsLabel.textContent = awayLabel;
-      }
-      
-      if (!lineupStatePill) return;
-
-      const submissionSummary = getLineupSubmissionSummary(match);
-      lineupStatePill.className = getStatusChipClass(summary.allAccepted ? "accepted" : "pending");
-      if (summary.allAccepted) {
-        lineupStatePill.textContent = `All ${summary.total} category lineups accepted`;
-      } else if (submissionSummary.homeSubmitted || submissionSummary.awaySubmitted) {
-        lineupStatePill.textContent = `${summary.acceptedCount}/${summary.total} category lineups accepted • ${submissionSummary.homeSubmitted ? homeLabel : "Home"} submitted / ${submissionSummary.awaySubmitted ? awayLabel : "Away"} ${submissionSummary.awaySubmitted ? "submitted" : "pending"}`;
-      } else {
-        lineupStatePill.textContent = `${summary.acceptedCount}/${summary.total} category lineups accepted`;
-      }
-
-      const firstUnlockedIndex = teamTieState.categories.findIndex(
-        (item) => item.lineupStatus === "accepted" && !item.categoryLocked
-      );
+      if (teamOverallHomePoints) teamOverallHomePoints.textContent = String(summary.homeMatchPoints);
+      if (teamOverallAwayPoints) teamOverallAwayPoints.textContent = String(summary.awayMatchPoints);
 
       if (teamCategoryHelp) {
-        if (!summary.allAccepted) {
-          teamCategoryHelp.textContent = "Category bars unlock only after every category lineup is accepted.";
-        } else if (firstUnlockedIndex === -1) {
-          teamCategoryHelp.textContent = "All category matches are completed and locked.";
+        if (teamTieState.tieLocked) {
+          teamCategoryHelp.textContent = "Scores locked for this tie.";
+        } else if (!summary.allAccepted) {
+          teamCategoryHelp.textContent = "Complete both team lineups in every category using dropdowns. Lineups auto-accept once complete.";
+        } else if (summary.allCompleted) {
+          teamCategoryHelp.textContent = "All category matches are completed. Lock scores to freeze this tie.";
         } else {
-          teamCategoryHelp.textContent = `Complete ${teamTieState.categories[firstUnlockedIndex].name} to unlock the next category.`;
+          teamCategoryHelp.textContent = "Start scoring category by category. Previous completed category unlocks the next one.";
         }
+      }
+
+      if (lockTeamScoresBtn) {
+        lockTeamScoresBtn.classList.toggle("hidden", !(summary.allCompleted && !teamTieState.tieLocked));
+        lockTeamScoresBtn.disabled = teamTieState.tieLocked;
+        lockTeamScoresBtn.textContent = teamTieState.tieLocked ? "Scores locked" : "Lock scores";
       }
 
       syncLineupCollapseUi();
@@ -1828,102 +1492,76 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!lineupReviewList) return;
       clear(lineupReviewList);
 
-      teamTieState.categories.forEach((category) => {
+      teamTieState.categories.forEach((category, index) => {
+        syncCategoryPlayerStrings(category);
+        const slotCount = getCategorySlotCount(category);
         const row = document.createElement("div");
         row.className = "lineup-row";
-        const statusClass = getStatusChipClass(category.lineupStatus);
-
-        const homeSubmissionTime = safeText(match?.lineups?.home?.submittedAt, "");
-        const awaySubmissionTime = safeText(match?.lineups?.away?.submittedAt, "");
-
         row.innerHTML = `
           <div class="lineup-row-head">
             <div>
               <div class="lineup-row-title">${escapeHtml(category.name)}</div>
-              <div class="helper-text">Saved captain lineup for this category. Host can review, accept, reject, or edit it here.</div>
-              <div class="lineup-row-meta">
-                ${escapeHtml(homeLabel)}${homeSubmissionTime ? ` submitted ${escapeHtml(new Date(homeSubmissionTime).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }))}` : " not submitted yet"}
-                •
-                ${escapeHtml(awayLabel)}${awaySubmissionTime ? ` submitted ${escapeHtml(new Date(awaySubmissionTime).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }))}` : " not submitted yet"}
-              </div>
+              <div class="helper-text">${escapeHtml(getCategoryFormatLabel(category))} • Auto accepted once both teams are complete</div>
             </div>
-            <div class="${statusClass}">${escapeHtml(category.lineupStatus)}</div>
+            <div class="lineup-row-tools">
+              <div class="${getStatusChipClass(isCategoryLineupComplete(category) ? "accepted" : "pending")} lineup-row-status">${isCategoryLineupComplete(category) ? "accepted" : "pending"}</div>
+              <button type="button" class="lineup-action-btn" data-action="edit-lineup">Edit</button>
+            </div>
           </div>
           <div class="lineup-row-body">
-            <div class="lineup-entry-grid">
-              <div class="field-stack">
-                <label>${escapeHtml(homeLabel)} lineup</label>
-                <input type="text" data-role="homePlayer" value="${escapeHtml(category.homePlayer)}" placeholder="Enter lineup" />
+            <div class="lineup-side-grid">
+              <div class="lineup-side-card">
+                <div class="lineup-side-title">${escapeHtml(homeLabel)}</div>
+                <div class="lineup-slot-grid" data-side-wrap="A">
+                  ${Array.from({ length: slotCount }, (_, slot) => `
+                    <select class="lineup-player-select" data-side="A" data-slot="${slot}" ${teamTieState.tieLocked ? "disabled" : ""}>
+                      <option value="">Select player</option>
+                      ${buildPlayerOptions(teamTieState.homeRoster, getSelectedPlayers(category, "A")[slot] || "")}
+                    </select>
+                  `).join("")}
+                </div>
               </div>
-              <div class="lineup-vs">VS</div>
-              <div class="field-stack">
-                <label>${escapeHtml(awayLabel)} lineup</label>
-                <input type="text" data-role="awayPlayer" value="${escapeHtml(category.awayPlayer)}" placeholder="Enter lineup" />
+              <div class="lineup-side-card">
+                <div class="lineup-side-title">${escapeHtml(awayLabel)}</div>
+                <div class="lineup-slot-grid" data-side-wrap="B">
+                  ${Array.from({ length: slotCount }, (_, slot) => `
+                    <select class="lineup-player-select" data-side="B" data-slot="${slot}" ${teamTieState.tieLocked ? "disabled" : ""}>
+                      <option value="">Select player</option>
+                      ${buildPlayerOptions(teamTieState.awayRoster, getSelectedPlayers(category, "B")[slot] || "")}
+                    </select>
+                  `).join("")}
+                </div>
               </div>
             </div>
 
             <div class="score-notes" style="margin-top: 12px;">
               <label>Host notes</label>
-              <textarea data-role="notes" placeholder="Optional notes for accept / reject / edit">${escapeHtml(category.notes)}</textarea>
-            </div>
-
-            <div class="lineup-actions" style="margin-top: 12px;">
-              <button type="button" class="lineup-action-btn primary" data-action="accept">Accept</button>
-              <button type="button" class="lineup-action-btn" data-action="reject">Reject</button>
-              <button type="button" class="lineup-action-btn" data-action="edit">Edit</button>
+              <textarea data-role="notes" placeholder="Optional notes for this category" ${teamTieState.tieLocked ? "disabled" : ""}>${escapeHtml(category.notes)}</textarea>
             </div>
           </div>
         `;
 
-        const homeInput = row.querySelector('[data-role="homePlayer"]');
-        const awayInput = row.querySelector('[data-role="awayPlayer"]');
+        row.querySelector('[data-action="edit-lineup"]')?.addEventListener("click", () => {
+          row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          row.querySelector('select')?.focus();
+        });
+
         const notesInput = row.querySelector('[data-role="notes"]');
-
-        function syncCategoryDraftFromInputs() {
-          category.homePlayer = safeText(homeInput?.value);
-          category.awayPlayer = safeText(awayInput?.value);
-          category.notes = safeText(notesInput?.value);
+        notesInput?.addEventListener("input", (event) => {
+          category.notes = safeText(event.target.value);
           saveTeamTieState(teamTieState);
-          renderTeamCategoryBars();
-          syncTeamSummaryUi();
-        }
-
-        homeInput?.addEventListener("input", syncCategoryDraftFromInputs);
-        awayInput?.addEventListener("input", syncCategoryDraftFromInputs);
-        notesInput?.addEventListener("input", syncCategoryDraftFromInputs);
-
-        row.querySelector('[data-action="accept"]')?.addEventListener("click", () => {
-          syncCategoryDraftFromInputs();
-          if (!category.homePlayer || !category.awayPlayer) {
-            alert("Please fill both players before accepting the lineup.");
-            return;
-          }
-          category.lineupStatus = "accepted";
-          saveTeamTieState(teamTieState);
-          renderLineupReview();
-          renderTeamCategoryBars();
-          syncTeamSummaryUi();
+          scheduleTeamAutoSave();
         });
 
-        row.querySelector('[data-action="reject"]')?.addEventListener("click", () => {
-          syncCategoryDraftFromInputs();
-          category.lineupStatus = "rejected";
-          category.isScoringOpen = false;
-          category.winnerSide = null;
-          category.categoryLocked = false;
-          saveTeamTieState(teamTieState);
-          renderLineupReview();
-          renderTeamCategoryBars();
-          syncTeamSummaryUi();
-        });
-
-        row.querySelector('[data-action="edit"]')?.addEventListener("click", () => {
-          category.lineupStatus = "pending";
-          category.isScoringOpen = false;
-          saveTeamTieState(teamTieState);
-          renderLineupReview();
-          renderTeamCategoryBars();
-          syncTeamSummaryUi();
+        row.querySelectorAll('.lineup-player-select').forEach((select) => {
+          select.addEventListener("change", () => {
+            setCategoryPlayersFromSelects(category, select.dataset.side, row);
+            saveTeamTieState(teamTieState);
+            renderLineupReview();
+            renderTeamCategoryBars();
+            syncTeamSummaryUi();
+            scheduleTeamAutoSave();
+          });
         });
 
         lineupReviewList.appendChild(row);
@@ -1934,41 +1572,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!teamCategoryBars) return;
       clear(teamCategoryBars);
 
-      const summary = computeTeamTieSummary(teamTieState);
-      if (!summary.allAccepted) {
-        const waitingCard = document.createElement("div");
-        waitingCard.className = "category-card";
-        waitingCard.innerHTML = `
-          <div class="category-card-head">
-            <div>
-              <div class="category-title">Waiting for lineup approvals</div>
-              <div class="helper-text">Accept all category lineups first. Then category-wise scoring will unlock.</div>
-            </div>
-          </div>
-        `;
-        teamCategoryBars.appendChild(waitingCard);
-        return;
-      }
-
-      const firstUnlockedIndex = teamTieState.categories.findIndex(
-        (item) => item.lineupStatus === "accepted" && !item.categoryLocked
-      );
-
       teamTieState.categories.forEach((category, index) => {
+        syncCategoryPlayerStrings(category);
         const card = document.createElement("div");
         card.className = `category-card${category.isScoringOpen ? " open" : ""}`;
 
         const resultInfo = getCategoryResultInfo(category, homeLabel, awayLabel);
-        const isUnlocked = category.categoryLocked || firstUnlockedIndex === -1 || index === firstUnlockedIndex;
-        const canToggle = category.categoryLocked || isUnlocked;
+        const previousCompleted = teamTieState.categories.slice(0, index).every((item) => Boolean(item.winnerSide));
+        const canScore = isCategoryLineupComplete(category) && previousCompleted && !teamTieState.tieLocked;
+        const canToggle = category.categoryLocked || category.isScoringOpen || canScore;
 
-        const buttonLabel = category.isScoringOpen
-          ? "Hide scoring"
-          : category.categoryLocked
-            ? "View result"
-            : isUnlocked
-              ? "Start scoring"
-              : "Complete previous category first";
+        const buttonLabel = teamTieState.tieLocked
+          ? "Locked"
+          : category.isScoringOpen
+            ? "Hide scoring"
+            : category.categoryLocked
+              ? "View result"
+              : !isCategoryLineupComplete(category)
+                ? "Complete lineup first"
+                : canScore
+                  ? "Start scoring"
+                  : "Complete previous category first";
 
         const categoryBody =
           category.sportKey === "pickleball"
@@ -1980,9 +1604,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             ? ""
             : `
                 <div class="category-winner-actions" style="margin-top: 14px;">
-                  <button type="button" class="category-winner-btn primary" data-action="home-winner">Mark ${escapeHtml(homeLabel)} winner</button>
-                  <button type="button" class="category-winner-btn primary" data-action="away-winner">Mark ${escapeHtml(awayLabel)} winner</button>
-                  <button type="button" class="category-winner-btn" data-action="clear-winner">Clear result</button>
+                  <button type="button" class="category-winner-btn primary" data-action="home-winner" ${teamTieState.tieLocked ? "disabled" : ""}>Mark ${escapeHtml(homeLabel)} winner</button>
+                  <button type="button" class="category-winner-btn primary" data-action="away-winner" ${teamTieState.tieLocked ? "disabled" : ""}>Mark ${escapeHtml(awayLabel)} winner</button>
+                  <button type="button" class="category-winner-btn" data-action="clear-winner" ${teamTieState.tieLocked ? "disabled" : ""}>Clear result</button>
                 </div>
               `;
 
@@ -1990,10 +1614,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="category-card-head">
             <div class="category-meta">
               <div class="category-title">${escapeHtml(category.name)}</div>
-              <div class="category-matchup">${escapeHtml(category.homePlayer || "TBD")} vs ${escapeHtml(category.awayPlayer || "TBD")}</div>
+              <div class="category-matchup">${escapeHtml(category.homePlayer || "TBD")} vs ${escapeHtml(category.awayPlayer || "TBD")} <small>• ${escapeHtml(getCategoryFormatLabel(category))}</small></div>
             </div>
             <div class="category-actions">
               <div class="status-chip ${resultInfo.chipClass}">${escapeHtml(resultInfo.text)}</div>
+              <div class="status-chip"><strong>${escapeHtml(formatCategoryPointsText(category))}</strong></div>
               <button type="button" class="lineup-action-btn primary" data-action="toggle-scoring" ${canToggle ? "" : "disabled"}>
                 ${escapeHtml(buttonLabel)}
               </button>
@@ -2002,24 +1627,24 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="category-card-body">
             ${categoryBody}
             ${manualWinnerMarkup}
-
             <div class="score-notes" style="margin-top: 14px;">
               <label>Category scoring notes</label>
-              <textarea data-action="score-notes" placeholder="Optional notes for this category">${escapeHtml(category.notes)}</textarea>
+              <textarea data-action="score-notes" placeholder="Optional notes for this category" ${teamTieState.tieLocked ? "disabled" : ""}>${escapeHtml(category.notes)}</textarea>
             </div>
           </div>
         `;
 
-        const rerender = () => {
+        const rerender = (saveNow = true) => {
           saveTeamTieState(teamTieState);
           renderTeamCategoryBars();
           syncTeamSummaryUi();
+          if (saveNow) scheduleTeamAutoSave();
         };
 
         card.querySelector('[data-action="toggle-scoring"]')?.addEventListener("click", () => {
           if (!canToggle) return;
           category.isScoringOpen = !category.isScoringOpen;
-          rerender();
+          rerender(false);
         });
 
         if (category.sportKey === "pickleball") {
@@ -2031,7 +1656,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             category.winnerSide = "A";
             category.categoryLocked = true;
             category.isScoringOpen = false;
-            unlockNextCategory(teamTieState, index);
             rerender();
           });
 
@@ -2039,7 +1663,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             category.winnerSide = "B";
             category.categoryLocked = true;
             category.isScoringOpen = false;
-            unlockNextCategory(teamTieState, index);
             rerender();
           });
 
@@ -2053,36 +1676,97 @@ document.addEventListener("DOMContentLoaded", async () => {
         card.querySelector('[data-action="score-notes"]')?.addEventListener("input", (event) => {
           category.notes = safeText(event.target.value);
           saveTeamTieState(teamTieState);
+          scheduleTeamAutoSave();
         });
+
+        if (teamTieState.tieLocked) {
+          card.insertAdjacentHTML("beforeend", `<div class="category-lock-banner">Scores locked</div>`);
+        }
 
         teamCategoryBars.appendChild(card);
       });
     }
 
-    receiveLineupBtn?.addEventListener("click", async () => {
-      await refreshMatchLineupsFromServer();
-      applyMatchLineupsToTeamState(match, teamTieState);
-      lineupReviewPanel?.classList.remove("hidden");
-      saveTeamTieState(teamTieState);
-      renderLineupReview();
-      renderTeamCategoryBars();
-      updateLineupToolbarUi();
-      syncTeamSummaryUi();
-    });
+    async function saveTeamEventAggregate({ silent = true } = {}) {
+      if (savingTeam) return;
+      savingTeam = true;
+      const summary = computeTeamTieSummary(teamTieState);
+      const candidateUrls = [
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/matches/score`,
+      ];
+      const hasSubmatches = Array.isArray(match?.submatches) && match.submatches.length >= teamTieState.categories.length;
 
-    manualLineupBtn?.addEventListener("click", () => {
-      lineupReviewPanel?.classList.remove("hidden");
-      teamTieState.categories.forEach((category, index) => {
-        if (!category.homePlayer) category.homePlayer = teamTieState.homeRoster[index] || "";
-        if (!category.awayPlayer) category.awayPlayer = teamTieState.awayRoster[index] || "";
-        if (category.lineupStatus === "rejected") category.lineupStatus = "pending";
-      });
-      saveTeamTieState(teamTieState);
-      renderLineupReview();
-      renderTeamCategoryBars();
-      updateLineupToolbarUi();
-      syncTeamSummaryUi();
-    });
+      try {
+        if (hasSubmatches) {
+          for (let index = 0; index < teamTieState.categories.length; index += 1) {
+            const category = teamTieState.categories[index];
+            const totals = getCategoryMatchPoints(category);
+            const targetPoints = Math.max(1, Number(Math.max(totals.home, totals.away) || 1));
+            const payload = {
+              tournamentId,
+              categoryId: resolvedCategoryId,
+              roundIndex,
+              matchIndex,
+              round: roundIndex,
+              match: matchIndex,
+              scoreIndex: index,
+              score: {
+                config: { targetPoints, winByTwo: false },
+                state: {
+                  A: { points: Number(totals.home || 0) },
+                  B: { points: Number(totals.away || 0) },
+                  meta: { categorySnapshot: category, tieLocked: teamTieState.tieLocked },
+                },
+                cricket: category.sportKey === "cricket" ? category.sportData : null,
+                football: category.sportKey === "football" ? category.sportData : null,
+                badminton: category.sportKey === "badminton" ? category.sportData : null,
+                pickleball: category.sportKey === "pickleball" ? category.sportData : null,
+                computed: {
+                  status: category.winnerSide ? "completed" : (isCategoryLineupComplete(category) ? "live" : "pending"),
+                  winnerSide: category.winnerSide || null,
+                  winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
+                },
+              },
+            };
+            for (const url of candidateUrls) {
+              await apiPut(url, payload);
+              break;
+            }
+          }
+        }
+
+        if (!hasSubmatches) {
+          const aggregatePayload = {
+            tournamentId,
+            categoryId: resolvedCategoryId,
+            roundIndex,
+            matchIndex,
+            round: roundIndex,
+            match: matchIndex,
+            scoreIndex: 0,
+            score: {
+              config: { targetPoints: Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1)), winByTwo: false },
+              state: {
+                A: { points: Number(summary.homeMatchPoints || 0) },
+                B: { points: Number(summary.awayMatchPoints || 0) },
+                meta: { teamTieState },
+              },
+              computed: {
+                status: summary.allCompleted ? "completed" : (summary.readyLineups ? "live" : "pending"),
+                winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
+                winnerName: summary.homeWins > summary.awayWins ? homeLabel : summary.awayWins > summary.homeWins ? awayLabel : null,
+              },
+            },
+          };
+          await apiPut(candidateUrls[0], aggregatePayload);
+        }
+      } catch (err) {
+        console.error(err);
+        if (!silent) alert(err?.message || "Could not auto-save tie data.");
+      } finally {
+        savingTeam = false;
+      }
+    }
 
     toggleLineupReviewBtn?.addEventListener("click", () => {
       teamTieState.lineupCollapsed = !teamTieState.lineupCollapsed;
@@ -2090,106 +1774,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       syncLineupCollapseUi();
     });
 
-    const initialSubmissionSummary = getLineupSubmissionSummary(match);
-    if (initialSubmissionSummary.homeSubmitted || initialSubmissionSummary.awaySubmitted) {
-      lineupReviewPanel?.classList.remove("hidden");
+    lockTeamScoresBtn?.addEventListener("click", async () => {
+      teamTieState.tieLocked = true;
       teamTieState.categories.forEach((category) => {
-        if ((category.homePlayer || category.awayPlayer) && category.lineupStatus !== "accepted" && category.lineupStatus !== "rejected") {
-          category.lineupStatus = "pending";
-        }
+        category.categoryLocked = true;
+        category.isScoringOpen = false;
       });
-    }
+      saveTeamTieState(teamTieState);
+      renderLineupReview();
+      renderTeamCategoryBars();
+      syncTeamSummaryUi();
+      await saveTeamEventAggregate({ silent: false });
+    });
 
-    async function saveTeamEventAggregate() {
-      const summary = computeTeamTieSummary(teamTieState);
-
-      const candidateUrls = [
-        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/matches/score`,
-      ];
-
-      const hasSubmatches = Array.isArray(match?.submatches) && match.submatches.length >= teamTieState.categories.length;
-
-      try {
-        if (hasSubmatches) {
-          for (let index = 0; index < teamTieState.categories.length; index += 1) {
-            const category = teamTieState.categories[index];
-            const totals = getCategoryPointTotals(category);
-            const targetPoints = Math.max(1, Number(Math.max(totals.homePoints, totals.awayPoints) || 1));
-            const payload = {
-              tournamentId,
-              categoryId: resolvedCategoryId,
-              round: roundIndex,
-              match: matchIndex,
-              scoreIndex: index,
-              score: {
-                config: { targetPoints, winByTwo: false },
-                state: {
-                  A: { points: Number(totals.homePoints || 0) },
-                  B: { points: Number(totals.awayPoints || 0) },
-                  meta: { categorySnapshot: category },
-                },
-                cricket: category.sportKey === "cricket" ? category.sportData : null,
-                football: category.sportKey === "football" ? category.sportData : null,
-                badminton: category.sportKey === "badminton" ? category.sportData : null,
-                pickleball: category.sportKey === "pickleball" ? category.sportData : null,
-                computed: {
-                  status: category.winnerSide ? "completed" : "pending",
-                  winnerSide: category.winnerSide || null,
-                  winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
-                },
-              },
-            };
-
-            for (const url of candidateUrls) {
-              await apiPut(url, payload);
-              break;
-            }
-          }
-        } else {
-          const targetPoints = Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1));
-          const payload = {
-            tournamentId,
-            categoryId: resolvedCategoryId,
-            round: roundIndex,
-            match: matchIndex,
-            scoreIndex: 0,
-            score: {
-              config: { targetPoints, winByTwo: false },
-              state: {
-                A: { points: Number(summary.homeMatchPoints || 0) },
-                B: { points: Number(summary.awayMatchPoints || 0) },
-                meta: { teamTieState },
-              },
-              computed: {
-                status: summary.homeWins || summary.awayWins ? "completed" : "pending",
-                winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
-                winnerName: summary.homeWins > summary.awayWins ? homeLabel : summary.awayWins > summary.homeWins ? awayLabel : null,
-              },
-            },
-          };
-
-          for (const url of candidateUrls) {
-            await apiPut(url, payload);
-            break;
-          }
-        }
-
-        saveTeamTieState(teamTieState);
-        if (saveMsg) saveMsg.textContent = "Saved and standings updated";
-        syncTeamSummaryUi();
-        alert("Tie data saved successfully.");
-      } catch (err) {
-        console.error(err);
-        if (saveMsg) saveMsg.textContent = "Save failed";
-        alert(err?.message || "Could not save tie data.");
-      }
-    }
-
-    saveBtn?.addEventListener("click", saveTeamEventAggregate);
     renderLineupReview();
     renderTeamCategoryBars();
-    updateLineupToolbarUi();
     syncTeamSummaryUi();
+    scheduleTeamAutoSave();
     return;
   }
 
@@ -2198,7 +1799,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!schema) {
     titleEl.textContent = "No scoring schema found";
     subEl.textContent = "Finalize scoring schema for this category first.";
-    saveBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
     return;
   }
 
@@ -2321,9 +1922,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       homeScoreEl.textContent = Number(state.state.A?.[logicField] ?? 0);
       awayScoreEl.textContent = Number(state.state.B?.[logicField] ?? 0);
     }
+
+    if (individualAutoSaveEnabled && !suppressIndividualAutoSave) {
+      if (saveMsg) saveMsg.textContent = "Saving...";
+      scheduleIndividualAutoSave();
+    }
   }
 
+  let individualAutoSaveEnabled = false;
+  let suppressIndividualAutoSave = false;
+  const scheduleIndividualAutoSave = debounce(() => saveScore({ silent: true }), 500);
+
   renderPills();
+  individualAutoSaveEnabled = true;
 
   toggleSettings?.addEventListener("click", () => {
     settingsPanel?.classList.toggle("open");
@@ -2418,6 +2029,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (state.timer.running) return;
     state.timer.running = true;
     state.timer.startedAtEpochMs = Date.now();
+    if (saveMsg) saveMsg.textContent = "Saving...";
+    scheduleIndividualAutoSave();
   });
 
   timerPauseBtn?.addEventListener("click", () => {
@@ -2426,6 +2039,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.timer.running = false;
     state.timer.startedAtEpochMs = null;
     refreshTimerUi();
+    if (saveMsg) saveMsg.textContent = "Saving...";
+    scheduleIndividualAutoSave();
   });
 
   timerResetBtn?.addEventListener("click", () => {
@@ -2433,6 +2048,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.timer.running = false;
     state.timer.startedAtEpochMs = null;
     refreshTimerUi();
+    if (saveMsg) saveMsg.textContent = "Saving...";
+    scheduleIndividualAutoSave();
   });
 
   function closeDrawer() {
@@ -2630,7 +2247,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     homePanel.classList.remove("active");
   });
 
-  async function saveScore() {
+  async function saveScore(options = {}) {
+    const { silent = false } = options;
     if (state.timer.running && state.timer.startedAtEpochMs) {
       state.timer.elapsedMs += Date.now() - state.timer.startedAtEpochMs;
       state.timer.running = false;
@@ -2642,6 +2260,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const payload = {
       tournamentId,
       categoryId: resolvedCategoryId,
+      roundIndex,
+      matchIndex,
       round: roundIndex,
       match: matchIndex,
       scoreIndex,
@@ -2680,21 +2300,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!saved) {
       console.error(lastError);
-      saveMsg.textContent = "Save failed";
-      alert(lastError?.message || "Could not save score.");
+      if (saveMsg) saveMsg.textContent = "Auto-save failed";
+      if (!silent) alert(lastError?.message || "Could not save score.");
       return;
     }
 
-    saveMsg.textContent = "Saved and standings updated";
+    if (saveMsg) saveMsg.textContent = "Saved";
+    suppressIndividualAutoSave = true;
     renderPills();
-
-    homeScoreEl.classList.add("bump");
-    awayScoreEl.classList.add("bump");
-    setTimeout(() => {
-      homeScoreEl.classList.remove("bump");
-      awayScoreEl.classList.remove("bump");
-    }, 250);
+    suppressIndividualAutoSave = false;
   }
 
-  saveBtn?.addEventListener("click", saveScore);
 });

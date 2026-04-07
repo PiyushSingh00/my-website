@@ -53,69 +53,44 @@
             <div class="match-meta" id="score-sub">Loading match...</div>
           </div>
 
-          <button type="button" class="ab-btn ab-save" id="save-score">Save</button>
         </div>
 
         <section class="team-event-shell hidden" id="team-event-shell">
-          <div class="lineup-toolbar">
-            <div class="lineup-toolbar-left">
-              <button type="button" class="ab-btn ab-save" id="receive-lineup-btn">Receive lineup</button>
-              <button type="button" class="ab-btn" id="manual-lineup-btn">Add lineup manually</button>
-            </div>
-            <div class="status-chip" id="lineup-state-pill">Waiting for both team lineups</div>
-          </div>
-
           <section class="team-overall-board">
             <div class="tob-head">
               <div>
                 <div class="panel-label team-label-top">Overall tie summary</div>
-                <div class="helper-text" id="team-overall-sub">Shows both category wins and cumulative actual points scored across all submatches.</div>
+                <div class="helper-text" id="team-overall-sub">Cumulative match points are shown prominently. Category wins are shown below.</div>
               </div>
             </div>
 
-            <div class="team-overall-score-grid">
-              <div class="overall-team-card">
+            <div class="team-overall-score-grid team-overall-score-grid--points">
+              <div class="overall-team-card overall-team-card--primary">
                 <div class="overall-team-name" id="team-overall-home-name">Home</div>
-                <div class="helper-text">Category wins</div>
-                <div class="overall-team-score" id="team-overall-home-score">0</div>
+                <div class="overall-points-label">Match points</div>
+                <div class="overall-team-score overall-team-score--points" id="team-overall-home-points">0</div>
+                <div class="overall-secondary-line">Category wins <strong id="team-overall-home-score">0</strong></div>
               </div>
 
               <div class="overall-vs">VS</div>
 
-              <div class="overall-team-card">
+              <div class="overall-team-card overall-team-card--primary">
                 <div class="overall-team-name" id="team-overall-away-name">Away</div>
-                <div class="helper-text">Category wins</div>
-                <div class="overall-team-score" id="team-overall-away-score">0</div>
-              </div>
-            </div>
-
-            <div class="status-row" data-team-points-row="1" style="margin-top: 14px; justify-content: center;">
-              <div class="status-chip">
-                <span id="team-overall-home-points-label">Home</span>
-                <strong id="team-overall-home-points">0</strong>
-                <span>match points</span>
-              </div>
-              <div class="status-chip">
-                <span id="team-overall-away-points-label">Away</span>
-                <strong id="team-overall-away-points">0</strong>
-                <span>match points</span>
+                <div class="overall-points-label">Match points</div>
+                <div class="overall-team-score overall-team-score--points" id="team-overall-away-points">0</div>
+                <div class="overall-secondary-line">Category wins <strong id="team-overall-away-score">0</strong></div>
               </div>
             </div>
           </section>
 
-          <section class="lineup-review-panel hidden" id="lineup-review-panel">
-            <div class="lineup-review-head">
+          <section class="lineup-review-panel" id="lineup-review-panel">
+            <button type="button" class="lineup-section-toggle" id="toggle-lineup-review">
               <div>
-                <p class="panel-label">Review team lineups</p>
-                <div class="helper-text">
-                  Accept, reject, edit, or manually fill category-wise player lineups before scoring.
-                </div>
+                <p class="panel-label">Team Lineup</p>
+                <div class="helper-text">Expand to review and edit category-wise player lineups.</div>
               </div>
-
-              <button type="button" class="lineup-collapse-btn" id="toggle-lineup-review">
-                Collapse lineup
-              </button>
-            </div>
+              <span class="lineup-section-toggle-text" id="team-lineup-toggle-text">Collapse</span>
+            </button>
 
             <div id="lineup-review-list"></div>
           </section>
@@ -125,9 +100,10 @@
               <div>
                 <p class="panel-label">Category matches</p>
                 <div class="helper-text" id="team-category-help">
-                  Category bars will unlock after all lineups are accepted.
+                  Complete lineups and scoring category by category.
                 </div>
               </div>
+              <button type="button" class="lineup-action-btn primary hidden" id="lock-team-scores-btn">Lock scores</button>
             </div>
             <div id="team-category-bars"></div>
           </section>
