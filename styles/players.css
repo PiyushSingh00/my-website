@@ -797,10 +797,7 @@
 }
 
 
-.hidden-file-input {
-  display: none !important;
-}
-
+/* collapsible section polish */
 .players-list-section {
   margin-top: 10px;
   padding-top: 18px;
@@ -808,19 +805,16 @@
 }
 
 #players-list-content,
-#team-setup-content,
-#fixtures-content,
-#leaderboard-content {
+#leaderboard-content,
+#fixtures-content {
   width: 100%;
 }
 
-#players-list-content,
-#team-setup-content,
-#fixtures-content,
-#leaderboard-content {
-  margin-top: 4px;
+#players-list-content {
+  margin-top: 8px;
 }
 
+.collapse-toggle-btn,
 #players-list-toggle-btn,
 #team-setup-toggle-btn,
 #leaderboard-toggle-btn,
@@ -829,6 +823,7 @@
   text-align: center;
 }
 
+/* team player list actions */
 .team-player-row {
   justify-content: space-between;
 }
@@ -877,4 +872,10 @@
   margin-top: 14px;
   display: flex;
   justify-content: flex-end;
+}
+
+.section-head + #fixtures-content,
+.section-head + #leaderboard-content,
+.section-head + #team-setup-content {
+  margin-top: 4px;
 }

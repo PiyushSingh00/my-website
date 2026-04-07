@@ -62,17 +62,16 @@
             + Add players
           </button>
 
-          <button class="btn-dark" type="button" id="add-player-excel-btn">
-            Add player using excel
-          </button>
-          <input id="add-player-excel-input" type="file" accept=".xlsx,.xls,.csv" class="hidden-file-input" />
-
           <button class="btn-dark" type="button" id="make-captains-btn">
             Make captains
           </button>
 
           <button class="btn-dark hidden" type="button" id="create-pools-btn">
             Create Pools
+          </button>
+
+          <button class="btn-primary" type="button" id="create-fixtures-btn">
+            View tournament fixtures
           </button>
         </div>
 
@@ -114,11 +113,11 @@
           </div>
         </section>
 
-        <section id="captains-summary-section" class="captains-summary-section hidden">
+        <section id="captains-summary-section" class="captains-summary-section">
           <div class="section-head">
             <div>
               <p class="eyebrow">Team setup</p>
-              <h2 class="section-title">Team setup</h2>
+              <h2 class="section-title">Team list</h2>
             </div>
 
             <button type="button" class="btn-dark" id="team-setup-toggle-btn" aria-expanded="false">
@@ -134,102 +133,6 @@
             </div>
 
             <div id="captains-summary-list" class="captains-summary-list"></div>
-          </div>
-        </section>
-
-        <section id="fixtures-embed" class="fixtures-embed">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">Tournament fixtures</p>
-              <h2 class="section-title">Fixtures</h2>
-            </div>
-
-            <button type="button" class="btn-dark" id="fixtures-toggle-btn" aria-expanded="false">
-              ▸
-            </button>
-          </div>
-
-          <div id="fixtures-content" class="hidden">
-            <header class="fixtures-header">
-              <p class="eyebrow">Tournament fixtures</p>
-              <h2 id="fixtures-tournament-name">Tournament name</h2>
-              <p class="helper-text players-meta">
-                <span id="fixtures-tournament-sport"></span>
-                <span id="fixtures-tournament-dates"></span>
-                <span>Code: <span id="fixtures-tournament-code"></span></span>
-              </p>
-            </header>
-
-            <div class="fixtures-toolbar">
-              <button type="button" class="btn-primary" id="fixtures-generate-btn">
-                Regenerate fixtures
-              </button>
-
-              <button type="button" class="btn-dark" id="fixtures-configure-fields-btn">
-                Configure scoring fields
-              </button>
-
-              <button type="button" class="btn-dark" id="fixtures-edit-btn" style="display:none;">
-                Edit fixtures
-              </button>
-            </div>
-
-            <div id="fixtures-toast" class="fixtures-toast" style="display:none;">✓ Done</div>
-
-            <p class="helper-text" id="embedded-fixtures-helper-text">
-              View generated fixtures here.
-            </p>
-
-            <div id="fixtures-team-stage-actions" class="fixtures-stage-actions"></div>
-            <div class="fixtures-toggle" id="fixtures-toggle"></div>
-
-            <div id="fixtures-none-selected" class="empty-state" style="display:flex;">
-              <div class="feature-icon">🎯</div>
-              <h3>Choose which fixtures to view</h3>
-              <p class="muted">
-                Select a <strong>Category</strong> above to see the tournament fixtures.
-              </p>
-            </div>
-
-            <div id="fixtures-groups"></div>
-          </div>
-        </section>
-
-        <section id="leaderboard-section" class="captains-summary-section hidden">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">League stage</p>
-              <h2 class="section-title">Leaderboard</h2>
-            </div>
-
-            <button type="button" class="btn-dark" id="leaderboard-toggle-btn" aria-expanded="false">
-              ▸
-            </button>
-          </div>
-
-          <div id="leaderboard-content" class="hidden">
-            <p class="helper-text" id="leaderboard-helper-text">
-              Match points = cumulative actual points scored by a team across all submatches played so far.
-            </p>
-
-            <div class="players-table-wrapper">
-              <table class="players-table">
-                <thead>
-                  <tr>
-                    <th>Rank</th>
-                    <th>Team</th>
-                    <th>Match points</th>
-                    <th>Matches played</th>
-                    <th>Qualified</th>
-                  </tr>
-                </thead>
-                <tbody id="leaderboard-table-body">
-                  <tr>
-                    <td colspan="5" class="muted">No leaderboard data yet.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </div>
         </section>
 
@@ -260,6 +163,102 @@
           </div>
 
           <div id="pools-grid" class="pools-grid"></div>
+        </section>
+
+        <section id="leaderboard-section" class="captains-summary-section">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">League stage</p>
+              <h2 class="section-title">Leaderboard</h2>
+            </div>
+
+            <button type="button" class="btn-dark" id="leaderboard-toggle-btn" aria-expanded="true">
+              ▾
+            </button>
+          </div>
+
+          <div id="leaderboard-content">
+            <p class="helper-text" id="leaderboard-helper-text">
+              Match points = cumulative actual points scored by a team across all submatches played so far.
+            </p>
+
+            <div class="players-table-wrapper">
+            <table class="players-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Team</th>
+                  <th>Match points</th>
+                  <th>Ties won</th>
+                  <th>Head-to-head</th>
+                  <th>Qualified</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-table-body">
+                <tr>
+                  <td colspan="6" class="muted">No leaderboard data yet.</td>
+                </tr>
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="fixtures-embed" class="fixtures-embed">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Tournament fixtures</p>
+              <h2 class="section-title">Fixtures</h2>
+            </div>
+
+            <button type="button" class="btn-dark" id="fixtures-toggle-btn" aria-expanded="true">
+              ▾
+            </button>
+          </div>
+
+          <div id="fixtures-content">
+            <header class="fixtures-header">
+            <p class="eyebrow">Tournament fixtures</p>
+            <h2 id="fixtures-tournament-name">Tournament name</h2>
+            <p class="helper-text players-meta">
+              <span id="fixtures-tournament-sport"></span>
+              <span id="fixtures-tournament-dates"></span>
+              <span>Code: <span id="fixtures-tournament-code"></span></span>
+            </p>
+          </header>
+
+          <div class="fixtures-toolbar">
+            <button type="button" class="btn-primary" id="fixtures-generate-btn">
+              Regenerate fixtures
+            </button>
+
+            <button type="button" class="btn-dark" id="fixtures-configure-fields-btn">
+              Configure scoring fields
+            </button>
+
+            <button type="button" class="btn-dark" id="fixtures-edit-btn" style="display:none;">
+              Edit fixtures
+            </button>
+          </div>
+
+          <div id="fixtures-toast" class="fixtures-toast" style="display:none;">✓ Done</div>
+
+          <p class="helper-text" id="embedded-fixtures-helper-text">
+            View generated fixtures here.
+          </p>
+
+          <div class="fixtures-toggle" id="fixtures-toggle"></div>
+
+          <div id="fixtures-none-selected" class="empty-state" style="display:flex;">
+            <div class="feature-icon">🎯</div>
+            <h3>Choose which fixtures to view</h3>
+            <p class="muted">
+              Select a <strong>Category</strong> above to see the tournament fixtures.
+            </p>
+          </div>
+
+          <div id="fixtures-groups"></div>
+          </div>
         </section>
       </section>
     </main>
@@ -370,15 +369,20 @@
 
         <h2>Add player to team</h2>
         <p class="helper-text">
-          Choose from registered players who are not captains and are not already assigned to another team.
+          Select a registered player or type a custom player name to add them to this team list.
         </p>
 
         <form id="team-player-form">
           <div class="field-group">
-            <label for="team-player-existing">Registered player</label>
-            <select id="team-player-existing" required>
-              <option value="">Select registered player</option>
+            <label for="team-player-existing">Choose registered player</label>
+            <select id="team-player-existing">
+              <option value="">Select player</option>
             </select>
+          </div>
+
+          <div class="field-group">
+            <label for="team-player-custom">Or enter player name manually</label>
+            <input id="team-player-custom" type="text" placeholder="Enter player name" />
           </div>
 
           <button type="submit" class="btn-primary full-width">
@@ -388,7 +392,6 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script type="module" src="scripts/players.js"></script>
   </body>
 </html>
