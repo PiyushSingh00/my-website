@@ -1283,14 +1283,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }));
   }
 
-    if (extracted.length) return extracted;
-
-    const fallbackCount = Math.max(1, Number(params.get("categoryCount") || 3));
-    return Array.from({ length: fallbackCount }, (_, index) => ({
-      id: `cat-${index + 1}`,
-      name: `Category ${index + 1}`,
-    }));
-  }
 
   function inferTeamRoster(matchObj, side) {
     const rosterFromMatch = side === "A" ? matchObj?.homePlayers : matchObj?.awayPlayers;
