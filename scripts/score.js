@@ -114,12 +114,56 @@ document.addEventListener("DOMContentLoaded", async () => {
   const teamOverallAwayName = document.getElementById("team-overall-away-name");
   const teamOverallHomeScore = document.getElementById("team-overall-home-score");
   const teamOverallAwayScore = document.getElementById("team-overall-away-score");
-  const teamOverallHomePoints = document.getElementById("team-overall-home-points");
-  const teamOverallAwayPoints = document.getElementById("team-overall-away-points");
-  const teamOverallHomePointsLabel = document.getElementById("team-overall-home-points-label");
-  const teamOverallAwayPointsLabel = document.getElementById("team-overall-away-points-label");
   const teamOverallSub = document.getElementById("team-overall-sub");
   const toggleLineupReviewBtn = document.getElementById("toggle-lineup-review");
+
+  function ensureTeamOverallPointsUi() {
+    const board = document.querySelector(".team-overall-board");
+    if (!board) {
+      return {
+        homePointsLabelEl: null,
+        awayPointsLabelEl: null,
+        homePointsEl: null,
+        awayPointsEl: null,
+      };
+    }
+
+    let row = board.querySelector('[data-team-points-row="1"]');
+    if (!row) {
+      row = document.createElement("div");
+      row.className = "status-row";
+      row.style.marginTop = "14px";
+      row.style.justifyContent = "center";
+      row.dataset.teamPointsRow = "1";
+      row.innerHTML = `
+        <div class="status-chip">
+          <span id="team-overall-home-points-label">Home</span>
+          <strong id="team-overall-home-points">0</strong>
+          <span>match points</span>
+        </div>
+        <div class="status-chip">
+          <span id="team-overall-away-points-label">Away</span>
+          <strong id="team-overall-away-points">0</strong>
+          <span>match points</span>
+        </div>
+      `;
+      board.appendChild(row);
+    }
+
+    return {
+      homePointsLabelEl: row.querySelector("#team-overall-home-points-label"),
+      awayPointsLabelEl: row.querySelector("#team-overall-away-points-label"),
+      homePointsEl: row.querySelector("#team-overall-home-points"),
+      awayPointsEl: row.querySelector("#team-overall-away-points"),
+    };
+  }
+
+  const {
+    homePointsLabelEl: teamOverallHomePointsLabel,
+    awayPointsLabelEl: teamOverallAwayPointsLabel,
+    homePointsEl: teamOverallHomePoints,
+    awayPointsEl: teamOverallAwayPoints,
+  } = ensureTeamOverallPointsUi();
 
   const params = new URLSearchParams(window.location.search);
   const tournamentId = params.get("tournamentId");
@@ -1302,103 +1346,110 @@ document.addEventListener("DOMContentLoaded", async () => {
     localStorage.setItem(getTeamStorageKey(), JSON.stringify(teamState));
   }
 
-  function getPickleballCategoryMatchPoints(category) {
-    const pb = ensurePickleballTeamData(category?.sportData, fixtures);
-    return toArray(pb?.sets).reduce(
-      (acc, set) => {
-        acc.home += Number(set?.homePoints || 0);
-        acc.away += Number(set?.awayPoints || 0);
+  function getCategoryPointTotals(category) {
+    if (!category) return { homePoints: 0, awayPoints: 0 };
+
+    if (category.sportKey === "pickleball") {
+      const pb = ensurePickleballTeamData(category.sportData, fixtures);
+      return toArray(pb.sets).reduce((acc, set) => {
+        acc.homePoints += Number(set?.homePoints || 0);
+        acc.awayPoints += Number(set?.awayPoints || 0);
         return acc;
-      },
-      { home: 0, away: 0 }
-    );
-  }
-
-  function getPresetCategoryMatchPoints(category) {
-    const sportKey = category?.sportKey || "";
-    const data = category?.sportData || {};
-
-    if (sportKey === "pickleball") {
-      return getPickleballCategoryMatchPoints(category);
+      }, { homePoints: 0, awayPoints: 0 });
     }
 
-    if (sportKey === "cricket") {
+    if (category.sportKey === "football") {
       return {
-        home: Number(data.homeRuns || 0),
-        away: Number(data.awayRuns || 0),
+        homePoints: Number(category?.sportData?.homeGoals || 0),
+        awayPoints: Number(category?.sportData?.awayGoals || 0),
       };
     }
 
-    if (sportKey === "football") {
+    if (category.sportKey === "cricket") {
       return {
-        home: Number(data.homeGoals || 0),
-        away: Number(data.awayGoals || 0),
+        homePoints: Number(category?.sportData?.homeRuns || 0),
+        awayPoints: Number(category?.sportData?.awayRuns || 0),
       };
     }
 
-    if (sportKey === "badminton") {
-      return toArray(data.games).reduce(
-        (acc, game) => {
-          acc.home += Number(game?.a || 0);
-          acc.away += Number(game?.b || 0);
-          return acc;
-        },
-        { home: 0, away: 0 }
-      );
+    if (category.sportKey === "badminton") {
+      return toArray(category?.sportData?.games).reduce((acc, row) => {
+        acc.homePoints += Number(row?.a || 0);
+        acc.awayPoints += Number(row?.b || 0);
+        return acc;
+      }, { homePoints: 0, awayPoints: 0 });
     }
 
-    if (sportKey === "tennis") {
-      return toArray(data.sets).reduce(
-        (acc, setRow) => {
-          acc.home += Number(setRow?.a || 0);
-          acc.away += Number(setRow?.b || 0);
-          return acc;
-        },
-        { home: 0, away: 0 }
-      );
+    if (category.sportKey === "tennis") {
+      return toArray(category?.sportData?.sets).reduce((acc, row) => {
+        acc.homePoints += Number(row?.a || 0);
+        acc.awayPoints += Number(row?.b || 0);
+        return acc;
+      }, { homePoints: 0, awayPoints: 0 });
     }
 
     return {
-      home: Number(category?.homeScore || 0),
-      away: Number(category?.awayScore || 0),
+      homePoints: Number(category?.homeScore || 0),
+      awayPoints: Number(category?.awayScore || 0),
     };
   }
 
-  function getCategoryMatchPoints(category) {
-    return getPresetCategoryMatchPoints(category);
-  }
+  function applyMatchLineupsToTeamState(matchObj, teamState) {
+    const lineups = matchObj?.lineups || {};
+    const approvals = matchObj?.lineupApproval || {};
 
-  function formatCategoryPointsText(category) {
-    const points = getCategoryMatchPoints(category);
-    return `${Number(points.home || 0)}-${Number(points.away || 0)} pts`;
+    const homeAssignments = Array.isArray(lineups?.home?.assignments) ? lineups.home.assignments : [];
+    const awayAssignments = Array.isArray(lineups?.away?.assignments) ? lineups.away.assignments : [];
+
+    if (Array.isArray(lineups?.home?.usage)) {
+      teamState.homeRoster = lineups.home.usage.map((u) => safeText(u?.playerName || u?.name)).filter(Boolean) || teamState.homeRoster;
+    }
+    if (Array.isArray(lineups?.away?.usage)) {
+      teamState.awayRoster = lineups.away.usage.map((u) => safeText(u?.playerName || u?.name)).filter(Boolean) || teamState.awayRoster;
+    }
+
+    teamState.categories.forEach((category, index) => {
+      const home = homeAssignments.find((item) => Number(item?.scoreIndex) === index);
+      const away = awayAssignments.find((item) => Number(item?.scoreIndex) === index);
+      if (home && Array.isArray(home.players) && home.players.length) {
+        category.homePlayer = home.players.map((p) => safeText(p)).filter(Boolean).join(" + ");
+      }
+      if (away && Array.isArray(away.players) && away.players.length) {
+        category.awayPlayer = away.players.map((p) => safeText(p)).filter(Boolean).join(" + ");
+      }
+      if (approvals.home === "approved" && approvals.away === "approved" && category.homePlayer && category.awayPlayer) {
+        if (category.lineupStatus !== "accepted") category.lineupStatus = "accepted";
+      }
+    });
   }
 
   function computeTeamTieSummary(teamState) {
-    const homeWins = teamState.categories.filter((c) => c.winnerSide === "A").length;
-    const awayWins = teamState.categories.filter((c) => c.winnerSide === "B").length;
+    let homeWins = 0;
+    let awayWins = 0;
+    let homeMatchPoints = 0;
+    let awayMatchPoints = 0;
+
+    teamState.categories.forEach((category) => {
+      if (category.winnerSide === "A") homeWins += 1;
+      if (category.winnerSide === "B") awayWins += 1;
+      const totals = getCategoryPointTotals(category);
+      homeMatchPoints += Number(totals.homePoints || 0);
+      awayMatchPoints += Number(totals.awayPoints || 0);
+    });
+
     const acceptedCount = teamState.categories.filter((c) => c.lineupStatus === "accepted").length;
     const rejectedCount = teamState.categories.filter((c) => c.lineupStatus === "rejected").length;
     const allAccepted = teamState.categories.length > 0 && acceptedCount === teamState.categories.length;
 
-    const matchPointTotals = teamState.categories.reduce(
-      (acc, category) => {
-        const pts = getCategoryMatchPoints(category);
-        acc.homeMatchPoints += Number(pts.home || 0);
-        acc.awayMatchPoints += Number(pts.away || 0);
-        return acc;
-      },
-      { homeMatchPoints: 0, awayMatchPoints: 0 }
-    );
-
     return {
       homeWins,
       awayWins,
+      homeMatchPoints,
+      awayMatchPoints,
       acceptedCount,
       rejectedCount,
       total: teamState.categories.length,
       allAccepted,
-      homeMatchPoints: matchPointTotals.homeMatchPoints,
-      awayMatchPoints: matchPointTotals.awayMatchPoints,
     };
   }
 
@@ -1411,7 +1462,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   function showTeamEventShell() {
     individualScoreShell?.classList.add("hidden");
     teamEventShell?.classList.remove("hidden");
-    saveBtn?.classList.add("hidden");
+    saveBtn?.classList.remove("hidden");
+    if (saveBtn) saveBtn.textContent = "Save";
     overlay?.classList.remove("show");
     drawer?.classList.remove("open");
   }
@@ -1479,13 +1531,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (teamOverallHomeName) teamOverallHomeName.textContent = homeLabel;
     if (teamOverallAwayName) teamOverallAwayName.textContent = awayLabel;
-    if (teamOverallHomePointsLabel) teamOverallHomePointsLabel.textContent = homeLabel;
-    if (teamOverallAwayPointsLabel) teamOverallAwayPointsLabel.textContent = awayLabel;
     if (teamOverallSub) {
       teamOverallSub.textContent = "Shows both category wins and cumulative actual points scored across all submatches.";
     }
 
     const teamTieState = loadTeamTieState(match, fixtures);
+    applyMatchLineupsToTeamState(match, teamTieState);
 
     function syncLineupCollapseUi() {
       if (!lineupReviewPanel || !toggleLineupReviewBtn) return;
@@ -1497,8 +1548,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const summary = computeTeamTieSummary(teamTieState);
       if (teamOverallHomeScore) teamOverallHomeScore.textContent = String(summary.homeWins);
       if (teamOverallAwayScore) teamOverallAwayScore.textContent = String(summary.awayWins);
-      if (teamOverallHomePoints) teamOverallHomePoints.textContent = String(summary.homeMatchPoints);
-      if (teamOverallAwayPoints) teamOverallAwayPoints.textContent = String(summary.awayMatchPoints);
 
       if (!lineupStatePill) return;
 
@@ -1688,7 +1737,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
             <div class="category-actions">
               <div class="status-chip ${resultInfo.chipClass}">${escapeHtml(resultInfo.text)}</div>
-              <div class="status-chip"><strong>${escapeHtml(formatCategoryPointsText(category))}</strong></div>
               <button type="button" class="lineup-action-btn primary" data-action="toggle-scoring" ${canToggle ? "" : "disabled"}>
                 ${escapeHtml(buttonLabel)}
               </button>
@@ -1755,7 +1803,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     receiveLineupBtn?.addEventListener("click", () => {
+      applyMatchLineupsToTeamState(match, teamTieState);
       lineupReviewPanel?.classList.remove("hidden");
+      saveTeamTieState(teamTieState);
       renderLineupReview();
       renderTeamCategoryBars();
       syncTeamSummaryUi();
@@ -1780,6 +1830,92 @@ document.addEventListener("DOMContentLoaded", async () => {
       syncLineupCollapseUi();
     });
 
+    async function saveTeamEventAggregate() {
+      const summary = computeTeamTieSummary(teamTieState);
+
+      const candidateUrls = [
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/matches/score`,
+      ];
+
+      const hasSubmatches = Array.isArray(match?.submatches) && match.submatches.length >= teamTieState.categories.length;
+
+      try {
+        if (hasSubmatches) {
+          for (let index = 0; index < teamTieState.categories.length; index += 1) {
+            const category = teamTieState.categories[index];
+            const totals = getCategoryPointTotals(category);
+            const targetPoints = Math.max(1, Number(Math.max(totals.homePoints, totals.awayPoints) || 1));
+            const payload = {
+              tournamentId,
+              categoryId: resolvedCategoryId,
+              round: roundIndex,
+              match: matchIndex,
+              scoreIndex: index,
+              score: {
+                config: { targetPoints, winByTwo: false },
+                state: {
+                  A: { points: Number(totals.homePoints || 0) },
+                  B: { points: Number(totals.awayPoints || 0) },
+                  meta: { categorySnapshot: category },
+                },
+                cricket: category.sportKey === "cricket" ? category.sportData : null,
+                football: category.sportKey === "football" ? category.sportData : null,
+                badminton: category.sportKey === "badminton" ? category.sportData : null,
+                pickleball: category.sportKey === "pickleball" ? category.sportData : null,
+                computed: {
+                  status: category.winnerSide ? "completed" : "pending",
+                  winnerSide: category.winnerSide || null,
+                  winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
+                },
+              },
+            };
+
+            for (const url of candidateUrls) {
+              await apiPut(url, payload);
+              break;
+            }
+          }
+        } else {
+          const targetPoints = Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1));
+          const payload = {
+            tournamentId,
+            categoryId: resolvedCategoryId,
+            round: roundIndex,
+            match: matchIndex,
+            scoreIndex: 0,
+            score: {
+              config: { targetPoints, winByTwo: false },
+              state: {
+                A: { points: Number(summary.homeMatchPoints || 0) },
+                B: { points: Number(summary.awayMatchPoints || 0) },
+                meta: { teamTieState },
+              },
+              computed: {
+                status: summary.homeWins || summary.awayWins ? "completed" : "pending",
+                winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
+                winnerName: summary.homeWins > summary.awayWins ? homeLabel : summary.awayWins > summary.homeWins ? awayLabel : null,
+              },
+            },
+          };
+
+          for (const url of candidateUrls) {
+            await apiPut(url, payload);
+            break;
+          }
+        }
+
+        saveTeamTieState(teamTieState);
+        if (saveMsg) saveMsg.textContent = "Saved and standings updated";
+        syncTeamSummaryUi();
+        alert("Tie data saved successfully.");
+      } catch (err) {
+        console.error(err);
+        if (saveMsg) saveMsg.textContent = "Save failed";
+        alert(err?.message || "Could not save tie data.");
+      }
+    }
+
+    saveBtn?.addEventListener("click", saveTeamEventAggregate);
     renderTeamCategoryBars();
     syncTeamSummaryUi();
     return;

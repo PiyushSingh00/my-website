@@ -1,3 +1,4 @@
+
 import { requireAuth, logout } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -31,6 +32,510 @@ document.addEventListener("DOMContentLoaded", async () => {
   let myNotifications = [];
   let myTeamInvites = [];
 
+  function getToken() {
+    return localStorage.getItem("token") || localStorage.getItem("authToken") || "";
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function normalizeIdentity(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function isSameUserByInviteFields(invite, currentUser) {
+    return (
+      (invite?.playerId && String(invite.playerId) === String(currentUser?.id || currentUser?.userId || "")) ||
+      (invite?.username && normalizeIdentity(invite.username) === normalizeIdentity(currentUser?.username)) ||
+      (invite?.inviteeUsername && normalizeIdentity(invite.inviteeUsername) === normalizeIdentity(currentUser?.username)) ||
+      (invite?.inviteeName && normalizeIdentity(invite.inviteeName) === normalizeIdentity(currentUser?.name)) ||
+      (invite?.playerName && normalizeIdentity(invite.playerName) === normalizeIdentity(currentUser?.name)) ||
+      (invite?.name && normalizeIdentity(invite.name) === normalizeIdentity(currentUser?.name))
+    );
+  }
+
+  function isTeamEvent(tournament) {
+    return String(tournament?.tournamentType || "").toLowerCase().includes("team");
+  }
+
+  function normalizeTournamentList(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (!raw || typeof raw !== "object") return [];
+    if (Array.isArray(raw.data)) return raw.data;
+    if (Array.isArray(raw.items)) return raw.items;
+    if (Array.isArray(raw.tournaments)) return raw.tournaments;
+    if (Array.isArray(raw.rows)) return raw.rows;
+    return [];
+  }
+
+  function normalizeCategories(cats) {
+    if (!cats) return [];
+    if (Array.isArray(cats)) return cats;
+    if (typeof cats === "string") {
+      try {
+        const parsed = JSON.parse(cats);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  function categoryLabel(c) {
+    const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
+    const gender = c?.gender ? String(c.gender).trim() : "";
+    const level = c?.playingLevel ? String(c.playingLevel).trim() : "";
+    const size = c?.teamSize ? Number(c.teamSize) : null;
+    const exact = c?.exactTeamSize ? Number(c.exactTeamSize) : null;
+
+    let type = "";
+    if (size === 1) type = "Singles";
+    else if (size === 2) type = "Doubles";
+    else if (size === 3) type = "Triples";
+    else if (size >= 4) type = exact ? `Team ${exact}` : "Team";
+
+    const parts = [age, gender, level, type].filter(Boolean);
+    return parts.length ? parts.join(" • ") : (c?.eventName || c?.categoryId || c?.id || "Category");
+  }
+
+  function getPreferredCategoryId(tournament) {
+    if (isTeamEvent(tournament)) return "__team_event__";
+    const cats = normalizeCategories(tournament?.categories);
+    return String(cats?.[0]?.categoryId || cats?.[0]?.id || "").trim();
+  }
+
+  async function apiJson(url, options = {}) {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: "Bearer " + getToken(),
+      },
+    });
+
+    const raw = await res.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = raw;
+    }
+
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  async function apiGet(url) {
+    return apiJson(url, { method: "GET" });
+  }
+
+  async function apiPost(url, body) {
+    return apiJson(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
+
+  async function apiPatch(url, body) {
+    return apiJson(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
+
+  function switchView(view) {
+    document.querySelectorAll(".join-nav-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.view === view);
+    });
+
+    browseView?.classList.toggle("join-view--active", view === "browse");
+    myView?.classList.toggle("join-view--active", view === "my");
+    notificationsView?.classList.toggle("join-view--active", view === "notifications");
+  }
+
+  async function loadBrowseTournaments() {
+    const r = await apiGet("/api/tournaments");
+    allTournaments = r.ok ? normalizeTournamentList(r.data) : [];
+  }
+
+  async function loadMyTournaments() {
+    const candidates = [
+      "/api/player/tournaments",
+      "/api/tournaments/mine",
+    ];
+
+    for (const url of candidates) {
+      const r = await apiGet(url);
+      if (!r.ok) continue;
+      myJoinedTournaments = normalizeTournamentList(r.data);
+      return;
+    }
+
+    myJoinedTournaments = [];
+  }
+
+  async function loadTeamInvites() {
+    const candidates = [
+      "/api/player/team-requests",
+    ];
+
+    for (const url of candidates) {
+      const r = await apiGet(url);
+      if (!r.ok) continue;
+
+      const rows = Array.isArray(r.data)
+        ? r.data
+        : Array.isArray(r.data?.items)
+          ? r.data.items
+          : Array.isArray(r.data?.requests)
+            ? r.data.requests
+            : Array.isArray(r.data?.data)
+              ? r.data.data
+              : [];
+
+      myTeamInvites = rows.filter((req) => {
+        const invitedPlayers = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+        return invitedPlayers.some((invite) => isSameUserByInviteFields(invite, user));
+      });
+      return;
+    }
+
+    myTeamInvites = [];
+  }
+
+  async function loadNotifications() {
+    myNotifications = [];
+    myTeamInvites.forEach((invite) => {
+      const mine = (Array.isArray(invite?.invitedPlayers) ? invite.invitedPlayers : []).find((p) => isSameUserByInviteFields(p, user));
+      myNotifications.push({
+        kind: "team_invite",
+        title: `Team invite from ${invite?.captainName || "Captain"}`,
+        body: `${invite?.teamName || "Team"} • ${invite?.tournamentName || "Tournament"}`,
+        status: mine?.inviteStatus || "pending",
+      });
+    });
+  }
+
+  async function lookupTournamentByCode(code) {
+    const attempts = [
+      () => apiPost("/api/tournaments/lookup-by-code", { code }),
+      () => apiPost("/api/tournaments/validate-code", { code }),
+    ];
+
+    for (const attempt of attempts) {
+      const r = await attempt();
+      if (!r.ok) continue;
+      if (r.data?.tournament) return r.data.tournament;
+      if (r.data?.tournamentId) {
+        const meta = await apiGet(`/api/tournaments/${encodeURIComponent(r.data.tournamentId)}`);
+        if (meta.ok) return meta.data;
+      }
+    }
+    return null;
+  }
+
+  async function joinTournamentNow(tournament, codeOverride = "") {
+    const tournamentId = String(tournament?.tournamentId || tournament?.id || "").trim();
+    if (!tournamentId) {
+      alert("Tournament not found.");
+      return;
+    }
+
+    const payload = {
+      tournamentId,
+      playerName: user?.name || user?.username || "",
+      username: user?.username || "",
+      accessCode: String(codeOverride || "").trim(),
+    };
+
+    if (!isTeamEvent(tournament)) {
+      const categoryId = getPreferredCategoryId(tournament);
+      if (!categoryId) {
+        alert("No category found for this tournament.");
+        return;
+      }
+      payload.categoryId = categoryId;
+    }
+
+    const candidates = [
+      `/api/player/tournaments/${encodeURIComponent(tournamentId)}/register`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/join`,
+    ];
+
+    let lastError = null;
+    for (const url of candidates) {
+      const r = await apiPost(url, payload);
+      if (r.ok) {
+        await loadMyTournaments();
+        renderMyJoinedList();
+        switchView("my");
+        alert("Joined tournament successfully.");
+        return;
+      }
+      lastError = r.data?.message || `Failed with ${r.status}`;
+    }
+
+    alert(lastError || "Could not join tournament.");
+  }
+
+  async function leaveTournamentNow(tournament) {
+    const tournamentId = String(tournament?.tournamentId || tournament?.id || "").trim();
+    if (!tournamentId) return;
+
+    const candidates = [
+      `/api/player/tournaments/${encodeURIComponent(tournamentId)}/leave`,
+      `/api/player/tournaments/${encodeURIComponent(tournamentId)}/register`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/leave`,
+    ];
+
+    for (const url of candidates) {
+      const method = url.endsWith("/register") ? "DELETE" : "POST";
+      const r = await apiJson(url, { method });
+      if (r.ok) {
+        await loadMyTournaments();
+        renderMyJoinedList();
+        return;
+      }
+    }
+
+    alert("Could not leave tournament.");
+  }
+
+  async function updateInviteStatus(request, status) {
+    const tournamentId = String(request?.tournamentId || request?.id || "").trim();
+    const requestId = String(request?.requestId || request?.teamRequestId || request?.id || "").trim();
+    if (!tournamentId || !requestId) {
+      alert("Invite data is incomplete.");
+      return;
+    }
+
+    const candidates = [
+      `/api/player/team-requests/${encodeURIComponent(tournamentId)}/${encodeURIComponent(requestId)}`,
+      `/api/player/tournaments/${encodeURIComponent(tournamentId)}/team-requests/${encodeURIComponent(requestId)}`,
+    ];
+
+    let ok = false;
+    for (const url of candidates) {
+      const r = await apiPatch(url, { status });
+      if (r.ok) {
+        ok = true;
+        break;
+      }
+    }
+
+    if (!ok) {
+      alert(`Could not ${status} invite.`);
+      return;
+    }
+
+    await loadTeamInvites();
+    await loadNotifications();
+    await loadMyTournaments();
+    renderNotifications();
+    renderTeamInvites();
+    renderMyJoinedList();
+  }
+
+  function renderBrowseList() {
+    if (!browseList) return;
+    browseList.innerHTML = "";
+
+    if (!allTournaments.length) {
+      browseList.innerHTML = `
+        <div class="empty-state">
+          <h3>No tournaments available</h3>
+          <p class="muted">Once hosts create tournaments, they will appear here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    allTournaments.forEach((tournament) => {
+      const tournamentId = tournament?.tournamentId || tournament?.id;
+      const categories = normalizeCategories(tournament?.categories);
+      const categoryMeta = categories.map((c) => `<div class="muted">${escapeHtml(categoryLabel(c))}</div>`).join("");
+      const isPrivate = tournament?.isPublic === false || tournament?.accessCodeRequired === true;
+      const card = document.createElement("div");
+      card.className = "browse-card";
+      card.innerHTML = `
+        <div class="browse-card-top">
+          <div>
+            <p class="eyebrow">${escapeHtml(tournament?.sportName || "Tournament")}</p>
+            <h3>${escapeHtml(tournament?.tournamentName || "Untitled tournament")}</h3>
+          </div>
+          <div class="status-pill ${tournament?.registrationsOpen === false ? "status-pill--rejected" : "status-pill--accepted"}">
+            ${tournament?.registrationsOpen === false ? "Closed" : (isPrivate ? "Private" : "Public")}
+          </div>
+        </div>
+        <p class="muted">${escapeHtml(tournament?.tournamentDates || "")}</p>
+        <p class="muted">${escapeHtml(tournament?.venue || "")}</p>
+        <div style="margin-top:10px;">${isTeamEvent(tournament) ? '<div class="muted">Team event</div>' : categoryMeta || '<div class="muted">No categories listed</div>'}</div>
+        <div class="browse-actions">
+          <button type="button" class="btn-dark" data-action="schedule">View schedule</button>
+          <button type="button" class="btn-primary" data-action="join" ${tournament?.registrationsOpen === false ? "disabled" : ""}>Join tournament</button>
+        </div>
+      `;
+
+      card.querySelector('[data-action="schedule"]')?.addEventListener("click", () => {
+        window.location.href = `schedule.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+      });
+
+      card.querySelector('[data-action="join"]')?.addEventListener("click", async () => {
+        if (isPrivate) {
+          const entered = prompt("Enter tournament code");
+          if (!entered) return;
+          await joinTournamentNow(tournament, entered);
+          return;
+        }
+        await joinTournamentNow(tournament);
+      });
+
+      browseList.appendChild(card);
+    });
+  }
+
+  function renderMyJoinedList() {
+    if (!myJoinedList) return;
+    myJoinedList.innerHTML = "";
+
+    if (!myJoinedTournaments.length) {
+      myJoinedList.innerHTML = `
+        <div class="empty-state">
+          <h3>No joined tournaments yet</h3>
+          <p class="muted">Tournaments you join will appear here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    myJoinedTournaments.forEach((tournament) => {
+      const tournamentId = tournament?.tournamentId || tournament?.id;
+      const myTeams = Array.isArray(tournament?.myTeams) ? tournament.myTeams : [];
+      const hasTeam = myTeams.length > 0;
+      const teamButtonText = hasTeam ? "View my team" : "View / Create my team";
+      const card = document.createElement("div");
+      card.className = "browse-card";
+      card.innerHTML = `
+        <div class="browse-card-top">
+          <div>
+            <p class="eyebrow">${escapeHtml(tournament?.sportName || "Tournament")}</p>
+            <h3>${escapeHtml(tournament?.tournamentName || "Untitled tournament")}</h3>
+          </div>
+          <div class="code-chip">${escapeHtml(tournament?.accessCode || (tournament?.isPublic === false ? "Private" : "Public"))}</div>
+        </div>
+        <p class="muted">${escapeHtml(tournament?.tournamentDates || "")}</p>
+        <p class="muted">${escapeHtml(tournament?.venue || "")}</p>
+        <div class="browse-actions">
+          <button type="button" class="btn-dark" data-action="schedule">View schedule</button>
+          <button type="button" class="btn-dark" data-action="team">${teamButtonText}</button>
+          <button type="button" class="btn-secondary danger-btn" data-action="leave">Leave tournament</button>
+        </div>
+      `;
+
+      card.querySelector('[data-action="schedule"]')?.addEventListener("click", () => {
+        window.location.href = `schedule.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+      });
+
+      card.querySelector('[data-action="team"]')?.addEventListener("click", () => {
+        window.location.href = `team.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+      });
+
+      card.querySelector('[data-action="leave"]')?.addEventListener("click", async () => {
+        if (!confirm("Leave this tournament?")) return;
+        await leaveTournamentNow(tournament);
+      });
+
+      myJoinedList.appendChild(card);
+    });
+  }
+
+  function renderNotifications() {
+    if (!notificationsList) return;
+    notificationsList.innerHTML = "";
+
+    if (!myNotifications.length) {
+      notificationsList.innerHTML = `
+        <div class="empty-state">
+          <h3>No notifications yet</h3>
+          <p class="muted">Updates about teams and tournaments will appear here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    myNotifications.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "browse-card";
+      card.innerHTML = `
+        <p class="eyebrow">${escapeHtml(item.kind.replaceAll("_", " "))}</p>
+        <h3>${escapeHtml(item.title)}</h3>
+        <p class="muted">${escapeHtml(item.body)}</p>
+      `;
+      notificationsList.appendChild(card);
+    });
+  }
+
+  function renderTeamInvites() {
+    if (!teamInviteSection || !teamInviteList) return;
+    teamInviteList.innerHTML = "";
+
+    if (!myTeamInvites.length) {
+      teamInviteSection.classList.add("hidden");
+      return;
+    }
+
+    teamInviteSection.classList.remove("hidden");
+
+    myTeamInvites.forEach((request) => {
+      const invite = (Array.isArray(request?.invitedPlayers) ? request.invitedPlayers : []).find((p) => isSameUserByInviteFields(p, user));
+      const currentStatus = String(invite?.inviteStatus || "pending").toLowerCase();
+      const requestId = request?.requestId || request?.teamRequestId || request?.id;
+      const tournamentId = request?.tournamentId || "";
+
+      const card = document.createElement("div");
+      card.className = "browse-card";
+      card.innerHTML = `
+        <div class="browse-card-top">
+          <div>
+            <p class="eyebrow">Team invite</p>
+            <h3>${escapeHtml(request?.teamName || "Team")}</h3>
+          </div>
+          <div class="status-pill ${currentStatus === "accepted" ? "status-pill--accepted" : currentStatus === "rejected" ? "status-pill--rejected" : "status-pill--pending"}">
+            ${escapeHtml(currentStatus)}
+          </div>
+        </div>
+        <p class="muted">Captain: ${escapeHtml(request?.captainName || "-")}</p>
+        <p class="muted">Tournament: ${escapeHtml(request?.tournamentName || "-")}</p>
+        <p class="muted">Request ID: ${escapeHtml(requestId || "-")}</p>
+        <div class="browse-actions">
+          ${currentStatus === "pending"
+            ? `
+              <button type="button" class="btn-primary" data-action="accept">Accept</button>
+              <button type="button" class="btn-dark" data-action="reject">Reject</button>
+            `
+            : `
+              <button type="button" class="btn-dark" data-action="team">View my team</button>
+            `}
+        </div>
+      `;
+
+      card.querySelector('[data-action="team"]')?.addEventListener("click", () => {
+        window.location.href = `team.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+      });
+      card.querySelector('[data-action="accept"]')?.addEventListener("click", async () => updateInviteStatus(request, "accepted"));
+      card.querySelector('[data-action="reject"]')?.addEventListener("click", async () => updateInviteStatus(request, "rejected"));
+      teamInviteList.appendChild(card);
+    });
+  }
+
   if (trigger) {
     const label = String(user?.name || user?.username || user?.email || "U").trim();
     trigger.textContent = (label[0] || "U").toUpperCase();
@@ -62,7 +567,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer " + (localStorage.getItem("token") || ""),
+          Authorization: "Bearer " + getToken(),
         },
         body: JSON.stringify({ mode: "player" }),
       });
@@ -75,12 +580,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer " + (localStorage.getItem("token") || ""),
+          Authorization: "Bearer " + getToken(),
         },
         body: JSON.stringify({ mode: "host" }),
       });
     } catch {}
-
     window.location.href = "host.html";
   });
 
@@ -88,539 +592,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     sidebar?.classList.toggle("is-collapsed");
   });
 
-  function switchView(view) {
-    document.querySelectorAll(".join-nav-btn").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.view === view);
-    });
-
-    browseView.classList.toggle("join-view--active", view === "browse");
-    myView.classList.toggle("join-view--active", view === "my");
-    notificationsView.classList.toggle("join-view--active", view === "notifications");
-  }
-
   document.querySelectorAll(".join-nav-btn").forEach((btn) => {
     btn.addEventListener("click", () => switchView(btn.dataset.view));
   });
 
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  function normalizeIdentity(value) {
-    return String(value || "").trim().toLowerCase();
-  }
-
-  function isSameUserByInviteFields(invite, currentUser) {
-    return (
-      (invite?.inviteeUsername &&
-        normalizeIdentity(invite.inviteeUsername) === normalizeIdentity(currentUser?.username)) ||
-      (invite?.inviteeName &&
-        normalizeIdentity(invite.inviteeName) === normalizeIdentity(currentUser?.name)) ||
-      (invite?.inviteeName &&
-        normalizeIdentity(invite.inviteeName) === normalizeIdentity(currentUser?.username))
-    );
-  }
-
-  async function apiJson(url, options = {}) {
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: "Bearer " + (localStorage.getItem("token") || ""),
-      },
-    });
-
-    const raw = await res.text();
-    let data = null;
-    try {
-      data = raw ? JSON.parse(raw) : null;
-    } catch {
-      data = raw;
-    }
-
-    return { ok: res.ok, status: res.status, data };
-  }
-
-  async function apiGet(url) {
-    return apiJson(url, { method: "GET" });
-  }
-
-  async function apiPost(url, body) {
-    return apiJson(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body ?? {}),
-    });
-  }
-
-  function normalizeTournamentList(raw) {
-    if (Array.isArray(raw)) return raw;
-    if (!raw || typeof raw !== "object") return [];
-    if (Array.isArray(raw.data)) return raw.data;
-    if (Array.isArray(raw.items)) return raw.items;
-    if (Array.isArray(raw.tournaments)) return raw.tournaments;
-    return [];
-  }
-
-  function getFirstCategoryId(tournament) {
-  const cats = Array.isArray(tournament?.categories)
-    ? tournament.categories
-    : [];
-  return String(cats?.[0]?.categoryId || cats?.[0]?.id || "").trim();
-}
-
-async function joinTournamentNow(tournament, codeOverride = "") {
-  const tournamentId = tournament.tournamentId ?? tournament.id;
-  if (!tournamentId) {
-    alert("Tournament not found.");
-    return;
-  }
-
-  const codeToUse = String(codeOverride || tournament.accessCode || "").trim();
-
-  if (tournament.isPublic === false) {
-    const validateCandidates = [
-      `/api/tournaments/validate-code`,
-      `/api/tournaments/${encodeURIComponent(tournamentId)}/validate-code`,
-    ];
-
-    let validated = false;
-    for (const url of validateCandidates) {
-      const r = await apiPost(url, { tournamentId, code: codeToUse });
-      if (r.ok) {
-        validated = true;
-        break;
-      }
-    }
-
-    if (!validated) {
-      alert("Could not validate join code for this tournament.");
-      return;
-    }
-  }
-
-  const categoryId = getFirstCategoryId(tournament);
-  if (!categoryId) {
-    alert("No category found for this tournament.");
-    return;
-  }
-
-  const registerPayload = {
-    tournamentId,
-    categoryId,
-    playerName: user.name || user.username || "",
-    username: user.username || "",
-    accessCode: codeToUse,
-  };
-
-  const registerCandidates = [
-    `/api/player/tournaments/${encodeURIComponent(tournamentId)}/register`,
-    `/api/tournaments/${encodeURIComponent(tournamentId)}/join`,
-  ];
-
-  for (const url of registerCandidates) {
-    const r = await apiPost(url, registerPayload);
-    if (r.ok) {
-      await loadMyTournaments();
-      renderMyJoinedList();
-      switchView("my");
-      alert("Joined tournament successfully.");
-      return;
-    }
-  }
-
-  alert("Could not join tournament.");
-}
-
-  async function loadBrowseTournaments() {
-  const r = await apiGet("/api/tournaments");
-  const rows = r.ok ? normalizeTournamentList(r.data) : [];
-  allTournaments = rows.filter((t) => t.isPublic !== false);
-}
-
-  async function loadMyTournaments() {
-    const candidates = [
-      `/api/player/tournaments`,
-      `/api/tournaments/mine`,
-    ];
-
-    for (const url of candidates) {
-      const r = await apiGet(url);
-      if (!r.ok) continue;
-
-      const rows = normalizeTournamentList(r.data);
-      if (rows.length || Array.isArray(rows)) {
-        myJoinedTournaments = rows;
-        return;
-      }
-    }
-
-    myJoinedTournaments = [];
-  }
-
-  async function loadTeamInvites() {
-    const candidates = [
-      `/api/player/team-requests`,
-      `/api/team-requests`,
-    ];
-
-    let requests = [];
-
-    for (const url of candidates) {
-      const r = await apiGet(url);
-      if (!r.ok) continue;
-
-      requests = Array.isArray(r.data)
-        ? r.data
-        : Array.isArray(r.data?.items)
-          ? r.data.items
-          : Array.isArray(r.data?.requests)
-            ? r.data.requests
-            : Array.isArray(r.data?.data)
-              ? r.data.data
-              : [];
-
-      if (requests.length || Array.isArray(requests)) break;
-    }
-
-    myTeamInvites = requests.filter((req) => {
-      const invitedPlayers = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
-      return invitedPlayers.some((invite) => isSameUserByInviteFields(invite, user));
-    });
-  }
-
-  async function loadNotifications() {
-    myNotifications = [];
-
-    myTeamInvites.forEach((invite) => {
-      myNotifications.push({
-        kind: "team_invite",
-        title: `Team invite from ${invite?.captainName || "Captain"}`,
-        body: `${invite?.teamName || "A team"} • ${invite?.tournamentName || "Tournament"}`,
-      });
-    });
-  }
-
-  function renderBrowseList() {
-  browseList.innerHTML = "";
-
-  if (!allTournaments.length) {
-    browseList.innerHTML = `
-      <div class="empty-state">
-        <h3>No tournaments available</h3>
-        <p class="muted">Once hosts create tournaments, they will appear here.</p>
-      </div>
-    `;
-    return;
-  }
-
-  allTournaments.forEach((t) => {
-    const tournamentId = t.tournamentId ?? t.id;
-
-    const categories = Array.isArray(t.categories)
-      ? t.categories
-      : (() => {
-          try {
-            return typeof t.categories === "string" ? JSON.parse(t.categories) : [];
-          } catch {
-            return [];
-          }
-        })();
-
-    const categoryOptions = categories
-      .map((c) => {
-        const id = c.categoryId || c.id || "";
-        if (!id) return "";
-        const label = [
-          c.eventName || "",
-          c.ageGroup || "",
-          c.gender || "",
-          c.playingLevel || "",
-          c.teamSize === 1 ? "Singles" :
-          c.teamSize === 2 ? "Doubles" :
-          c.teamSize === 3 ? "Triples" :
-          c.teamSize >= 4 ? `Team ${c.exactTeamSize || ""}`.trim() : ""
-        ].filter(Boolean).join(" • ");
-        return `<option value="${escapeHtml(id)}">${escapeHtml(label || id)}</option>`;
-      })
-      .filter(Boolean)
-      .join("");
-
-    const card = document.createElement("div");
-    card.className = "browse-card";
-    card.innerHTML = `
-      <div class="browse-card-top">
-        <div>
-          <p class="eyebrow">${escapeHtml(t.sportName || "Tournament")}</p>
-          <h3>${escapeHtml(t.tournamentName || "Untitled tournament")}</h3>
-        </div>
-      </div>
-
-      <p class="muted">${escapeHtml(t.tournamentDates || "")}</p>
-      <p class="muted">${escapeHtml(t.venue || "")}</p>
-
-      <div class="field-group" style="margin-top:10px;">
-        <label>Select category</label>
-        <select class="join-category-select">
-          <option value="">Select category</option>
-          ${categoryOptions}
-        </select>
-      </div>
-
-      <div class="browse-actions">
-        <button type="button" class="btn-dark" data-action="schedule">View schedule</button>
-        <button type="button" class="btn-primary" data-action="join">Join tournament</button>
-      </div>
-    `;
-
-    card.querySelector('[data-action="schedule"]')?.addEventListener("click", () => {
-      window.location.href = `schedule.html?tournamentId=${encodeURIComponent(tournamentId)}`;
-    });
-
-    card.querySelector('[data-action="join"]')?.addEventListener("click", async () => {
-  if (t.isPublic === false) {
-    const entered = prompt("Enter tournament code");
-    if (!entered) return;
-    await joinTournamentNow(t, entered);
-    return;
-  }
-
-  await joinTournamentNow(t);
-});
-
-    browseList.appendChild(card);
-  });
-}
-
-  function renderMyJoinedList() {
-    myJoinedList.innerHTML = "";
-
-    if (!myJoinedTournaments.length) {
-      myJoinedList.innerHTML = `
-        <div class="empty-state">
-          <h3>No joined tournaments yet</h3>
-          <p class="muted">Tournaments you join will appear here.</p>
-        </div>
-      `;
-      return;
-    }
-
-    myJoinedTournaments.forEach((t) => {
-      const card = document.createElement("div");
-      card.className = "browse-card";
-      card.innerHTML = `
-        <div class="browse-card-top">
-          <div>
-            <p class="eyebrow">${escapeHtml(t.sportName || "Tournament")}</p>
-            <h3>${escapeHtml(t.tournamentName || "Untitled tournament")}</h3>
-          </div>
-          <div class="code-chip">${escapeHtml(t.accessCode || "—")}</div>
-        </div>
-
-        <p class="muted">${escapeHtml(t.tournamentDates || "")}</p>
-        <p class="muted">${escapeHtml(t.venue || "")}</p>
-
-        <div class="browse-actions">
-          <button type="button" class="btn-dark" data-action="schedule">View schedule</button>
-          <button type="button" class="btn-dark" data-action="team">View / Create my team</button>
-          <button type="button" class="btn-secondary danger-btn" data-action="leave">Leave tournament</button>
-        </div>
-      `;
-
-      card.querySelector('[data-action="schedule"]')?.addEventListener("click", () => {
-        window.location.href = `schedule.html?tournamentId=${encodeURIComponent(t.tournamentId ?? t.id)}`;
-      });
-
-      card.querySelector('[data-action="team"]')?.addEventListener("click", () => {
-        window.location.href = `team.html?tournamentId=${encodeURIComponent(t.tournamentId ?? t.id)}`;
-      });
-
-      card.querySelector('[data-action="leave"]')?.addEventListener("click", async () => {
-        const ok = confirm("Leave this tournament?");
-        if (!ok) return;
-
-        const candidates = [
-          `/api/player/tournaments/${encodeURIComponent(t.tournamentId ?? t.id)}/leave`,
-          `/api/tournaments/${encodeURIComponent(t.tournamentId ?? t.id)}/leave`,
-        ];
-
-        for (const url of candidates) {
-          const r = await apiPost(url, {});
-          if (r.ok) {
-            await loadMyTournaments();
-            renderMyJoinedList();
-            return;
-          }
-        }
-
-        alert("Could not leave tournament.");
-      });
-
-      myJoinedList.appendChild(card);
-    });
-  }
-
-  function renderNotifications() {
-    notificationsList.innerHTML = "";
-
-    if (!myNotifications.length) {
-      notificationsList.innerHTML = `
-        <div class="empty-state">
-          <h3>No notifications yet</h3>
-          <p class="muted">Updates about teams and tournaments will appear here.</p>
-        </div>
-      `;
-    } else {
-      myNotifications.forEach((n) => {
-        const card = document.createElement("div");
-        card.className = "browse-card";
-        card.innerHTML = `
-          <p class="eyebrow">${escapeHtml(n.kind.replaceAll("_", " "))}</p>
-          <h3>${escapeHtml(n.title)}</h3>
-          <p class="muted">${escapeHtml(n.body)}</p>
-        `;
-        notificationsList.appendChild(card);
-      });
-    }
-  }
-
-  function renderTeamInvites() {
-    teamInviteList.innerHTML = "";
-
-    if (!myTeamInvites.length) {
-      teamInviteSection.classList.add("hidden");
-      return;
-    }
-
-    teamInviteSection.classList.remove("hidden");
-
-    myTeamInvites.forEach((req) => {
-      const invite = (Array.isArray(req.invitedPlayers) ? req.invitedPlayers : []).find((p) =>
-        isSameUserByInviteFields(p, user)
-      );
-
-      const currentStatus = invite?.inviteStatus || "pending";
-
-      const card = document.createElement("div");
-      card.className = "browse-card";
-      card.innerHTML = `
-        <div class="browse-card-top">
-          <div>
-            <p class="eyebrow">Team invite</p>
-            <h3>${escapeHtml(req.teamName || "Team")}</h3>
-          </div>
-          <div class="status-pill ${
-            currentStatus === "accepted"
-              ? "status-pill--accepted"
-              : currentStatus === "rejected"
-                ? "status-pill--rejected"
-                : "status-pill--pending"
-          }">${escapeHtml(currentStatus)}</div>
-        </div>
-
-        <p class="muted">Captain: ${escapeHtml(req.captainName || "-")}</p>
-        <p class="muted">Tournament: ${escapeHtml(req.tournamentName || "-")}</p>
-        <p class="muted">Category: ${escapeHtml(req.categoryLabel || "-")}</p>
-
-        <div class="browse-actions">
-          ${
-            currentStatus === "pending"
-              ? `
-            <button type="button" class="btn-primary" data-action="accept">Accept</button>
-            <button type="button" class="btn-dark" data-action="reject">Reject</button>
-          `
-              : `
-            <button type="button" class="btn-dark" data-action="team">View my team</button>
-          `
-          }
-        </div>
-      `;
-
-      card.querySelector('[data-action="team"]')?.addEventListener("click", () => {
-        window.location.href = `team.html?tournamentId=${encodeURIComponent(req.tournamentId || req.id || "")}`;
-      });
-
-      card.querySelector('[data-action="accept"]')?.addEventListener("click", async () => {
-        await updateInviteStatus(req, "accepted");
-      });
-
-      card.querySelector('[data-action="reject"]')?.addEventListener("click", async () => {
-        await updateInviteStatus(req, "rejected");
-      });
-
-      teamInviteList.appendChild(card);
-    });
-  }
-
-  async function updateInviteStatus(request, status) {
-  const invite = (Array.isArray(request?.invitedPlayers) ? request.invitedPlayers : []).find((p) =>
-    isSameUserByInviteFields(p, user)
-  );
-
-  if (!invite?.playerId) {
-    alert("Could not identify invited player record.");
-    return;
-  }
-
-  const r = await apiPost(
-    `/api/host/tournaments/${encodeURIComponent(request.tournamentId)}/team-requests/${encodeURIComponent(request.requestId || request.teamRequestId || request.id)}`,
-    null
-  );
-
-  // fallback because apiPost always POST, but this endpoint is PATCH
-  const patchRes = await apiJson(
-    `/api/host/tournaments/${encodeURIComponent(request.tournamentId)}/team-requests/${encodeURIComponent(request.requestId || request.teamRequestId || request.id)}`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playerId: invite.playerId,
-        status,
-      }),
-    }
-  );
-
-  if (!patchRes.ok) {
-    alert(`Could not ${status} invite.`);
-    return;
-  }
-
-  await loadTeamInvites();
-  await loadNotifications();
-  renderNotifications();
-  renderTeamInvites();
-  await loadMyTournaments();
-  renderMyJoinedList();
-}
-
   joinCodeBtn?.addEventListener("click", async () => {
-  const code = joinCodeInput.value.trim();
-  if (!code) {
-    alert("Enter a tournament code.");
-    return;
-  }
+    const code = String(joinCodeInput?.value || "").trim();
+    if (!code) {
+      alert("Enter a tournament code.");
+      return;
+    }
 
-  const match = allTournaments.find(
-    (t) => String(t.accessCode || "").trim().toUpperCase() === code.toUpperCase()
-  );
+    const tournament = await lookupTournamentByCode(code);
+    if (!tournament) {
+      alert("No tournament found for this code.");
+      return;
+    }
 
-  if (!match) {
-    alert("No tournament found for this code.");
-    return;
-  }
-
-  await joinTournamentNow(match, code);
-});
-
-  const queryTournamentId = new URLSearchParams(window.location.search).get("tournamentId");
-  if (queryTournamentId) {
-    switchView("browse");
-  }
+    await joinTournamentNow(tournament, code);
+  });
 
   await loadBrowseTournaments();
   await loadMyTournaments();
@@ -631,4 +621,8 @@ async function joinTournamentNow(tournament, codeOverride = "") {
   renderMyJoinedList();
   renderNotifications();
   renderTeamInvites();
+
+  const queryTournamentId = new URLSearchParams(window.location.search).get("tournamentId");
+  if (queryTournamentId) switchView("browse");
+  else switchView("browse");
 });
