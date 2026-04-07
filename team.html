@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -96,7 +97,6 @@
             </button>
           </div>
 
-          <!-- MY TEAM TAB -->
           <section class="team-tab-panel is-active" data-panel="my-team">
             <div class="my-team-summary-card">
               <div class="my-team-summary-grid">
@@ -127,7 +127,7 @@
                 <div>
                   <h3>Team members</h3>
                   <p class="helper-text">
-                    Players invited to this team and their current status.
+                    Captain and invited players for this team.
                   </p>
                 </div>
               </div>
@@ -143,7 +143,6 @@
             </div>
           </section>
 
-          <!-- CREATE TEAM TAB -->
           <section class="team-tab-panel" data-panel="create-team" id="create-team-panel">
             <form id="team-form" class="team-form">
               <div class="field-group">
@@ -155,7 +154,7 @@
                 />
               </div>
 
-              <div class="field-group" id="team-category-wrap">
+              <div class="field-group hidden" id="team-category-wrap">
                 <label for="team-category-select">Category</label>
                 <select id="team-category-select">
                   <option value="">Select category</option>
@@ -203,47 +202,26 @@
             </form>
           </section>
 
-          <!-- LINEUP TAB -->
-          <!-- LINEUP TAB -->
           <section class="team-tab-panel" data-panel="lineup">
             <div id="team-lineup-status" class="helper-text" style="margin-bottom:10px;"></div>
-            <div id="team-lineup-panel"></div>  
+
             <div class="lineup-shell">
               <div class="rules-box">
                 <h3>Lineup submission</h3>
                 <p class="helper-text" id="lineup-help-text">
-                  Captains can submit tie-wise lineup slips here.
+                  Captains can submit player lineups match by match. Each scheduled match shows all category submatches below it.
                 </p>
               </div>
 
               <div id="lineup-empty-state" class="empty-state-card">
                 <h3>No lineup available</h3>
                 <p class="helper-text">
-                  Captains will see the lineup form here once their team is available.
+                  Scheduled matches will appear here once league fixtures are generated and your team is available.
                 </p>
               </div>
 
-              <div id="lineup-builder" class="hidden">
-                <div class="field-group">
-                  <label for="lineup-tie-label">Tie label</label>
-                  <input type="text" id="lineup-tie-label" placeholder="e.g. League Tie 1" />
-                </div>
-
-                <div class="field-group">
-                  <label for="lineup-category-select">Category</label>
-                  <select id="lineup-category-select">
-                    <option value="">Select category</option>
-                  </select>
-                </div>
-
-                <div id="lineup-submatches-wrap" class="team-player-rows"></div>
-
-                <div class="form-actions">
-                  <button type="button" class="btn-dark" id="lineup-save-btn">Save lineup</button>
-                </div>
-              </div>
-
-              <div id="lineup-existing-list" class="my-team-player-list"></div>
+              <div id="lineup-participation-summary" class="my-team-player-list hidden"></div>
+              <div id="lineup-matches-list" class="my-team-player-list"></div>
             </div>
           </section>
         </section>

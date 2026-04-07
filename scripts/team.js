@@ -1,8 +1,11 @@
+
 import { requireAuth, logout } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
+
+  const TEAM_EVENT_CATEGORY_ID = "__team_event__";
 
   const params = new URLSearchParams(window.location.search);
   const tournamentId = params.get("tournamentId");
@@ -26,6 +29,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentUserIsCaptain = false;
   let currentAcceptedInvite = null;
   let currentCaptainSubmission = null;
+  let teamRequestsCache = [];
 
   const draftKey = `scheduleit_team_draft_${tournamentId}_${user.username || user.name || "user"}`;
 
@@ -33,7 +37,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dropdown = document.getElementById("team-user-menu-dropdown");
   const playerBtn = document.getElementById("mode-player-btn");
   const hostBtn = document.getElementById("mode-host-btn");
-
   const backBtn = document.getElementById("team-back-btn");
 
   const teamTabs = document.querySelectorAll(".team-tab");
@@ -66,11 +69,266 @@ document.addEventListener("DOMContentLoaded", async () => {
   const myTeamPlayerListEl = document.getElementById("my-team-player-list");
   const myTeamEmptyStateEl = document.getElementById("my-team-empty-state");
   const myTeamEmptyTextEl = document.getElementById("my-team-empty-text");
-  const lineupPanel = document.getElementById("team-lineup-panel");
-  const lineupStatus = document.getElementById("team-lineup-status");
-  // ---------------------------------------------------------------------------
-  // TOPBAR
-  // ---------------------------------------------------------------------------
+
+  const lineupStatusEl = document.getElementById("team-lineup-status");
+  const lineupHelpTextEl = document.getElementById("lineup-help-text");
+  const lineupEmptyStateEl = document.getElementById("lineup-empty-state");
+  const lineupParticipationSummaryEl = document.getElementById("lineup-participation-summary");
+  const lineupMatchesListEl = document.getElementById("lineup-matches-list");
+
+  function normalizeIdentity(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function identitiesMatch(a, b) {
+    return normalizeIdentity(a) && normalizeIdentity(a) === normalizeIdentity(b);
+  }
+
+  function safeJson(value, fallback = null) {
+    if (value == null) return fallback;
+    if (typeof value === "object") return value;
+    if (typeof value !== "string") return fallback;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+
+  function normalizeCategories(cats) {
+    if (!cats) return [];
+    if (Array.isArray(cats)) return cats;
+    if (typeof cats === "string") {
+      try {
+        const parsed = JSON.parse(cats);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  function getAdvancedSettingsSafe() {
+    return safeJson(tournamentMeta?.advancedSettings, tournamentMeta?.advancedSettings) || {};
+  }
+
+  function isPickleballLeagueMode() {
+    return String(getAdvancedSettingsSafe()?.advancedMode || "") === "pickleball_team_league";
+  }
+
+  function getTeamEventCategoryId() {
+    return TEAM_EVENT_CATEGORY_ID;
+  }
+
+  function normalizeTeamRequest(req) {
+    if (!req || typeof req !== "object") return null;
+    const normalized = { ...req };
+    if (tournamentMeta?.tournamentType === "team" && !String(normalized.categoryId || "").trim()) {
+      normalized.categoryId = TEAM_EVENT_CATEGORY_ID;
+      normalized.categoryLabel = normalized.categoryLabel || "Team event";
+    }
+    return normalized;
+  }
+
+  function getMyTournamentPlayerRecords() {
+    return allPlayers.filter((player) => {
+      return (
+        identitiesMatch(player?.username, user?.username) ||
+        identitiesMatch(player?.playerName, user?.name) ||
+        identitiesMatch(player?.playerName, user?.username) ||
+        identitiesMatch(player?.name, user?.name) ||
+        identitiesMatch(player?.name, user?.username)
+      );
+    });
+  }
+
+  function isSameUserByInviteFields(invite, currentUser = user) {
+    const myPlayerRecords = getMyTournamentPlayerRecords();
+    const myPlayerIds = new Set(
+      myPlayerRecords
+        .map((p) => String(p?.playerId || p?.registrationId || p?.id || ""))
+        .filter(Boolean)
+    );
+
+    return (
+      (invite?.playerId && myPlayerIds.has(String(invite.playerId))) ||
+      (invite?.inviteePlayerId && myPlayerIds.has(String(invite.inviteePlayerId))) ||
+      identitiesMatch(invite?.inviteeUsername, currentUser?.username) ||
+      identitiesMatch(invite?.username, currentUser?.username) ||
+      identitiesMatch(invite?.inviteeName, currentUser?.name) ||
+      identitiesMatch(invite?.inviteeName, currentUser?.username) ||
+      identitiesMatch(invite?.playerName, currentUser?.name) ||
+      identitiesMatch(invite?.playerName, currentUser?.username) ||
+      identitiesMatch(invite?.name, currentUser?.name) ||
+      identitiesMatch(invite?.name, currentUser?.username)
+    );
+  }
+
+  function isSameCaptain(submission, currentUser = user) {
+    return (
+      identitiesMatch(submission?.captainUsername, currentUser?.username) ||
+      identitiesMatch(submission?.captainName, currentUser?.name) ||
+      identitiesMatch(submission?.captainName, currentUser?.username) ||
+      identitiesMatch(submission?.createdBy, currentUser?.username) ||
+      identitiesMatch(submission?.createdBy, currentUser?.name)
+    );
+  }
+
+  function getPlayerId(p) {
+    return p.playerId ?? p.registrationId ?? p.id ?? p._id ?? p.pk ?? null;
+  }
+
+  function getPlayerName(p) {
+    return p.playerName ?? p.name ?? p.fullName ?? p.username ?? "Player";
+  }
+
+  function getPlayerCategoryId(p) {
+    return p.categoryId ?? p.category ?? p.categoryID ?? p.category_id ?? "";
+  }
+
+  function normalizeStatus(p) {
+    const raw = p?.status ?? p?.registrationStatus ?? p?.state ?? "accepted";
+    const s = String(raw).toLowerCase();
+    if (["rejected", "reject", "declined", "denied"].includes(s)) return "rejected";
+    if (["pending", "awaiting"].includes(s)) return "pending";
+    return "accepted";
+  }
+
+  function categoryLabel(c) {
+    const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
+    const gender = c?.gender ? String(c.gender).trim() : "";
+    const level = c?.playingLevel ? String(c.playingLevel).trim() : "";
+    const size = c?.teamSize ? Number(c.teamSize) : null;
+    const exact = c?.exactTeamSize ? Number(c.exactTeamSize) : null;
+
+    let type = "";
+    if (size === 1) type = "Singles";
+    else if (size === 2) type = "Doubles";
+    else if (size === 3) type = "Triples";
+    else if (size >= 4) type = exact ? `Team ${exact}` : "Team";
+
+    const parts = [age, gender, level, type].filter(Boolean);
+    return parts.length ? parts.join(" • ") : (c?.categoryId || c?.id || "Category");
+  }
+
+  function getAcceptedPlayers() {
+    return allPlayers.filter((p) => normalizeStatus(p) === "accepted");
+  }
+
+  function getCurrentCategory() {
+    const categories = normalizeCategories(tournamentMeta?.categories);
+    if (tournamentMeta?.tournamentType === "team") return null;
+    return categories.find((c) => String(c.categoryId || c.id) === String(categorySelect.value)) || null;
+  }
+
+  function getPlayersForCategory(categoryId) {
+    const accepted = getAcceptedPlayers();
+    if (tournamentMeta?.tournamentType === "team") return accepted;
+    return accepted.filter((p) => String(getPlayerCategoryId(p)) === String(categoryId));
+  }
+
+  function getCurrentTeamCategoryId() {
+    const fromCaptain = String(currentCaptainSubmission?.categoryId || "").trim();
+    const fromInvite = String(currentAcceptedInvite?.categoryId || "").trim();
+    if (fromCaptain) return fromCaptain;
+    if (fromInvite) return fromInvite;
+    if (tournamentMeta?.tournamentType === "team") return TEAM_EVENT_CATEGORY_ID;
+    return "";
+  }
+
+  function getCaptainIdentity() {
+    return {
+      username: user.username || "",
+      name: user.name || user.username || "",
+    };
+  }
+
+  function getTournamentCaptainState() {
+    return tournamentMeta?.captainState || tournamentMeta?.captains || {};
+  }
+
+  function getOtherCaptainNamesForTournament() {
+    const captainState = getTournamentCaptainState();
+    const confirmed = Array.isArray(captainState?.confirmedCaptains) ? captainState.confirmedCaptains : [];
+    return confirmed
+      .map((c) => normalizeIdentity(c?.playerName || c?.captainName || c?.username))
+      .filter(Boolean)
+      .filter((name) => name !== normalizeIdentity(user?.name) && name !== normalizeIdentity(user?.username));
+  }
+
+  function isCaptainPlayerRecord(player) {
+    const captain = getCaptainIdentity();
+    return (
+      identitiesMatch(player?.username, captain.username) ||
+      identitiesMatch(player?.playerName, captain.name) ||
+      identitiesMatch(player?.name, captain.name)
+    );
+  }
+
+  function isOtherCaptainPlayerRecord(player) {
+    const otherCaptainNames = getOtherCaptainNamesForTournament();
+    const playerName =
+      normalizeIdentity(player?.playerName) ||
+      normalizeIdentity(player?.name) ||
+      normalizeIdentity(player?.username);
+    return otherCaptainNames.includes(playerName);
+  }
+
+  function getSelectablePlayersForTeam(categoryId) {
+    const pool =
+      tournamentMeta?.tournamentType === "team"
+        ? getAcceptedPlayers()
+        : getPlayersForCategory(categoryId);
+
+    return pool.filter((player) => {
+      if (isCaptainPlayerRecord(player)) return false;
+      if (isOtherCaptainPlayerRecord(player)) return false;
+      return true;
+    });
+  }
+
+  async function apiJson(url, options = {}) {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: "Bearer " + localStorage.getItem("token"),
+      },
+    });
+
+    const raw = await res.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = raw;
+    }
+
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  async function apiGet(url) {
+    return apiJson(url, { method: "GET" });
+  }
+
+  async function apiPost(url, body) {
+    return apiJson(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
+
   if (trigger) {
     const label = String(user?.username || user?.name || user?.email || "U").trim();
     trigger.textContent = (label[0] || "U").toUpperCase();
@@ -128,376 +386,165 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "join.html";
   });
 
-  // ---------------------------------------------------------------------------
-  // HELPERS
-  // ---------------------------------------------------------------------------
-  function normalizeIdentity(value) {
-    return String(value || "").trim().toLowerCase();
-  }
+  function wireTeamTabs() {
+    teamTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const target = tab.dataset.tab;
+        if (!target) return;
 
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+        teamTabs.forEach((btn) => btn.classList.toggle("is-active", btn === tab));
+        teamPanels.forEach((panel) => {
+          panel.classList.toggle("is-active", panel.dataset.panel === target);
+        });
+      });
+    });
   }
+  wireTeamTabs();
 
-  function identitiesMatch(a, b) {
-    return normalizeIdentity(a) && normalizeIdentity(a) === normalizeIdentity(b);
-  }
+  async function loadTournamentMeta() {
+    const direct = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}`);
+    if (direct.ok && direct.data) return direct.data;
 
-  function isSameUserByInviteFields(invite, currentUser) {
-    return (
-      (invite?.inviteeUsername && identitiesMatch(invite.inviteeUsername, currentUser?.username)) ||
-      (invite?.inviteeName && identitiesMatch(invite.inviteeName, currentUser?.name)) ||
-      (invite?.inviteeName && identitiesMatch(invite.inviteeName, currentUser?.username))
-    );
-  }
-
-  function isSameCaptain(submission, currentUser) {
-    return (
-      (submission?.captainUsername && identitiesMatch(submission.captainUsername, currentUser?.username)) ||
-      (submission?.captainName && identitiesMatch(submission.captainName, currentUser?.name)) ||
-      (submission?.createdBy && identitiesMatch(submission.createdBy, currentUser?.username)) ||
-      (submission?.createdBy && identitiesMatch(submission.createdBy, currentUser?.name))
-    );
-  }
-
-  function normalizeCategories(cats) {
-    if (!cats) return [];
-    if (Array.isArray(cats)) return cats;
-    if (typeof cats === "string") {
-      try {
-        const parsed = JSON.parse(cats);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
+    const hostResp = await apiGet("/api/host/tournaments");
+    if (hostResp.ok && Array.isArray(hostResp.data)) {
+      const found = hostResp.data.find((t) => String(t.tournamentId ?? t.id) === String(tournamentId));
+      if (found) return found;
     }
+
+    const publicResp = await apiGet("/api/tournaments");
+    if (publicResp.ok && Array.isArray(publicResp.data)) {
+      const found = publicResp.data.find((t) => String(t.tournamentId ?? t.id) === String(tournamentId));
+      if (found) return found;
+    }
+
+    return null;
+  }
+
+  async function loadPlayers() {
+    const candidates = [
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/players`,
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/players`,
+    ];
+
+    for (const url of candidates) {
+      const resp = await apiGet(url);
+      if (!resp.ok) continue;
+      if (Array.isArray(resp.data)) return resp.data;
+      if (Array.isArray(resp.data?.players)) return resp.data.players;
+      if (Array.isArray(resp.data?.items)) return resp.data.items;
+    }
+
+    alert("Could not load tournament players.");
     return [];
   }
 
-  function getPlayerId(p) {
-    return p.playerId ?? p.registrationId ?? p.id ?? p._id ?? p.pk ?? null;
+  async function loadTeamRequestsForTournament() {
+    const candidates = [
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
+    ];
+
+    for (const url of candidates) {
+      const resp = await apiGet(url);
+      if (!resp.ok) continue;
+      if (Array.isArray(resp.data)) return resp.data.map(normalizeTeamRequest).filter(Boolean);
+      if (Array.isArray(resp.data?.items)) return resp.data.items.map(normalizeTeamRequest).filter(Boolean);
+      if (Array.isArray(resp.data?.requests)) return resp.data.requests.map(normalizeTeamRequest).filter(Boolean);
+    }
+
+    return [];
   }
 
-  function getPlayerName(p) {
-    return p.playerName ?? p.name ?? p.fullName ?? p.username ?? "Player";
+  async function loadCaptainStateForTournament() {
+    const candidates = [
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}`,
+    ];
+
+    for (const url of candidates) {
+      const resp = await apiGet(url);
+      if (!resp.ok) continue;
+
+      if (url.includes("/captains")) return resp.data || null;
+
+      const t = resp.data || null;
+      if (t?.captains) return t.captains;
+      if (t?.captainState) return t.captainState;
+    }
+
+    return tournamentMeta?.captains || tournamentMeta?.captainState || null;
   }
 
-  function getPlayerCategoryId(p) {
-    return p.categoryId ?? p.category ?? p.categoryID ?? p.category_id ?? "";
-  }
-
-  function normalizeStatus(p) {
-    const raw = p?.status ?? p?.registrationStatus ?? p?.state ?? "accepted";
-    const s = String(raw).toLowerCase();
-    if (["rejected", "reject", "declined", "denied"].includes(s)) return "rejected";
-    if (["pending", "awaiting"].includes(s)) return "pending";
-    return "accepted";
-  }
-
-  async function apiJson(url, options = {}) {
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-    });
-
-    const raw = await res.text();
-    let data = null;
+  function loadDraft() {
     try {
-      data = raw ? JSON.parse(raw) : null;
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      return JSON.parse(raw);
     } catch {
-      data = raw;
-    }
-
-    return { ok: res.ok, status: res.status, data };
-  }
-
-  async function apiGet(url) {
-    return apiJson(url, { method: "GET" });
-  }
-
-  async function apiPost(url, body) {
-    return apiJson(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body ?? {}),
-    });
-  }
-
-    async function apiDelete(url) {
-    return apiJson(url, { method: "DELETE" });
-  }
-
-function categoryLabel(c) {
-  const age = c?.ageGroup ? String(c.ageGroup).trim() : "";
-  const gender = c?.gender ? String(c.gender).trim() : "";
-  const level = c?.playingLevel ? String(c.playingLevel).trim() : "";
-  const size = c?.teamSize ? Number(c.teamSize) : null;
-  const exact = c?.exactTeamSize ? Number(c.exactTeamSize) : null;
-
-  let type = "";
-  if (size === 1) type = "Singles";
-  else if (size === 2) type = "Doubles";
-  else if (size === 3) type = "Triples";
-  else if (size >= 4) type = exact ? `Team ${exact}` : "Team";
-
-  const parts = [age, gender, level, type].filter(Boolean);
-  return parts.length ? parts.join(" • ") : (c?.categoryId || c?.id || "Category");
-}
-
-  function getAcceptedPlayers() {
-    return allPlayers.filter((p) => normalizeStatus(p) === "accepted");
-  }
-
-  function getCaptainDisplayName() {
-    return currentCaptainSubmission?.captainName || user.name || user.username || "Captain";
-  }
-
-  function getCaptainIdentity() {
-    return {
-      username: user.username || "",
-      name: user.name || user.username || "",
-    };
-  }
-
-  function getTournamentCaptainState() {
-    return tournamentMeta?.captainState || tournamentMeta?.captains || {};
-  }
-  function getCurrentTeamCategoryId() {
-    return currentCaptainSubmission?.categoryId || currentAcceptedInvite?.categoryId || "";
-  }
-
-  async function loadMyTieWorkflow() {
-    if (!lineupPanel || !lineupTabBtn) return;
-
-    const categoryId = getCurrentTeamCategoryId();
-    if (!categoryId) {
-      lineupTabBtn.classList.add("hidden");
-      lineupPanel.innerHTML = `
-        <div class="empty-state-card">
-          <h3>No tie workflow yet</h3>
-          <p class="helper-text">Join or create a team first.</p>
-        </div>
-      `;
-      return;
-    }
-
-    const resp = await apiGet(
-      `/api/player/tournaments/${encodeURIComponent(tournamentId)}/lineups?categoryId=${encodeURIComponent(categoryId)}`
-    );
-
-    if (!resp.ok) {
-      lineupTabBtn.classList.add("hidden");
-      lineupPanel.innerHTML = `
-        <div class="empty-state-card">
-          <h3>No generated ties yet</h3>
-          <p class="helper-text">${escapeHtml(resp.data?.message || "Host has not generated ties yet.")}</p>
-        </div>
-      `;
-      return;
-    }
-
-    lineupTabBtn.classList.remove("hidden");
-    renderMyTieWorkflow(resp.data || {});
-  }
-
-  function renderMyTieWorkflow(payload) {
-    const team = payload?.team || null;
-    const ties = Array.isArray(payload?.ties) ? payload.ties : [];
-
-    if (!lineupPanel) return;
-
-    if (!team || !ties.length) {
-      lineupPanel.innerHTML = `
-        <div class="empty-state-card">
-          <h3>No generated ties yet</h3>
-          <p class="helper-text">Host needs to generate league ties first.</p>
-        </div>
-      `;
-      return;
-    }
-
-    const myRoster = Array.isArray(team.players) ? team.players : [];
-    const myPlayerOptions = myRoster
-      .map(
-        (p) => `<option value="${escapeHtml(p.playerName)}">${escapeHtml(p.playerName)}</option>`
-      )
-      .join("");
-
-    lineupPanel.innerHTML = ties
-      .map((tie) => {
-        const side = tie.mySide === "home" ? "home" : "away";
-        const opponent = side === "home" ? tie.away : tie.home;
-        const locked = Boolean(tie.lineupLocked);
-        const submatches = Array.isArray(tie.submatches) ? tie.submatches : [];
-
-        const builder = submatches
-          .map(
-            (sm, idx) => `
-              <div class="lineup-slot-card">
-                <div><strong>${escapeHtml(sm.roundLabel || `Tie ${idx + 1}`)}</strong></div>
-                <div class="lineup-slot-grid">
-                  <select class="lineup-player-select" data-tie-id="${escapeHtml(tie.tieId)}" data-score-index="${idx}" data-pick="0" ${locked ? "disabled" : ""}>
-                    <option value="">Select player</option>
-                    ${myPlayerOptions}
-                  </select>
-                  <select class="lineup-player-select" data-tie-id="${escapeHtml(tie.tieId)}" data-score-index="${idx}" data-pick="1" ${locked ? "disabled" : ""}>
-                    <option value="">Select player</option>
-                    ${myPlayerOptions}
-                  </select>
-                </div>
-                <div class="helper-text">Opponent: ${escapeHtml(opponent || "-")}</div>
-              </div>
-            `
-          )
-          .join("");
-
-        return `
-          <div class="lineup-review-card">
-            <div class="lineup-review-head">
-              <div>
-                <h3>${escapeHtml(team.teamName || "My team")} vs ${escapeHtml(opponent || "-")}</h3>
-                <p class="helper-text">${escapeHtml(tie.roundLabel || "")}</p>
-              </div>
-              <div class="team-name-chip">${locked ? "Locked" : "Open"}</div>
-            </div>
-            <div class="lineup-builder-wrap">${builder}</div>
-            <div class="row-actions">
-              <button type="button" class="action-btn accept" data-save-lineup="${escapeHtml(tie.tieId)}" ${locked ? "disabled" : ""}>
-                Save lineup
-              </button>
-            </div>
-          </div>
-        `;
-      })
-      .join("");
-
-    lineupPanel.querySelectorAll("[data-save-lineup]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const tieId = btn.getAttribute("data-save-lineup");
-        const categoryId = getCurrentTeamCategoryId();
-
-        const slotEls = Array.from(
-          lineupPanel.querySelectorAll(`[data-tie-id="${CSS.escape(String(tieId))}"]`)
-        );
-
-        const grouped = new Map();
-
-        slotEls.forEach((el) => {
-          const scoreIndex = Number(el.getAttribute("data-score-index"));
-          const pick = Number(el.getAttribute("data-pick"));
-          if (!grouped.has(scoreIndex)) grouped.set(scoreIndex, []);
-          grouped.get(scoreIndex)[pick] = el.value;
-        });
-
-        const assignments = Array.from(grouped.entries())
-          .sort((a, b) => a[0] - b[0])
-          .map(([scoreIndex, players]) => ({
-            scoreIndex,
-            players: (players || []).filter(Boolean),
-          }));
-
-        const resp = await apiPost(
-          `/api/player/tournaments/${encodeURIComponent(tournamentId)}/lineups`,
-          {
-            categoryId,
-            tieId,
-            assignments,
-          }
-        );
-
-        if (!resp.ok) {
-          if (lineupStatus) lineupStatus.textContent = resp.data?.message || "Failed to save lineup";
-          return;
-        }
-
-        if (lineupStatus) lineupStatus.textContent = "Lineup saved";
-        await loadMyTieWorkflow();
-      });
-    });
-  }
-  function getOtherCaptainNamesForTournament() {
-    const captainState = getTournamentCaptainState();
-    const confirmed = Array.isArray(captainState?.confirmedCaptains) ? captainState.confirmedCaptains : [];
-
-    return confirmed
-      .map((c) => normalizeIdentity(c?.playerName))
-      .filter(Boolean)
-      .filter((name) => {
-        const meByName = normalizeIdentity(user?.name);
-        const meByUsername = normalizeIdentity(user?.username);
-        return name !== meByName && name !== meByUsername;
-      });
-  }
-
-  function isCaptainPlayerRecord(player) {
-    const captain = getCaptainIdentity();
-
-    return (
-      (player?.username && identitiesMatch(player.username, captain.username)) ||
-      (player?.playerName && identitiesMatch(player.playerName, captain.name)) ||
-      (player?.name && identitiesMatch(player.name, captain.name))
-    );
-  }
-
-  function isOtherCaptainPlayerRecord(player) {
-    const otherCaptainNames = getOtherCaptainNamesForTournament();
-    const playerName =
-      normalizeIdentity(player?.playerName) ||
-      normalizeIdentity(player?.name) ||
-      normalizeIdentity(player?.username);
-
-    return otherCaptainNames.includes(playerName);
-  }
-
-  function getSelectablePlayersForTeam(categoryId) {
-    const pool =
-      tournamentMeta?.tournamentType === "team"
-        ? getAcceptedPlayers()
-        : getPlayersForCategory(categoryId);
-
-    return pool.filter((player) => {
-      if (isCaptainPlayerRecord(player)) return false;
-      if (isOtherCaptainPlayerRecord(player)) return false;
-      return true;
-    });
-  }
-
-  function getCurrentCategory() {
-    const categories = normalizeCategories(tournamentMeta?.categories);
-
-    if (tournamentMeta?.tournamentType === "team") {
       return null;
     }
-
-    return categories.find(
-      (c) => String(c.categoryId || c.id) === String(categorySelect.value)
-    ) || null;
   }
 
-  function getPlayersForCategory(categoryId) {
-    const accepted = getAcceptedPlayers();
+  function saveDraft(showMessage = true) {
+    const payload = {
+      teamName: teamNameInput.value.trim(),
+      categoryId: tournamentMeta?.tournamentType === "team" ? TEAM_EVENT_CATEGORY_ID : categorySelect.value,
+      playerIds: getSelectedValues(),
+      updatedAt: new Date().toISOString(),
+    };
 
-    if (tournamentMeta?.tournamentType === "team") {
-      return accepted;
+    localStorage.setItem(draftKey, JSON.stringify(payload));
+    if (showMessage) alert("Draft saved.");
+  }
+
+  async function hydrateSubmissionState() {
+    teamRequestsCache = await loadTeamRequestsForTournament();
+    const captainState = await loadCaptainStateForTournament();
+
+    if (captainState && tournamentMeta) {
+      tournamentMeta.captainState = captainState;
     }
 
-    return accepted.filter(
-      (p) => String(getPlayerCategoryId(p)) === String(categoryId)
-    );
-  }
+    const confirmedCaptains = Array.isArray(captainState?.confirmedCaptains) ? captainState.confirmedCaptains : [];
 
-  function getSelectedValues() {
-    return Array.from(teamRowsWrap.querySelectorAll(".team-player-select"))
-      .map((select) => select.value)
-      .filter(Boolean);
+    const myCaptainRequest = teamRequestsCache.find((req) => isSameCaptain(req, user));
+
+    const myConfirmedCaptain = confirmedCaptains.find((c) => {
+      return (
+        identitiesMatch(c?.username, user?.username) ||
+        identitiesMatch(c?.captainUsername, user?.username) ||
+        identitiesMatch(c?.playerName, user?.name) ||
+        identitiesMatch(c?.playerName, user?.username)
+      );
+    });
+
+    if (myCaptainRequest) {
+      currentUserIsCaptain = true;
+      currentCaptainSubmission = normalizeTeamRequest(myCaptainRequest);
+    } else if (myConfirmedCaptain) {
+      currentUserIsCaptain = true;
+      currentCaptainSubmission = normalizeTeamRequest({
+        captainName: myConfirmedCaptain.playerName || user.name || user.username || "Captain",
+        captainUsername: myConfirmedCaptain.username || user.username || "",
+        captainPlayerId: myConfirmedCaptain.playerId || "",
+        categoryId: myConfirmedCaptain.categoryId || "",
+        teamName: myConfirmedCaptain.teamName || "",
+        invitedPlayers: [],
+        categoryLabel: tournamentMeta?.tournamentType === "team" ? "Team event" : "",
+      });
+    } else {
+      currentUserIsCaptain = false;
+      currentCaptainSubmission = null;
+    }
+
+    const acceptedInvite = teamRequestsCache.find((req) => {
+      const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+      return invited.some((invite) => {
+        return isSameUserByInviteFields(invite, user) && String(invite.inviteStatus || "").toLowerCase() === "accepted";
+      });
+    });
+
+    currentAcceptedInvite = acceptedInvite ? normalizeTeamRequest(acceptedInvite) : null;
   }
 
   function getRuleForCategory(category) {
@@ -511,7 +558,7 @@ function categoryLabel(c) {
       };
     }
 
-    const rules = tournamentMeta?.tournamentRules || {};
+    const rules = safeJson(tournamentMeta?.tournamentRules, tournamentMeta?.tournamentRules) || {};
     const minPlayersPerTeam = Number(rules.minPlayersPerTeam || 1);
     const maxPlayersPerTeam = Number(rules.maxPlayersPerTeam || 1);
 
@@ -563,7 +610,7 @@ function categoryLabel(c) {
       requiredCountEl.textContent = `${currentRule.min}-${currentRule.max}`;
     }
 
-    const selected = getSelectedValues().length + 1; // include captain
+    const selected = getSelectedValues().length + 1;
     selectedCountEl.textContent = String(selected);
   }
 
@@ -583,13 +630,18 @@ function categoryLabel(c) {
       .join("");
   }
 
+  function getSelectedValues() {
+    return Array.from(teamRowsWrap.querySelectorAll(".team-player-select"))
+      .map((select) => select.value)
+      .filter(Boolean);
+  }
+
   function renderPlayerRows(values = []) {
     teamRowsWrap.innerHTML = "";
 
     let categoryId = "";
-
     if (tournamentMeta?.tournamentType === "team") {
-      categoryId = "__team_event__";
+      categoryId = TEAM_EVENT_CATEGORY_ID;
     } else {
       const category = getCurrentCategory();
       categoryId = category ? String(category.categoryId || category.id) : "";
@@ -614,19 +666,13 @@ function categoryLabel(c) {
       const removeBtn = row.querySelector(".row-remove-btn");
 
       select.value = value || "";
-
-      select.addEventListener("change", () => {
-        refreshAllPlayerDropdowns();
-      });
-
+      select.addEventListener("change", () => refreshAllPlayerDropdowns());
       removeBtn.addEventListener("click", () => {
         const nextValues = getSelectedValues().filter((_, i) => i !== idx);
-
         if (currentRule.mode === "range" && nextValues.length + 1 < currentRule.min) {
           alert(`Minimum ${currentRule.min} players are required.`);
           return;
         }
-
         renderPlayerRows(nextValues);
         updateRuleUi();
       });
@@ -642,13 +688,12 @@ function categoryLabel(c) {
     const category = getCurrentCategory();
     const categoryId =
       tournamentMeta?.tournamentType === "team"
-        ? "__team_event__"
+        ? TEAM_EVENT_CATEGORY_ID
         : (category ? String(category.categoryId || category.id) : "");
 
-    if (!categoryId) return;
+    if (!categoryId && tournamentMeta?.tournamentType !== "team") return;
 
     const selects = Array.from(teamRowsWrap.querySelectorAll(".team-player-select"));
-
     selects.forEach((select) => {
       const current = select.value;
       select.innerHTML = `
@@ -661,175 +706,101 @@ function categoryLabel(c) {
     selectedCountEl.textContent = String(getSelectedValues().length + 1);
   }
 
-function populateCategoryDropdown() {
-  const categories = normalizeCategories(tournamentMeta?.categories);
-  const seenIds = new Set();
-  const seenLabels = new Set();
+  function populateCategoryDropdown() {
+    if (!categorySelect) return;
+    const categories = normalizeCategories(tournamentMeta?.categories);
+    const seenIds = new Set();
+    const seenLabels = new Set();
 
-  categorySelect.innerHTML = `<option value="">Select category</option>`;
+    categorySelect.innerHTML = `<option value="">Select category</option>`;
 
-  categories.forEach((category) => {
-    const id = String(category.categoryId || category.id || "").trim();
-    if (!id || seenIds.has(id)) return;
+    categories.forEach((category) => {
+      const id = String(category.categoryId || category.id || "").trim();
+      if (!id || seenIds.has(id)) return;
 
-    const label = categoryLabel(category);
-    const labelKey = label.trim().toLowerCase();
+      const label = categoryLabel(category);
+      const labelKey = label.trim().toLowerCase();
+      if (seenLabels.has(labelKey)) return;
 
-    if (seenLabels.has(labelKey)) return;
+      seenIds.add(id);
+      seenLabels.add(labelKey);
 
-    seenIds.add(id);
-    seenLabels.add(labelKey);
-
-    const option = document.createElement("option");
-    option.value = id;
-    option.textContent = label;
-    categorySelect.appendChild(option);
-  });
-}
-
-  function saveDraft(showMessage = true) {
-    const payload = {
-      teamName: teamNameInput.value.trim(),
-      categoryId: tournamentMeta?.tournamentType === "team" ? "" : categorySelect.value,
-      playerIds: getSelectedValues(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem(draftKey, JSON.stringify(payload));
-    if (showMessage) alert("Team draft saved in browser.");
-  }
-
-  function loadDraft() {
-    try {
-      const raw = localStorage.getItem(draftKey);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  async function loadTournamentMeta() {
-    const hostResp = await apiGet("/api/host/tournaments");
-    if (hostResp.ok && Array.isArray(hostResp.data)) {
-      const found = hostResp.data.find(
-        (t) => String(t.tournamentId ?? t.id) === String(tournamentId)
-      );
-      if (found) return found;
-    }
-
-    const publicResp = await apiGet("/api/tournaments");
-    if (publicResp.ok && Array.isArray(publicResp.data)) {
-      const found = publicResp.data.find(
-        (t) => String(t.tournamentId ?? t.id) === String(tournamentId)
-      );
-      if (found) return found;
-    }
-
-    return null;
-  }
-
-  async function loadPlayers() {
-    const resp = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/players`);
-    if (!resp.ok) {
-      alert("Could not load tournament players.");
-      return [];
-    }
-
-    return Array.isArray(resp.data)
-      ? resp.data
-      : resp.data?.players || resp.data?.items || [];
-  }
-
-  async function loadTeamRequestsForTournament() {
-    const candidates = [
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
-      `/api/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
-    ];
-
-    for (const url of candidates) {
-      const resp = await apiGet(url);
-      if (!resp.ok) continue;
-
-      if (Array.isArray(resp.data)) return resp.data;
-      if (Array.isArray(resp.data?.items)) return resp.data.items;
-      if (Array.isArray(resp.data?.requests)) return resp.data.requests;
-      if (Array.isArray(resp.data?.data)) return resp.data.data;
-    }
-
-    return [];
-  }
-
-  async function loadCaptainStateForTournament() {
-  const candidates = [
-    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`,
-    `/api/tournaments/${encodeURIComponent(tournamentId)}`,
-  ];
-
-  for (const url of candidates) {
-    const resp = await apiGet(url);
-    if (!resp.ok) continue;
-
-    if (url.includes("/captains")) return resp.data || null;
-
-    const t = resp.data || null;
-    if (t?.captains) return t.captains;
-    if (t?.captainState) return t.captainState;
-  }
-
-  return tournamentMeta?.captains || tournamentMeta?.captainState || null;
-}
-
-async function hydrateSubmissionState() {
-  const requests = await loadTeamRequestsForTournament();
-  const captainState = await loadCaptainStateForTournament();
-
-  if (captainState) {
-    tournamentMeta.captainState = captainState;
-  }
-
-  const confirmedCaptains = Array.isArray(captainState?.confirmedCaptains)
-    ? captainState.confirmedCaptains
-    : [];
-
-  const myCaptainRequest = requests.find((req) => isSameCaptain(req, user));
-
-  const myConfirmedCaptain = confirmedCaptains.find((c) => {
-    return (
-      identitiesMatch(c?.username, user?.username) ||
-      identitiesMatch(c?.captainUsername, user?.username) ||
-      identitiesMatch(c?.playerName, user?.name) ||
-      identitiesMatch(c?.playerName, user?.username)
-    );
-  });
-
-  if (myCaptainRequest) {
-    currentUserIsCaptain = true;
-    currentCaptainSubmission = myCaptainRequest;
-  } else if (myConfirmedCaptain) {
-    currentUserIsCaptain = true;
-    currentCaptainSubmission = {
-      captainName: myConfirmedCaptain.playerName || user.name || user.username || "Captain",
-      captainUsername: myConfirmedCaptain.username || user.username || "",
-      captainPlayerId: myConfirmedCaptain.playerId || "",
-      categoryId: myConfirmedCaptain.categoryId || "",
-      teamName: myConfirmedCaptain.teamName || "",
-    };
-  } else {
-    currentUserIsCaptain = false;
-    currentCaptainSubmission = null;
-  }
-
-  const acceptedInvite = requests.find((req) => {
-    const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
-    return invited.some((invite) => {
-      const sameUser = isSameUserByInviteFields(invite, user);
-      return sameUser && invite.inviteStatus === "accepted";
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = label;
+      categorySelect.appendChild(option);
     });
-  });
+  }
 
-  currentAcceptedInvite = acceptedInvite || null;
-}
+  function getCaptainPlayerIdForPayload() {
+    const mine = getMyTournamentPlayerRecords();
+    const exact = mine.find((p) => identitiesMatch(p?.username, user?.username));
+    return String(getPlayerId(exact || mine[0] || "") || "");
+  }
+
+  function buildMemberCards(activeTeam) {
+    const cards = [];
+    const captainName = activeTeam?.captainName || "-";
+
+    cards.push(`
+      <div class="my-team-player-card">
+        <div class="my-team-player-left">
+          <div class="my-team-player-name">${escapeHtml(captainName)}</div>
+          <div class="my-team-player-meta">Captain</div>
+        </div>
+        <div class="status-pill status-pill--accepted">captain</div>
+      </div>
+    `);
+
+    const invitedPlayers = Array.isArray(activeTeam?.invitedPlayers) ? activeTeam.invitedPlayers : [];
+    invitedPlayers.forEach((player) => {
+      const status = String(player?.inviteStatus || "pending").toLowerCase();
+      const statusClass =
+        status === "accepted"
+          ? "status-pill status-pill--accepted"
+          : status === "rejected"
+            ? "status-pill status-pill--rejected"
+            : "status-pill status-pill--pending";
+
+      cards.push(`
+        <div class="my-team-player-card">
+          <div class="my-team-player-left">
+            <div class="my-team-player-name">${escapeHtml(player.playerName || player.inviteeName || player.name || player.username || "Player")}</div>
+            <div class="my-team-player-meta">${escapeHtml(player.phone || player.playerPhone || "")}</div>
+          </div>
+          <div class="${statusClass}">${escapeHtml(status)}</div>
+        </div>
+      `);
+    });
+
+    return cards.join("");
+  }
+
+  function renderMyTeamPanel() {
+    myTeamPlayerListEl.innerHTML = "";
+
+    const activeTeam = currentCaptainSubmission || currentAcceptedInvite;
+
+    if (!activeTeam) {
+      myTeamNameEl.textContent = "-";
+      myTeamCaptainEl.textContent = "-";
+      myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
+      myTeamCategoryEl.textContent = "-";
+      myTeamEmptyStateEl.classList.remove("hidden");
+      myTeamEmptyTextEl.textContent = currentUserIsCaptain
+        ? "You have not submitted a team for this tournament yet."
+        : "You are not part of any accepted team for this tournament yet.";
+      return;
+    }
+
+    myTeamEmptyStateEl.classList.add("hidden");
+    myTeamNameEl.textContent = activeTeam.teamName || "-";
+    myTeamCaptainEl.textContent = activeTeam.captainName || "-";
+    myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
+    myTeamCategoryEl.textContent = activeTeam.categoryLabel || (tournamentMeta?.tournamentType === "team" ? "Team event" : "-");
+
+    myTeamPlayerListEl.innerHTML = buildMemberCards(activeTeam);
+  }
 
   function hydratePage() {
     tournamentNameEl.textContent = tournamentMeta?.tournamentName || "-";
@@ -861,13 +832,13 @@ async function hydrateSubmissionState() {
     }
 
     if (currentUserIsCaptain) {
-  pageTitleEl.textContent = currentCaptainSubmission?.invitedPlayers?.length
-    ? "Create / Manage team"
-    : "Create team";
-  pageSubtitleEl.textContent = "Invite players to your team and manage pending team requests.";
-  createTeamTabBtn?.classList.remove("hidden");
-  lineupTabBtn?.classList.remove("hidden");
-}else if (currentAcceptedInvite) {
+      pageTitleEl.textContent = currentCaptainSubmission?.invitedPlayers?.length
+        ? "Create / Manage team"
+        : "Create team";
+      pageSubtitleEl.textContent = "Invite players to your team and manage pending team requests.";
+      createTeamTabBtn?.classList.remove("hidden");
+      lineupTabBtn?.classList.toggle("hidden", !isPickleballLeagueMode());
+    } else if (currentAcceptedInvite) {
       pageTitleEl.textContent = "My team";
       pageSubtitleEl.textContent = "View the team you are part of for this tournament.";
       createTeamTabBtn?.classList.add("hidden");
@@ -882,87 +853,8 @@ async function hydrateSubmissionState() {
     renderMyTeamPanel();
   }
 
-  function renderMyTeamPanel() {
-    myTeamPlayerListEl.innerHTML = "";
-
-    const activeTeam = currentCaptainSubmission || currentAcceptedInvite;
-
-    if (!activeTeam) {
-      myTeamNameEl.textContent = "-";
-      myTeamCaptainEl.textContent = "-";
-      myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
-      myTeamCategoryEl.textContent = "-";
-      myTeamEmptyStateEl.classList.remove("hidden");
-      myTeamEmptyTextEl.textContent = currentUserIsCaptain
-        ? "You have not submitted a team for this tournament yet."
-        : "You are not part of any accepted team for this tournament yet.";
-      return;
-    }
-
-    myTeamEmptyStateEl.classList.add("hidden");
-
-    myTeamNameEl.textContent = activeTeam.teamName || "-";
-    myTeamCaptainEl.textContent = activeTeam.captainName || "-";
-    myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
-    myTeamCategoryEl.textContent = activeTeam.categoryLabel || "-";
-
-    const invitedPlayers = Array.isArray(activeTeam.invitedPlayers) ? activeTeam.invitedPlayers : [];
-
-    if (!invitedPlayers.length) {
-      myTeamPlayerListEl.innerHTML = `
-        <div class="empty-state-card">
-          <h3>No invited players yet</h3>
-          <p class="helper-text">Once players are invited, they will appear here.</p>
-        </div>
-      `;
-      return;
-    }
-
-    invitedPlayers.forEach((player) => {
-      const card = document.createElement("div");
-      card.className = "my-team-player-card";
-
-      const status = player?.inviteStatus || "pending";
-      const statusClass =
-        status === "accepted"
-          ? "status-pill status-pill--accepted"
-          : status === "rejected"
-            ? "status-pill status-pill--rejected"
-            : "status-pill status-pill--pending";
-
-      card.innerHTML = `
-        <div class="my-team-player-left">
-          <div class="my-team-player-name">${escapeHtml(player.playerName || player.name || "Player")}</div>
-          <div class="my-team-player-meta">${escapeHtml(player.phone || player.playerPhone || "")}</div>
-        </div>
-        <div class="${statusClass}">${escapeHtml(status)}</div>
-      `;
-      myTeamPlayerListEl.appendChild(card);
-    });
-  }
-
-  function wireTeamTabs() {
-    teamTabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        const target = tab.dataset.tab;
-        if (!target) return;
-
-        teamTabs.forEach((btn) => btn.classList.toggle("is-active", btn === tab));
-        teamPanels.forEach((panel) => {
-          panel.classList.toggle("is-active", panel.dataset.panel === target);
-        });
-      });
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // CATEGORY / ROW EVENTS
-  // ---------------------------------------------------------------------------
-  wireTeamTabs();
-
   categorySelect?.addEventListener("change", () => {
     if (tournamentMeta?.tournamentType === "team") return;
-
     const category = getCurrentCategory();
     currentRule = getRuleForCategory(category);
     renderPlayerRows([]);
@@ -973,7 +865,7 @@ async function hydrateSubmissionState() {
     let categoryId = "";
 
     if (tournamentMeta?.tournamentType === "team") {
-      categoryId = "__team_event__";
+      categoryId = TEAM_EVENT_CATEGORY_ID;
     } else {
       const category = getCurrentCategory();
       categoryId = category ? String(category.categoryId || category.id) : "";
@@ -984,8 +876,7 @@ async function hydrateSubmissionState() {
     }
 
     const selectedValues = getSelectedValues();
-    const currentTotal = selectedValues.length + 1; // captain included
-
+    const currentTotal = selectedValues.length + 1;
     if (currentTotal >= currentRule.max) {
       alert(`You can add maximum ${currentRule.max} players including captain.`);
       return;
@@ -999,9 +890,6 @@ async function hydrateSubmissionState() {
     saveDraft(true);
   });
 
-  // ---------------------------------------------------------------------------
-  // SUBMIT TEAM
-  // ---------------------------------------------------------------------------
   teamForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -1014,7 +902,7 @@ async function hydrateSubmissionState() {
     let category = null;
 
     if (tournamentMeta?.tournamentType === "team") {
-      categoryId = "";
+      categoryId = TEAM_EVENT_CATEGORY_ID;
     } else {
       category = getCurrentCategory();
       categoryId = category ? String(category.categoryId || category.id) : "";
@@ -1025,7 +913,6 @@ async function hydrateSubmissionState() {
     }
 
     const selectedValues = getSelectedValues();
-
     if (new Set(selectedValues).size !== selectedValues.length) {
       alert("Same player cannot be selected twice.");
       return;
@@ -1059,11 +946,14 @@ async function hydrateSubmissionState() {
 
     const captainName = user.name || user.username || "";
     const captainUsername = user.username || "";
+    const captainPlayerId = getCaptainPlayerIdForPayload();
 
     const invitedPlayers = selectedPlayers.map((player) => ({
       playerId: String(getPlayerId(player)),
       playerName: getPlayerName(player),
+      inviteeName: getPlayerName(player),
       username: player.username || "",
+      inviteeUsername: player.username || "",
       phone: player.phone || player.playerPhone || "",
       inviteStatus: "pending",
     }));
@@ -1078,6 +968,7 @@ async function hydrateSubmissionState() {
           : (category ? categoryLabel(category) : ""),
       captainName,
       captainUsername,
+      captainPlayerId,
       createdBy: captainUsername || captainName,
       invitedPlayers,
       tournamentName: tournamentMeta?.tournamentName || "",
@@ -1091,11 +982,11 @@ async function hydrateSubmissionState() {
     for (const url of candidates) {
       const result = await apiPost(url, payload);
       if (result.ok) {
-        saveDraft(false);
         localStorage.removeItem(draftKey);
         alert("Team request created successfully.");
         await hydrateSubmissionState();
         hydratePage();
+        await renderLineupTab();
         return;
       }
     }
@@ -1103,272 +994,427 @@ async function hydrateSubmissionState() {
     alert("Could not create team request. Please verify backend route.");
   });
 
-    // ---------------------------------------------------------------------------
-  // LINEUP TAB
-  // ---------------------------------------------------------------------------
-  const lineupEmptyStateEl = document.getElementById("lineup-empty-state");
-  const lineupBuilderEl = document.getElementById("lineup-builder");
-  const lineupExistingListEl = document.getElementById("lineup-existing-list");
-  const lineupTieLabelInput = document.getElementById("lineup-tie-label");
-  const lineupCategorySelect = document.getElementById("lineup-category-select");
-  const lineupSubmatchesWrap = document.getElementById("lineup-submatches-wrap");
-  const lineupSaveBtn = document.getElementById("lineup-save-btn");
-  const lineupHelpTextEl = document.getElementById("lineup-help-text");
-
-  let lineupStateLocal = {
-    existing: [],
-    myRequest: null,
-  };
-
-  function getAdvancedSettingsSafe() {
-    const raw = tournamentMeta?.advancedSettings;
-    if (!raw) return {};
-    if (typeof raw === "object") return raw;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return {};
-    }
+  function getMyActiveTeamForLineup() {
+    return currentCaptainSubmission || currentAcceptedInvite || null;
   }
 
-  function getSubmatchCount() {
-    const adv = getAdvancedSettingsSafe();
-    return Math.max(1, Number(adv.tieSubmatchCount || 5));
-  }
+  function getTeamRosterForLineup(payloadTeam = null) {
+    const rosterNames = [];
+    const activeTeam = getMyActiveTeamForLineup();
 
-  async function loadMyTeamRequestForLineup() {
-    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`);
-    const requests = Array.isArray(r.data) ? r.data : [];
-
-    lineupStateLocal.myRequest =
-      requests.find((req) => isSameCaptain(req, user)) ||
-      requests.find((req) => {
-        const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
-        return invited.some((p) => isSameUserByInviteFields(p, user) && p.inviteStatus === "accepted");
-      }) ||
-      null;
-  }
-
-  async function loadExistingLineupsForMe() {
-    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups`);
-    lineupStateLocal.existing = Array.isArray(r.data?.ties) ? r.data.ties : [];
-  }
-
-  function getMyTeamRoster() {
-    const req = lineupStateLocal.myRequest;
-    if (!req) return [];
-
-    const roster = [];
-    const captainName = req.captainName || user.name || user.username || "Captain";
-    const captainUsername = req.captainUsername || user.username || "";
-
-    roster.push({
-      playerId: req.captainPlayerId || captainUsername || captainName,
-      playerName: captainName,
-    });
-
-    const invited = Array.isArray(req.invitedPlayers) ? req.invitedPlayers : [];
-    invited.forEach((p) => {
-      if (String(p.inviteStatus || "").toLowerCase() !== "accepted") return;
-      roster.push({
-        playerId: p.playerId,
-        playerName: p.inviteeName || p.playerName || p.name || p.username || "Player",
+    if (Array.isArray(payloadTeam?.players)) {
+      payloadTeam.players.forEach((player) => {
+        const name = String(player?.playerName || player?.name || player?.username || "").trim();
+        if (name) rosterNames.push(name);
       });
+    }
+
+    if (activeTeam?.captainName) rosterNames.unshift(String(activeTeam.captainName).trim());
+
+    const invited = Array.isArray(activeTeam?.invitedPlayers) ? activeTeam.invitedPlayers : [];
+    invited.forEach((player) => {
+      if (String(player?.inviteStatus || "").toLowerCase() !== "accepted") return;
+      const name = String(
+        player?.playerName || player?.inviteeName || player?.name || player?.username || ""
+      ).trim();
+      if (name) rosterNames.push(name);
     });
 
     const seen = new Set();
-    return roster.filter((p) => {
-      const id = String(p.playerId || p.playerName);
-      if (!id || seen.has(id)) return false;
-      seen.add(id);
+    return rosterNames.filter((name) => {
+      const key = normalizeIdentity(name);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
   }
 
-  function buildLineupPlayerOptions(currentValue = "") {
-    const players = getMyTeamRoster();
-    return players
-      .map((p) => {
-        const v = String(p.playerId || "");
-        return `<option value="${escapeHtml(v)}" ${v === String(currentValue) ? "selected" : ""}>${escapeHtml(p.playerName || "Player")}</option>`;
-      })
-      .join("");
+  function getCategoryDefinitionsForLineup() {
+    const categories = normalizeCategories(tournamentMeta?.categories);
+    if (categories.length) return categories;
+    const count = Math.max(1, Number(getAdvancedSettingsSafe()?.tieSubmatchCount || 1));
+    return Array.from({ length: count }, (_, index) => ({
+      categoryId: `CAT-${index + 1}`,
+      eventName: `Category ${index + 1}`,
+      teamSize: 1,
+    }));
   }
 
-  function populateLineupCategories() {
-    if (!lineupCategorySelect) return;
-    lineupCategorySelect.innerHTML = `<option value="">Select category</option>`;
+  function getRequiredSlotsForCategory(categoryDef) {
+    const teamSize = Number(categoryDef?.teamSize || 1);
+    const exactTeamSize = Number(categoryDef?.exactTeamSize || 0);
+    if (teamSize >= 4 && exactTeamSize >= 4) return exactTeamSize;
+    return Math.max(1, teamSize);
+  }
 
-    normalizeCategories(tournamentMeta?.categories).forEach((c) => {
-      const id = String(c.categoryId || c.id || "");
-      if (!id) return;
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = categoryLabel(c);
-      lineupCategorySelect.appendChild(opt);
+  function getMaxMatchesPerPlayer() {
+    const rules = safeJson(tournamentMeta?.tournamentRules, tournamentMeta?.tournamentRules) || {};
+    const raw = Number(rules?.maxMatchesPerPlayer || 0);
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  }
+
+  function getParticipationRuleText() {
+    const rule = String(getAdvancedSettingsSafe()?.participationRule || "").trim();
+    if (!rule) return "";
+    if (rule === "all_bench_must_play_once") {
+      return "Each player should appear at least once across all league matches.";
+    }
+    return rule.replace(/_/g, " ");
+  }
+
+  function getMySideForTie(tie) {
+    return tie?.mySide === "away" ? "away" : "home";
+  }
+
+  function getSavedAssignmentsForTie(tie) {
+    const side = getMySideForTie(tie);
+    const assignments = tie?.lineups?.[side]?.assignments;
+    return Array.isArray(assignments) ? assignments : [];
+  }
+
+  function extractPlayersFromAssignment(assignment) {
+    if (!assignment || typeof assignment !== "object") return [];
+    if (Array.isArray(assignment.players)) return assignment.players.filter(Boolean).map(String);
+    if (Array.isArray(assignment.playerNames)) return assignment.playerNames.filter(Boolean).map(String);
+    return [];
+  }
+
+  function buildParticipationCounts(ties, currentTieId = "", currentDraftAssignments = null) {
+    const counts = new Map();
+
+    ties.forEach((tie) => {
+      const assignments =
+        currentTieId && String(tie.tieId || tie.matchId || "") === String(currentTieId) && Array.isArray(currentDraftAssignments)
+          ? currentDraftAssignments
+          : getSavedAssignmentsForTie(tie);
+
+      assignments.forEach((assignment) => {
+        extractPlayersFromAssignment(assignment).forEach((playerName) => {
+          const key = normalizeIdentity(playerName);
+          counts.set(key, (counts.get(key) || 0) + 1);
+        });
+      });
     });
 
-    if (lineupStateLocal.myRequest?.categoryId) {
-      lineupCategorySelect.value = String(lineupStateLocal.myRequest.categoryId);
-    }
+    return counts;
   }
 
-  function renderLineupSubmatches(savedSubmatches = []) {
-    if (!lineupSubmatchesWrap) return;
-    lineupSubmatchesWrap.innerHTML = "";
+  function allMyTiesHaveLineup(ties, currentTieId = "", currentDraftAssignments = null) {
+    return ties.every((tie) => {
+      const isCurrent = currentTieId && String(tie.tieId || tie.matchId || "") === String(currentTieId);
+      const assignments = isCurrent && Array.isArray(currentDraftAssignments)
+        ? currentDraftAssignments
+        : getSavedAssignmentsForTie(tie);
 
-    const count = getSubmatchCount();
-    for (let i = 0; i < count; i++) {
-      const row = savedSubmatches[i] || {};
-      const card = document.createElement("div");
-      card.className = "lineup-slot-card";
-      card.innerHTML = `
-        <div class="lineup-slot-title">Submatch ${i + 1}</div>
-        <div class="lineup-two-col">
-          <div class="field-group">
-            <label>Player 1</label>
-            <select class="lineup-player-a" data-index="${i}">
-              <option value="">Select player</option>
-              ${buildLineupPlayerOptions(row.playerIds?.[0] || "")}
-            </select>
+      return Array.isArray(assignments) && assignments.some((assignment) => extractPlayersFromAssignment(assignment).length > 0);
+    });
+  }
+
+  function validateTieAssignments(tie, draftAssignments, categoryDefs, rosterNames, allTies) {
+    const maxMatchesPerPlayer = getMaxMatchesPerPlayer();
+    const appearanceCountsThisTie = new Map();
+
+    for (let i = 0; i < draftAssignments.length; i += 1) {
+      const assignment = draftAssignments[i];
+      const players = extractPlayersFromAssignment(assignment);
+      const requiredSlots = getRequiredSlotsForCategory(categoryDefs[i] || {});
+      const dedupSet = new Set(players.map(normalizeIdentity));
+
+      if (players.length !== requiredSlots) {
+        return { ok: false, message: `Submatch ${i + 1} needs exactly ${requiredSlots} player(s).` };
+      }
+
+      if (dedupSet.size !== players.length) {
+        return { ok: false, message: `Same player cannot be repeated inside submatch ${i + 1}.` };
+      }
+
+      for (const playerName of players) {
+        const key = normalizeIdentity(playerName);
+        if (!rosterNames.some((name) => normalizeIdentity(name) === key)) {
+          return { ok: false, message: `${playerName} is not part of your accepted team roster.` };
+        }
+        appearanceCountsThisTie.set(key, (appearanceCountsThisTie.get(key) || 0) + 1);
+      }
+    }
+
+    if (maxMatchesPerPlayer) {
+      for (const [playerKey, count] of appearanceCountsThisTie.entries()) {
+        if (count > maxMatchesPerPlayer) {
+          const actualName = rosterNames.find((name) => normalizeIdentity(name) === playerKey) || "Player";
+          return {
+            ok: false,
+            message: `${actualName} can play maximum ${maxMatchesPerPlayer} submatch(es) against this team.`,
+          };
+        }
+      }
+    }
+
+    const participationCounts = buildParticipationCounts(
+      allTies,
+      String(tie.tieId || tie.matchId || ""),
+      draftAssignments
+    );
+
+    const ifFinalSave = allMyTiesHaveLineup(
+      allTies,
+      String(tie.tieId || tie.matchId || ""),
+      draftAssignments
+    );
+
+    if (ifFinalSave && isPickleballLeagueMode()) {
+      const missing = rosterNames.filter((name) => (participationCounts.get(normalizeIdentity(name)) || 0) < 1);
+      if (missing.length) {
+        return {
+          ok: false,
+          message: `Before completing all league lineups, every player should play at least once. Missing: ${missing.join(", ")}`,
+        };
+      }
+    }
+
+    return { ok: true };
+  }
+
+  function buildPlayerSelectHtml(options, selectedValue = "", label = "Player") {
+    return `
+      <div class="field-group">
+        <label>${escapeHtml(label)}</label>
+        <select class="lineup-player-select">
+          <option value="">Select player</option>
+          ${options
+            .map((name) => {
+              const selected = normalizeIdentity(name) === normalizeIdentity(selectedValue);
+              return `<option value="${escapeHtml(name)}" ${selected ? "selected" : ""}>${escapeHtml(name)}</option>`;
+            })
+            .join("")}
+        </select>
+      </div>
+    `;
+  }
+
+  function renderParticipationSummary(ties, rosterNames) {
+    if (!lineupParticipationSummaryEl) return;
+
+    const counts = buildParticipationCounts(ties);
+    const participationRule = getParticipationRuleText();
+
+    if (!rosterNames.length) {
+      lineupParticipationSummaryEl.classList.add("hidden");
+      lineupParticipationSummaryEl.innerHTML = "";
+      return;
+    }
+
+    lineupParticipationSummaryEl.classList.remove("hidden");
+    lineupParticipationSummaryEl.innerHTML = `
+      <div class="rules-box">
+        <h3>League participation tracker</h3>
+        <p class="helper-text">${escapeHtml(participationRule || "Track how many times each player has appeared across all submitted match lineups.")}</p>
+      </div>
+      ${rosterNames.map((name) => {
+        const count = counts.get(normalizeIdentity(name)) || 0;
+        const pill = count > 0 ? "status-pill status-pill--accepted" : "status-pill status-pill--pending";
+        return `
+          <div class="my-team-player-card">
+            <div class="my-team-player-left">
+              <div class="my-team-player-name">${escapeHtml(name)}</div>
+              <div class="my-team-player-meta">${count} appearance(s) submitted so far</div>
+            </div>
+            <div class="${pill}">${count > 0 ? "covered" : "pending"}</div>
           </div>
-          <div class="field-group">
-            <label>Player 2</label>
-            <select class="lineup-player-b" data-index="${i}">
-              <option value="">Select player</option>
-              ${buildLineupPlayerOptions(row.playerIds?.[1] || "")}
-            </select>
+        `;
+      }).join("")}
+    `;
+  }
+
+  function getTieCategoryDefs(tie) {
+    const defs = getCategoryDefinitionsForLineup();
+    const submatchCount = Array.isArray(tie?.submatches) && tie.submatches.length
+      ? tie.submatches.length
+      : defs.length;
+    return Array.from({ length: submatchCount }, (_, index) => defs[index] || {
+      categoryId: `CAT-${index + 1}`,
+      eventName: `Category ${index + 1}`,
+      teamSize: 1,
+    });
+  }
+
+  function renderLineupMatches(payload) {
+    if (!lineupMatchesListEl) return;
+
+    const team = payload?.team || null;
+    const ties = Array.isArray(payload?.ties) ? payload.ties : [];
+    const rosterNames = getTeamRosterForLineup(team);
+
+    renderParticipationSummary(ties, rosterNames);
+
+    if (!currentUserIsCaptain) {
+      lineupEmptyStateEl?.classList.remove("hidden");
+      lineupMatchesListEl.innerHTML = "";
+      if (lineupHelpTextEl) lineupHelpTextEl.textContent = "Only the captain can submit match lineups.";
+      return;
+    }
+
+    if (!ties.length) {
+      lineupEmptyStateEl?.classList.remove("hidden");
+      lineupMatchesListEl.innerHTML = "";
+      return;
+    }
+
+    lineupEmptyStateEl?.classList.add("hidden");
+
+    lineupMatchesListEl.innerHTML = ties.map((tie, tieIndex) => {
+      const tieId = String(tie.tieId || tie.matchId || `tie-${tieIndex + 1}`);
+      const categoryDefs = getTieCategoryDefs(tie);
+      const savedAssignments = getSavedAssignmentsForTie(tie);
+
+      const slotCards = categoryDefs.map((categoryDef, idx) => {
+        const requiredSlots = getRequiredSlotsForCategory(categoryDef);
+        const savedPlayers = extractPlayersFromAssignment(savedAssignments[idx] || {});
+        const selectsHtml = Array.from({ length: requiredSlots }, (_, slotIndex) => {
+          return buildPlayerSelectHtml(
+            rosterNames,
+            savedPlayers[slotIndex] || "",
+            requiredSlots === 1 ? "Player" : `Player ${slotIndex + 1}`
+          );
+        }).join("");
+
+        return `
+          <div class="lineup-slot-card" data-submatch-index="${idx}">
+            <div class="lineup-slot-title">${escapeHtml(categoryLabel(categoryDef) || categoryDef.eventName || `Submatch ${idx + 1}`)}</div>
+            <div class="helper-text">Pick ${requiredSlots} player(s) for this category.</div>
+            <div class="lineup-two-col">${selectsHtml}</div>
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <div class="lineup-review-card" data-tie-card-id="${escapeHtml(tieId)}">
+          <div class="lineup-review-head">
+            <div>
+              <h3>${escapeHtml(tie.home || "Home")} vs ${escapeHtml(tie.away || "Away")}</h3>
+              <p class="helper-text">
+                ${escapeHtml(tie.roundLabel || `Match ${tieIndex + 1}`)}
+                ${tie.date ? ` • ${escapeHtml(tie.date)}` : ""}
+                ${tie.time ? ` • ${escapeHtml(tie.time)}` : ""}
+                ${tie.court ? ` • ${escapeHtml(tie.court)}` : ""}
+              </p>
+            </div>
+            <div class="team-name-chip">${tie.lineupLocked ? "Locked" : "Open"}</div>
+          </div>
+
+          <div class="lineup-builder-wrap">
+            ${slotCards}
+          </div>
+
+          <div class="row-actions">
+            <button
+              type="button"
+              class="action-btn accept"
+              data-save-lineup="${escapeHtml(tieId)}"
+              ${tie.lineupLocked ? "disabled" : ""}
+            >
+              Save lineup
+            </button>
           </div>
         </div>
       `;
-      lineupSubmatchesWrap.appendChild(card);
-    }
-  }
+    }).join("");
 
-  function collectLineupPayload() {
-    const req = lineupStateLocal.myRequest;
-    const rosterMap = new Map(getMyTeamRoster().map((p) => [String(p.playerId), p.playerName]));
+    lineupMatchesListEl.querySelectorAll("[data-save-lineup]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const tieId = btn.getAttribute("data-save-lineup");
+        const tie = ties.find((item) => String(item.tieId || item.matchId || "") === String(tieId));
+        if (!tie) return;
 
-    const submatches = Array.from(lineupSubmatchesWrap.querySelectorAll(".lineup-slot-card")).map((card, idx) => {
-      const a = card.querySelector(".lineup-player-a")?.value || "";
-      const b = card.querySelector(".lineup-player-b")?.value || "";
+        const tieCard = lineupMatchesListEl.querySelector(`[data-tie-card-id="${CSS.escape(String(tieId))}"]`);
+        if (!tieCard) return;
 
-      return {
-        slot: idx + 1,
-        playerIds: [a, b].filter(Boolean),
-        playerNames: [rosterMap.get(a), rosterMap.get(b)].filter(Boolean),
-      };
+        const categoryDefs = getTieCategoryDefs(tie);
+        const draftAssignments = Array.from(tieCard.querySelectorAll("[data-submatch-index]")).map((card, idx) => {
+          const players = Array.from(card.querySelectorAll(".lineup-player-select"))
+            .map((select) => String(select.value || "").trim())
+            .filter(Boolean);
+
+          return {
+            scoreIndex: idx,
+            players,
+          };
+        });
+
+        const rosterNames = getTeamRosterForLineup(payload?.team || null);
+        const validation = validateTieAssignments(tie, draftAssignments, categoryDefs, rosterNames, ties);
+        if (!validation.ok) {
+          if (lineupStatusEl) lineupStatusEl.textContent = validation.message;
+          alert(validation.message);
+          return;
+        }
+
+        const resp = await apiPost(
+          `/api/player/tournaments/${encodeURIComponent(tournamentId)}/lineups`,
+          {
+            categoryId: getCurrentTeamCategoryId(),
+            tieId,
+            assignments: draftAssignments,
+          }
+        );
+
+        if (!resp.ok) {
+          const message = resp.data?.message || "Failed to save lineup.";
+          if (lineupStatusEl) lineupStatusEl.textContent = message;
+          alert(message);
+          return;
+        }
+
+        if (lineupStatusEl) {
+          lineupStatusEl.textContent = "Lineup saved successfully.";
+        }
+        await renderLineupTab();
+      });
     });
-
-    return {
-      tieId: req?.requestId || undefined,
-      tieLabel: lineupTieLabelInput?.value?.trim() || `Tie ${req?.teamName || ""}`.trim(),
-      teamA: req?.teamName || "My Team",
-      teamB: "",
-      teamKey: req?.requestId || "",
-      categoryId: lineupCategorySelect?.value || req?.categoryId || "",
-      captainUsername: req?.captainUsername || user.username || "",
-      captainName: req?.captainName || user.name || user.username || "",
-      submatches,
-      locked: false,
-    };
   }
 
-  function renderExistingLineups() {
-    if (!lineupExistingListEl) return;
-    lineupExistingListEl.innerHTML = "";
+  async function renderLineupTab() {
+    if (!lineupMatchesListEl || !lineupTabBtn) return;
 
-    if (!lineupStateLocal.existing.length) {
-      lineupExistingListEl.innerHTML = `<div class="helper-text">No lineup submitted yet.</div>`;
-      return;
-    }
+    lineupMatchesListEl.innerHTML = "";
+    if (lineupStatusEl) lineupStatusEl.textContent = "";
 
-    lineupStateLocal.existing.forEach((tie) => {
-      const card = document.createElement("div");
-      card.className = "meta-chip";
-      card.innerHTML = `
-        <strong>${escapeHtml(tie.tieLabel || "Tie")}</strong>
-        <span class="helper-text">${escapeHtml(tie.teamA || "")}</span>
-        <span class="helper-text">${tie.locked ? "Locked" : "Pending"}</span>
-      `;
-      lineupExistingListEl.appendChild(card);
-    });
-  }
-
-  async function setupLineupTab() {
-    if (!lineupTabBtn) return;
-
-    const adv = getAdvancedSettingsSafe();
-    const isPickleballLeague = adv.advancedMode === "pickleball_team_league";
-
-    if (!isPickleballLeague) {
+    if (!currentUserIsCaptain || !isPickleballLeagueMode()) {
       lineupTabBtn.classList.add("hidden");
-      return;
-    }
-
-    await loadMyTeamRequestForLineup();
-    await loadExistingLineupsForMe();
-
-    if (!lineupStateLocal.myRequest) {
-      lineupTabBtn.classList.add("hidden");
+      lineupEmptyStateEl?.classList.remove("hidden");
+      if (lineupParticipationSummaryEl) {
+        lineupParticipationSummaryEl.classList.add("hidden");
+        lineupParticipationSummaryEl.innerHTML = "";
+      }
+      if (lineupHelpTextEl) {
+        lineupHelpTextEl.textContent = currentUserIsCaptain
+          ? "This lineup flow is enabled only for pickleball team league."
+          : "Only captains can submit match lineups.";
+      }
       return;
     }
 
     lineupTabBtn.classList.remove("hidden");
-    populateLineupCategories();
-    renderLineupSubmatches();
-    renderExistingLineups();
-
-    const isCaptain =
-      (lineupStateLocal.myRequest?.captainUsername && identitiesMatch(lineupStateLocal.myRequest.captainUsername, user.username)) ||
-      (lineupStateLocal.myRequest?.captainName && identitiesMatch(lineupStateLocal.myRequest.captainName, user.name)) ||
-      (lineupStateLocal.myRequest?.captainName && identitiesMatch(lineupStateLocal.myRequest.captainName, user.username));
-
-    if (isCaptain) {
-      lineupEmptyStateEl?.classList.add("hidden");
-      lineupBuilderEl?.classList.remove("hidden");
-      if (lineupHelpTextEl) {
-        lineupHelpTextEl.textContent = "Submit your team lineup for this tie.";
-      }
-    } else {
-      lineupEmptyStateEl?.classList.add("hidden");
-      lineupBuilderEl?.classList.add("hidden");
-      if (lineupHelpTextEl) {
-        lineupHelpTextEl.textContent = "You can view submitted lineups here.";
-      }
+    if (lineupHelpTextEl) {
+      lineupHelpTextEl.textContent =
+        "Captain sees all scheduled matches here. Under each match, submit category-wise submatch lineups.";
     }
+
+    const categoryId = getCurrentTeamCategoryId() || TEAM_EVENT_CATEGORY_ID;
+    const resp = await apiGet(
+      `/api/player/tournaments/${encodeURIComponent(tournamentId)}/lineups?categoryId=${encodeURIComponent(categoryId)}`
+    );
+
+    if (!resp.ok) {
+      lineupEmptyStateEl?.classList.remove("hidden");
+      if (lineupStatusEl) {
+        lineupStatusEl.textContent = resp.data?.message || "Host has not generated league fixtures yet.";
+      }
+      return;
+    }
+
+    renderLineupMatches(resp.data || {});
   }
 
-  lineupSaveBtn?.addEventListener("click", async () => {
-    const payload = collectLineupPayload();
-
-    if (!payload.categoryId) {
-      alert("Select category first.");
-      return;
-    }
-
-    const hasAtLeastOne = payload.submatches.some((m) => (m.playerIds || []).length > 0);
-    if (!hasAtLeastOne) {
-      alert("Add at least one submatch lineup.");
-      return;
-    }
-
-    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups`, payload);
-    if (!r.ok) {
-      alert("Could not save lineup.");
-      return;
-    }
-
-    alert("Lineup saved.");
-    await loadExistingLineupsForMe();
-    renderExistingLineups();
-  });
-
-  await setupLineupTab();
-
-  // ---------------------------------------------------------------------------
-  // INITIAL LOAD
-  // ---------------------------------------------------------------------------
   tournamentMeta = await loadTournamentMeta();
   if (!tournamentMeta) {
     alert("Could not load tournament.");
@@ -1379,7 +1425,5 @@ async function hydrateSubmissionState() {
   allPlayers = await loadPlayers();
   await hydrateSubmissionState();
   hydratePage();
-    await loadMyTieWorkflow();
-
-
+  await renderLineupTab();
 });
