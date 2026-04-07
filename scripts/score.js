@@ -1639,19 +1639,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   }
 
-  console.log("[SCORE DEBUG] tournamentId:", tournamentId);
-  console.log("[SCORE DEBUG] raw tournamentMeta:", tournamentMeta);
-  console.log("[SCORE DEBUG] merged fixtures:", fixtures);
-  console.log("[SCORE DEBUG] detected sport name:", getTournamentSportName(fixtures));
-  console.log("[SCORE DEBUG] normalized sport key:", normalizeSportKey(getTournamentSportName(fixtures)));
-  console.log("[SCORE DEBUG] detected tournament type:", {
-    fixturesTournamentType: fixtures?.tournamentType,
-    fixturesMetaTournamentType: fixtures?.meta?.tournamentType,
-    fixturesNestedTournamentType: fixtures?.tournament?.tournamentType,
-    fixturesNestedEventType: fixtures?.tournament?.eventType,
-    isTeamEvent: detectTeamEvent(fixtures),
-  });
-
   try {
     if (categoryId) {
       const schemaResp = await apiGet(
@@ -1701,18 +1688,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const teamTieState = loadTeamTieState(match, fixtures);
-    console.log("[SCORE DEBUG] loaded teamTieState:", teamTieState);
-    console.log("[SCORE DEBUG] teamTieState tournamentSportKey:", teamTieState?.tournamentSportKey);
-    console.log(
-      "[SCORE DEBUG] category sport keys:",
-      Array.isArray(teamTieState?.categories)
-        ? teamTieState.categories.map((c) => ({
-            id: c?.id,
-            name: c?.name,
-            sportKey: c?.sportKey,
-          }))
-        : []
-    );
     applyMatchLineupsToTeamState(match, teamTieState);
 
     function syncLineupCollapseUi() {
@@ -1889,12 +1864,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             : isUnlocked
               ? "Start scoring"
               : "Complete previous category first";
-
-        console.log("[SCORE DEBUG] rendering category:", {
-          name: category?.name,
-          sportKey: category?.sportKey,
-          sportData: category?.sportData,
-        });
 
         const categoryBody =
           category.sportKey === "pickleball"
