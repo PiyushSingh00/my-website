@@ -1310,15 +1310,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (saved && Array.isArray(saved.categories)) {
         saved.homeRoster = Array.isArray(saved.homeRoster) ? saved.homeRoster : fresh.homeRoster;
         saved.awayRoster = Array.isArray(saved.awayRoster) ? saved.awayRoster : fresh.awayRoster;
-        saved.tournamentSportKey = saved.tournamentSportKey || fresh.tournamentSportKey;
+        saved.tournamentSportKey = fresh.tournamentSportKey || saved.tournamentSportKey || "";
         saved.lineupCollapsed = Boolean(saved.lineupCollapsed);
 
         saved.categories = saved.categories.map((category, index) => {
-          const merged = {
-            ...fresh.categories[index],
-            ...category,
-            sportKey: category?.sportKey || fresh.categories[index]?.sportKey || saved.tournamentSportKey,
-          };
+            const merged = {
+              ...fresh.categories[index],
+              ...category,
+              sportKey:
+                fresh.categories[index]?.sportKey ||
+                category?.sportKey ||
+                saved.tournamentSportKey ||
+                "",
+            };
 
           if (merged.sportKey === "pickleball") {
             merged.sportData = ensurePickleballTeamData(category?.sportData, rawFixtures);
@@ -1476,15 +1480,163 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let fixtures = null;
   let schema = null;
+  let tournamentMeta = null;
 
   try {
-    const fixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
+    const fixturesResp = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`
+    );
     fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
   } catch (e) {
     console.error(e);
     titleEl.textContent = "Failed to load fixtures";
     subEl.textContent = String(e?.message || e);
     return;
+  }
+
+  try {
+    const tournamentResp = await apiGet(
+      `/api/tournaments/${encodeURIComponent(tournamentId)}`
+    );
+    tournamentMeta = tournamentResp?.ok ? tournamentResp.data : tournamentResp;
+  } catch (e) {
+    console.warn("Tournament meta not loaded.", e);
+    tournamentMeta = null;
+  }
+
+  if (fixtures && tournamentMeta) {
+    const metaSportName =
+      safeText(tournamentMeta?.sportName || tournamentMeta?.sport, "");
+
+    const metaTournamentType =
+      safeText(
+        tournamentMeta?.tournamentType || tournamentMeta?.eventType,
+        ""
+      );
+
+    fixtures = {
+      ...(fixtures || {}),
+
+      sportName:
+        safeText(
+          fixtures?.sportName ||
+            fixtures?.meta?.sportName ||
+            fixtures?.tournament?.sportName ||
+            metaSportName,
+          ""
+        ),
+
+      tournamentType:
+        safeText(
+          fixtures?.tournamentType ||
+            fixtures?.meta?.tournamentType ||
+            fixtures?.tournament?.tournamentType ||
+            metaTournamentType,
+          ""
+        ),
+
+      teamCategories:
+        (Array.isArray(fixtures?.teamCategories) && fixtures.teamCategories.length
+          ? fixtures.teamCategories
+          : Array.isArray(tournamentMeta?.categories)
+            ? tournamentMeta.categories
+            : []),
+
+      categoriesMeta:
+        (Array.isArray(fixtures?.categoriesMeta) && fixtures.categoriesMeta.length
+          ? fixtures.categoriesMeta
+          : Array.isArray(tournamentMeta?.categories)
+            ? tournamentMeta.categories
+            : []),
+
+      meta: {
+        ...(fixtures?.meta || {}),
+        sportName:
+          safeText(
+            fixtures?.meta?.sportName ||
+              fixtures?.sportName ||
+              fixtures?.tournament?.sportName ||
+              metaSportName,
+            ""
+          ),
+        sport:
+          safeText(
+            fixtures?.meta?.sport ||
+              fixtures?.sportName ||
+              fixtures?.tournament?.sport ||
+              metaSportName,
+            ""
+          ),
+        tournamentType:
+          safeText(
+            fixtures?.meta?.tournamentType ||
+              fixtures?.tournamentType ||
+              fixtures?.tournament?.tournamentType ||
+              metaTournamentType,
+            ""
+          ),
+        categories:
+          (Array.isArray(fixtures?.meta?.categories) && fixtures.meta.categories.length
+            ? fixtures.meta.categories
+            : Array.isArray(tournamentMeta?.categories)
+              ? tournamentMeta.categories
+              : []),
+      },
+
+      tournament: {
+        ...(fixtures?.tournament || {}),
+        sportName:
+          safeText(
+            fixtures?.tournament?.sportName ||
+              fixtures?.sportName ||
+              metaSportName,
+            ""
+          ),
+        sport:
+          safeText(
+            fixtures?.tournament?.sport ||
+              fixtures?.sportName ||
+              metaSportName,
+            ""
+          ),
+        tournamentType:
+          safeText(
+            fixtures?.tournament?.tournamentType ||
+              fixtures?.tournamentType ||
+              metaTournamentType,
+            ""
+          ),
+        eventType:
+          safeText(
+            fixtures?.tournament?.eventType ||
+              metaTournamentType,
+            ""
+          ),
+        categories:
+          (Array.isArray(fixtures?.tournament?.categories) && fixtures.tournament.categories.length
+            ? fixtures.tournament.categories
+            : Array.isArray(tournamentMeta?.categories)
+              ? tournamentMeta.categories
+              : []),
+
+        // so pickleball UI also uses host form rules instead of default 11 / best-of-3
+        pickleballTargetPoints:
+          Number(
+            fixtures?.tournament?.pickleballTargetPoints ||
+            fixtures?.meta?.pickleballTargetPoints ||
+            tournamentMeta?.tournamentRules?.pointsPerSet ||
+            0
+          ) || null,
+
+        pickleballTotalSets:
+          Number(
+            fixtures?.tournament?.pickleballTotalSets ||
+            fixtures?.meta?.pickleballTotalSets ||
+            tournamentMeta?.tournamentRules?.bestOfSets ||
+            0
+          ) || null,
+      },
+    };
   }
 
   try {
