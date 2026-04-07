@@ -162,6 +162,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     rows: [],
   };
 
+  let teamsState = {
+    rows: [],
+  };
+
   const fixturesUi = {
     wrap: fixturesEmbed,
     generateBtn: fixturesGenerateBtn,
@@ -489,7 +493,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function getCaptainSubmittedPlayers(captain) {
-    const raw = captain?.teamPlayers || captain?.players || captain?.members || captain?.submittedPlayers || captain?.roster || [];
+    const raw = captain?.teamRoster || captain?.teamPlayers || captain?.players || captain?.members || captain?.submittedPlayers || captain?.roster || [];
     if (!Array.isArray(raw)) return [];
     return raw
       .map((item) => typeof item === "string" ? item : (item?.playerName || item?.name || item?.fullName || item?.username || ""))
@@ -497,15 +501,41 @@ document.addEventListener("DOMContentLoaded", async () => {
       .filter(Boolean);
   }
 
+  function normalizeTeamRows(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows.map((team, index) => {
+      const captainId = String(team?.captainPlayerId || team?.captainId || team?.playerId || team?.teamId || `captain-${index}`);
+      const players = Array.isArray(team?.players) ? team.players : [];
+      return {
+        teamId: String(team?.teamId || `team-${captainId}`),
+        teamKey: String(team?.teamKey || `captain:${captainId}`),
+        captainId,
+        captainName: String(team?.captainName || "").trim(),
+        captainUsername: String(team?.captainUsername || "").trim(),
+        teamName: String(team?.teamName || team?.captainName || `Team ${index + 1}`).trim(),
+        categoryId: String(team?.categoryId || (isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : "")).trim(),
+        teamStatus: String(team?.teamStatus || "pending").trim(),
+        teamPlayers: players.map((p) => String(p?.playerName || p?.name || p?.username || "").trim()).filter(Boolean),
+        teamRoster: players.map((p) => ({ ...p })),
+      };
+    });
+  }
+
   function getConfirmedTeams() {
-    return captainState.confirmedCaptains.map((captain) => ({
+    const fromTeamsApi = normalizeTeamRows(teamsState.rows);
+    if (fromTeamsApi.length) return fromTeamsApi;
+
+    return captainState.confirmedCaptains.map((captain, index) => ({
+      teamId: `team-${String(captain.playerId || index)}`,
       teamKey: `captain:${captain.playerId}`,
       captainId: captain.playerId,
       captainName: captain.playerName,
+      captainUsername: captain.captainUsername || captain.username || "",
       teamName: captain.teamName || captain.playerName,
-      categoryId: captain.categoryId,
+      categoryId: captain.categoryId || (isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : ""),
       teamStatus: captain.teamStatus || "pending",
       teamPlayers: getCaptainSubmittedPlayers(captain),
+      teamRoster: Array.isArray(captain.teamRoster) ? captain.teamRoster.map((p) => ({ ...p })) : [],
     }));
   }
 
@@ -768,7 +798,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       else if (Array.isArray(r.data?.registrations)) rows = r.data.registrations;
 
       if (Array.isArray(rows)) {
-        allPlayers = rows;
+        allPlayers = rows.map((row) => {
+          if (!isTournamentTeamEvent()) return row;
+          return {
+            ...row,
+            categoryId: row?.categoryId || row?.category || row?.categoryID || row?.category_id || TEAM_EVENT_CATEGORY_ID,
+          };
+        });
         renderPlayerTabs();
         renderPlayers();
         return;
@@ -832,8 +868,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       gender: document.getElementById("host-player-gender")?.value || "",
       phone: document.getElementById("host-player-phone")?.value?.trim() || "",
       categoryId: isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : (addPlayerCategory?.value || ""),
+      categoryMode: isTournamentTeamEvent() ? "team_event" : "event_category",
+      teamEvent: isTournamentTeamEvent(),
+      tournamentType: tournamentMetaCache?.tournamentType || "",
+      stageFormat: tournamentMetaCache?.stageFormat || "",
       status: "accepted",
       addedByHost: true,
+      sourcePage: "players",
+      createdByHostUsername: user?.username || "",
+      createdByHostName: user?.name || user?.username || "",
     };
 
     if (!payload.playerName || !payload.age || !payload.gender || !payload.phone || (!isTournamentTeamEvent() && !payload.categoryId)) {
@@ -877,6 +920,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  async function loadTeamsFromDb() {
+    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/teams`);
+    if (r.ok) {
+      teamsState.rows = Array.isArray(r.data?.teams) ? r.data.teams : Array.isArray(r.data) ? r.data : [];
+    } else {
+      teamsState.rows = [];
+    }
+  }
+
   async function saveCaptainStateToDb() {
     const r = await apiPut(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`, {
       selectedCaptainIds: captainState.selectedCaptainIds,
@@ -889,6 +941,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const captain = captainState.confirmedCaptains.find((c) => String(c.playerId) === String(playerId));
     if (!captain) return;
     captain.teamStatus = nextStatus;
+    teamsState.rows = teamsState.rows.map((team) =>
+      String(team?.captainPlayerId || team?.captainId || "") === String(playerId)
+        ? { ...team, teamStatus: nextStatus }
+        : team
+    );
     await saveCaptainStateToDb();
   }
 
@@ -1012,15 +1069,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       return {
         ...existing,
         playerId,
+        userId: String(player?.userId || playerId),
+        username: String(player?.username || existing.username || "").trim(),
+        captainUsername: String(player?.username || existing.captainUsername || "").trim(),
         playerName: getPlayerDisplayName(player),
-        categoryId: getPlayerCategoryId(player),
+        phone: String(player?.phone || existing.phone || "").trim(),
+        age: player?.age ?? existing.age ?? null,
+        gender: String(player?.gender || existing.gender || "").trim(),
+        categoryId: isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : getPlayerCategoryId(player),
+        categoryMode: isTournamentTeamEvent() ? "team_event" : "event_category",
         teamName: teamNameInput?.value?.trim() || existing.teamName || `Team ${index + 1}`,
         teamStatus: existing.teamStatus || "pending",
+        teamPlayers: Array.isArray(existing.teamPlayers) ? [...existing.teamPlayers] : [],
+        teamRoster: Array.isArray(existing.teamRoster) ? existing.teamRoster.map((p) => ({ ...p })) : [],
       };
     });
 
     try {
       await saveCaptainStateToDb();
+      await loadTeamsFromDb();
       closeConfirmCaptainsModal();
       renderCaptainsSummary();
       refreshStageSpecificUi();
@@ -1035,17 +1102,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     captainsSummaryList.innerHTML = "";
     syncTeamSetupUi();
 
-    if (!captainState.confirmedCaptains.length) {
+    const teams = getConfirmedTeams();
+
+    if (!teams.length) {
       captainsSummaryEmpty?.classList.remove("hidden");
       return;
     }
 
     captainsSummaryEmpty?.classList.add("hidden");
 
-    captainState.confirmedCaptains.forEach((captain) => {
-      const playerId = String(captain.playerId || "");
+    teams.forEach((captain) => {
+      const playerId = String(captain.captainId || captain.playerId || "");
       const expanded = expandedTeamIds.has(playerId);
-      const teamPlayers = getCaptainSubmittedPlayers(captain);
+      const teamPlayers = Array.isArray(captain.teamPlayers) ? captain.teamPlayers : getCaptainSubmittedPlayers(captain);
       const teamStatus = String(captain.teamStatus || "pending");
       const statusChipClass = teamStatus === "accepted"
         ? "status-pill status-pill--accepted"
@@ -1064,7 +1133,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <button type="button" class="captain-summary-head-btn" data-team-card-toggle="${escapeHtml(playerId)}">
           <div class="captain-summary-left">
             <div class="captain-summary-name">${escapeHtml(captain.teamName || captain.playerName || "Team")}</div>
-            <div class="captain-summary-meta">Captain: ${escapeHtml(captain.playerName || "—")}</div>
+            <div class="captain-summary-meta">Captain: ${escapeHtml(captain.captainName || captain.playerName || "—")}</div>
           </div>
           <div class="row-actions team-setup-head-actions">
             <span class="${statusChipClass}">${escapeHtml(statusChipText)}</span>
@@ -1445,6 +1514,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   function computeAcceptedByCategory() {
     const accepted = getAcceptedPlayers();
     const map = {};
+    if (isTournamentTeamEvent()) {
+      map[TEAM_EVENT_CATEGORY_ID] = accepted.map((p) => getPlayerDisplayName(p));
+      fixturesState.acceptedByCategory = map;
+      return;
+    }
     tournamentCategories.forEach((c) => {
       const cid = c.categoryId || c.id;
       map[cid] = accepted
@@ -1479,9 +1553,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function persistFixturesState() {
-    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`, fixturesState.fixtures || { categories: {} });
+    const payload = {
+      ...(fixturesState.fixtures || { categories: {} }),
+      updatedBy: user?.username || user?.name || "host",
+      updatedFromPage: "players",
+      updatedAtClient: new Date().toISOString(),
+      teamEvent: isTournamentTeamEvent(),
+      stageFormat: tournamentMetaCache?.stageFormat || "",
+    };
+    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`, payload);
     if (!r.ok) throw new Error(r.data?.message || "Failed to save fixtures");
-    fixturesState.fixtures = migrateFixtures(r.data || fixturesState.fixtures || { categories: {} });
+    fixturesState.fixtures = migrateFixtures(r.data || payload || { categories: {} });
   }
 
   function migrateFixtures(fixturesObj) {
@@ -1836,6 +1918,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         ? cat.rounds[0]
         : [];
 
+    const seenPairKeys = new Set();
+
     matches.forEach((match, index) => {
       const root = fixturesUi.groupsEl;
       const home = root?.querySelector(`input[data-edit-field="home"][data-index="${index}"]`)?.value?.trim() || match.home || "";
@@ -1844,6 +1928,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       const time = root?.querySelector(`input[data-edit-field="time"][data-index="${index}"]`)?.value || match.time || "";
       const court = root?.querySelector(`input[data-edit-field="court"][data-index="${index}"]`)?.value?.trim() || match.court || "";
 
+      if (!home || !away) {
+        throw new Error(`Team 1 and Team 2 are required for match ${index + 1}`);
+      }
+      if (home === away) {
+        throw new Error(`Team 1 and Team 2 cannot be the same in match ${index + 1}`);
+      }
+
+      const pairKey = [home, away].sort().join("::");
+      if (seenPairKeys.has(pairKey)) {
+        throw new Error(`Duplicate team pairing found for match ${index + 1}`);
+      }
+      seenPairKeys.add(pairKey);
+
       match.home = home;
       match.away = away;
       match.homePlayers = home ? [home] : [];
@@ -1851,6 +1948,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       match.date = date;
       match.time = time;
       match.court = court;
+      match.updatedAt = new Date().toISOString();
+      match.updatedBy = user?.username || user?.name || "host";
     });
 
     cat.matches = matches;
@@ -1946,7 +2045,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         const scheduledMatches = scheduleLeaguePairs(pairs, shuffle(getAvailableCourtNames()), getTournamentStartDate());
-        fixturesState.bulkEditMode = false;
         fixturesState.bulkEditMode = false;
       fixturesState.fixtures = migrateFixtures({
           tournamentType: "team",
@@ -2125,6 +2223,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadTournamentMeta();
   await loadPlayers();
   await loadCaptainStateFromDb();
+  await loadTeamsFromDb();
   await loadPoolsFromDb();
   await loadLeaderboardFromDb();
 
