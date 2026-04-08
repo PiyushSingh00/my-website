@@ -554,10 +554,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       rawFixtures?.tournament?.tournamentRules?.pointsPerSet ||
       rawFixtures?.tournamentRules?.pointsPerSet ||
       params.get("targetPoints") ||
-      11;
+      15;
 
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 11;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
   }
 
   function getPickleballTotalSets(rawFixtures) {
@@ -570,10 +570,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       rawFixtures?.tournament?.tournamentRules?.bestOfSets ||
       rawFixtures?.tournamentRules?.bestOfSets ||
       params.get("totalSets") ||
-      3;
+      1;
 
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
   }
 
   function setsNeededToWin(totalSets) {
