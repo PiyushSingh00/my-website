@@ -1790,16 +1790,26 @@ document.addEventListener("DOMContentLoaded", async () => {
           scheduleTeamAutoSave();
         });
 
-        row.querySelectorAll('.lineup-player-select').forEach((select) => {
-          select.addEventListener("change", () => {
-            setCategoryPlayersFromSelects(category, select.dataset.side, row);
-            saveTeamTieState(teamTieState);
-            renderLineupReview();
-            renderTeamCategoryBars();
-            syncTeamSummaryUi();
-            scheduleTeamAutoSave();
+          row.querySelectorAll('.lineup-player-select').forEach((select) => {
+            select.addEventListener("change", () => {
+              setCategoryPlayersFromSelects(category, select.dataset.side, row);
+
+              console.log("LINEUP DEBUG", {
+                category: category.name,
+                slotCount: getCategorySlotCount(category),
+                homePlayersSelected: category.homePlayersSelected,
+                awayPlayersSelected: category.awayPlayersSelected,
+                lineupComplete: isCategoryLineupComplete(category),
+                tieLocked: teamTieState.tieLocked,
+              });
+
+              saveTeamTieState(teamTieState);
+              renderLineupReview();
+              renderTeamCategoryBars();
+              syncTeamSummaryUi();
+              scheduleTeamAutoSave();
+            });
           });
-        });
 
         lineupReviewList.appendChild(row);
       });
@@ -1816,8 +1826,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const resultInfo = getCategoryResultInfo(category, homeLabel, awayLabel);
         const previousCompleted = teamTieState.categories.slice(0, index).every((item) => Boolean(item.winnerSide));
-        const canScore = isCategoryLineupComplete(category) && previousCompleted && !teamTieState.tieLocked;
+
+        const slotCount = getCategorySlotCount(category);
+        const homeSelectedCount = getSelectedPlayers(category, "A").length;
+        const awaySelectedCount = getSelectedPlayers(category, "B").length;
+        const lineupComplete = isCategoryLineupComplete(category);
+
+        const canScore = lineupComplete && previousCompleted && !teamTieState.tieLocked;
         const canToggle = category.categoryLocked || category.isScoringOpen || canScore;
+
+        const debugReason = teamTieState.tieLocked
+          ? "LOCKED"
+          : !lineupComplete
+            ? `Need lineup • A ${homeSelectedCount}/${slotCount} • B ${awaySelectedCount}/${slotCount}`
+            : !previousCompleted
+              ? "Previous category incomplete"
+              : "Ready";
 
         const buttonLabel = teamTieState.tieLocked
           ? "Locked"
@@ -1853,13 +1877,14 @@ document.addEventListener("DOMContentLoaded", async () => {
               <div class="category-title">${escapeHtml(category.name)}</div>
               <div class="category-matchup">${escapeHtml(category.homePlayer || "TBD")} vs ${escapeHtml(category.awayPlayer || "TBD")} <small>• ${escapeHtml(getCategoryFormatLabel(category))}</small></div>
             </div>
-            <div class="category-actions">
-              <div class="status-chip ${resultInfo.chipClass}">${escapeHtml(resultInfo.text)}</div>
-              <div class="status-chip"><strong>${escapeHtml(formatCategoryPointsText(category))}</strong></div>
-              <button type="button" class="lineup-action-btn primary" data-action="toggle-scoring" ${canToggle ? "" : "disabled"}>
-                ${escapeHtml(buttonLabel)}
-              </button>
-            </div>
+              <div class="category-actions">
+                <div class="status-chip ${resultInfo.chipClass}">${escapeHtml(resultInfo.text)}</div>
+                <div class="status-chip"><strong>${escapeHtml(formatCategoryPointsText(category))}</strong></div>
+                <div class="status-chip">${escapeHtml(debugReason)}</div>
+                <button type="button" class="lineup-action-btn primary" data-action="toggle-scoring" ${canToggle ? "" : "disabled"}>
+                  ${escapeHtml(buttonLabel)}
+                </button>
+              </div>
           </div>
           <div class="category-card-body">
             ${categoryBody}
