@@ -558,6 +558,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }));
   }
 
+  function getEditableTeamNameOptions(currentValue = "") {
+    const names = [...new Set(
+      getConfirmedTeams()
+        .map((team) => String(team?.teamName || "").trim())
+        .filter(Boolean)
+    )];
+
+    const current = String(currentValue || "").trim();
+    if (current && !names.includes(current)) names.unshift(current);
+
+    return names;
+  }
+
+  function buildTeamNameSelectOptions(selectedValue = "") {
+    const selected = String(selectedValue || "").trim();
+    return getEditableTeamNameOptions(selected)
+      .map((name) => `
+        <option value="${escapeHtml(name)}"${name === selected ? " selected" : ""}>
+          ${escapeHtml(name)}
+        </option>
+      `)
+      .join("");
+  }
+
   function getTeamEventFixtureBucket() {
     const categories = fixturesState.fixtures?.categories || {};
     return categories[TEAM_EVENT_CATEGORY_ID] || Object.values(categories)[0] || null;
@@ -2241,10 +2265,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             <tbody>
               ${matches.map((match, index) => {
                 const team1Cell = editing
-                  ? `<input class="schedule-edit-input" type="text" data-edit-field="home" data-index="${index}" value="${escapeHtml(match.home || "")}" placeholder="Team 1" />`
+                  ? `
+                    <select class="schedule-edit-input" data-edit-field="home" data-index="${index}">
+                      <option value="">Select team</option>
+                      ${buildTeamNameSelectOptions(match.home || "")}
+                    </select>
+                  `
                   : escapeHtml(match.home || "—");
+
                 const team2Cell = editing
-                  ? `<input class="schedule-edit-input" type="text" data-edit-field="away" data-index="${index}" value="${escapeHtml(match.away || "")}" placeholder="Team 2" />`
+                  ? `
+                    <select class="schedule-edit-input" data-edit-field="away" data-index="${index}">
+                      <option value="">Select team</option>
+                      ${buildTeamNameSelectOptions(match.away || "")}
+                    </select>
+                  `
                   : escapeHtml(match.away || "—");
                 const dateCell = editing
                   ? `<input class="schedule-edit-input" type="date" data-edit-field="date" data-index="${index}" value="${escapeHtml(match.date || "")}" />`
@@ -2300,8 +2335,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     matches.forEach((match, index) => {
       const root = fixturesUi.groupsEl;
-      const home = root?.querySelector(`input[data-edit-field="home"][data-index="${index}"]`)?.value?.trim() || match.home || "";
-      const away = root?.querySelector(`input[data-edit-field="away"][data-index="${index}"]`)?.value?.trim() || match.away || "";
+      const home = root?.querySelector(`[data-edit-field="home"][data-index="${index}"]`)?.value?.trim() || match.home || "";
+      const away = root?.querySelector(`[data-edit-field="away"][data-index="${index}"]`)?.value?.trim() || match.away || "";
       const date = root?.querySelector(`input[data-edit-field="date"][data-index="${index}"]`)?.value || match.date || "";
       const time = root?.querySelector(`input[data-edit-field="time"][data-index="${index}"]`)?.value || match.time || "";
       const court = root?.querySelector(`input[data-edit-field="court"][data-index="${index}"]`)?.value?.trim() || match.court || "";
