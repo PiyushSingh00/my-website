@@ -885,3 +885,39 @@
 .section-head + #team-setup-content {
   margin-top: 4px;
 }
+
+.team-player-row {
+  justify-content: flex-start;
+}
+
+.team-player-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.team-manual-add {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-manual-select {
+  min-width: 240px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(5, 11, 24, 0.96);
+  color: var(--text);
+  font: inherit;
+}
+
+.team-manual-select:focus {
+  outline: none;
+  border-color: rgba(77, 208, 225, 0.6);
+  box-shadow: 0 0 0 3px rgba(77, 208, 225, 0.12);
+}

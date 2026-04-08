@@ -1122,6 +1122,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     await saveCaptainStateToDb();
   }
 
+  function getManualAddEligiblePlayers(captainPlayerId) {
+    const captainIds = new Set([
+      ...(captainState.selectedCaptainIds || []).map((id) => String(id)),
+      ...(captainState.confirmedCaptains || []).map((c) => String(c?.playerId || "")),
+    ]);
+
+    const captain = captainState.confirmedCaptains.find(
+      (c) => String(c.playerId) === String(captainPlayerId)
+    );
+
+    const existingNames = new Set(
+      getCaptainSubmittedPlayers(captain).map((name) => String(name || "").trim().toLowerCase())
+    );
+
+    return (allPlayers || []).filter((player) => {
+      const playerId = String(getPlayerId(player) || "");
+      const playerName = String(getPlayerDisplayName(player) || "").trim();
+
+      if (!playerId || !playerName) return false;
+      if (captainIds.has(playerId)) return false; // exclude all captains
+      if (normalizeStatusPlayersPage(player) === "rejected") return false;
+      if (existingNames.has(playerName.toLowerCase())) return false;
+
+      return true;
+    });
+  }
+
+  async function addManualPlayerToCaptainTeam(captainPlayerId, addedPlayerId) {
+    const captain = captainState.confirmedCaptains.find(
+      (c) => String(c.playerId) === String(captainPlayerId)
+    );
+    if (!captain) throw new Error("Team not found.");
+
+    const player = (allPlayers || []).find(
+      (p) => String(getPlayerId(p)) === String(addedPlayerId)
+    );
+    if (!player) throw new Error("Player not found.");
+
+    const playerName = String(getPlayerDisplayName(player) || "").trim();
+    if (!playerName) throw new Error("Invalid player.");
+
+    const existing = getCaptainSubmittedPlayers(captain);
+    const existsAlready = existing.some(
+      (name) => String(name || "").trim().toLowerCase() === playerName.toLowerCase()
+    );
+    if (existsAlready) return;
+
+    captain.teamPlayers = [...existing, playerName];
+    await saveCaptainStateToDb();
+  }
+
   function openMakeCaptainsModal() {
     renderCaptainPickList();
     makeCaptainsModal?.classList.remove("hidden");
@@ -1260,33 +1311,39 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function renderCaptainsSummary() {
-    if (!captainsSummarySection) return;
-    captainsSummarySection.classList.remove("hidden");
-    captainsSummaryList.innerHTML = "";
-    syncTeamSetupUi();
+    if (!captainsSummaryList) return;
 
-    if (!captainState.confirmedCaptains.length) {
+    captainsSummaryList.innerHTML = "";
+
+    if (!Array.isArray(captainState.confirmedCaptains) || !captainState.confirmedCaptains.length) {
+      captainsSummarySection?.classList.add("hidden");
       captainsSummaryEmpty?.classList.remove("hidden");
       return;
     }
 
+    captainsSummarySection?.classList.remove("hidden");
     captainsSummaryEmpty?.classList.add("hidden");
 
     captainState.confirmedCaptains.forEach((captain) => {
       const playerId = String(captain.playerId || "");
       const expanded = expandedTeamIds.has(playerId);
       const teamPlayers = getCaptainSubmittedPlayers(captain);
-      const teamStatus = String(captain.teamStatus || "pending");
-      const statusChipClass = teamStatus === "accepted"
-        ? "status-pill status-pill--accepted"
-        : teamStatus === "rejected"
-          ? "status-pill status-pill--rejected"
-          : "status-pill status-pill--pending";
-      const statusChipText = teamStatus === "accepted"
-        ? "Team accepted"
-        : teamStatus === "rejected"
-          ? "Team rejected"
-          : "Team pending";
+      const eligiblePlayers = getManualAddEligiblePlayers(playerId);
+
+      const teamStatus = String(captain.teamStatus || "pending").toLowerCase();
+      const statusChipClass =
+        teamStatus === "accepted"
+          ? "status-pill status-pill--accepted"
+          : teamStatus === "rejected"
+            ? "status-pill status-pill--rejected"
+            : "status-pill status-pill--pending";
+
+      const statusChipText =
+        teamStatus === "accepted"
+          ? "Team accepted"
+          : teamStatus === "rejected"
+            ? "Team rejected"
+            : "Team pending";
 
       const card = document.createElement("div");
       card.className = "captain-summary-card team-setup-card";
@@ -1301,17 +1358,93 @@ document.addEventListener("DOMContentLoaded", async () => {
             <span class="team-name-chip team-toggle-chip">${expanded ? "▾" : "▸"}</span>
           </div>
         </button>
+
         <div class="team-setup-details${expanded ? "" : " hidden"}" data-team-card-body="${escapeHtml(playerId)}">
           <div class="helper-text team-setup-helper">Players submitted by captain</div>
-          ${teamPlayers.length
-            ? `<div class="team-player-list">${teamPlayers.map((name, idx) => `<div class="team-player-row"><span class="team-player-index">${idx + 1}</span><span class="team-player-name">${escapeHtml(name)}</span></div>`).join("")}</div>`
-            : `<div class="empty-state compact-empty team-setup-empty"><div class="feature-icon">👥</div><h3>No team list yet</h3><p class="muted">Team players from captain submission on join mode will appear here once linked.</p></div>`}
+
+          ${
+            teamPlayers.length
+              ? `
+                <div class="team-player-list">
+                  ${teamPlayers
+                    .map(
+                      (name, idx) => `
+                        <div class="team-player-row">
+                          <div class="team-player-main">
+                            <span class="team-player-index">${idx + 1}</span>
+                            <span class="team-player-name">${escapeHtml(name)}</span>
+                          </div>
+                        </div>
+                      `
+                    )
+                    .join("")}
+                </div>
+              `
+              : `
+                <div class="empty-state compact-empty team-setup-empty">
+                  <div class="feature-icon">👥</div>
+                  <h3>No team list yet</h3>
+                  <p class="muted">Team players from captain submission on join mode will appear here once linked.</p>
+                </div>
+              `
+          }
+
           <div class="row-actions team-setup-actions">
-            <button type="button" class="action-btn accept" data-team-status="accepted" data-team-player-id="${escapeHtml(playerId)}">Accept team</button>
-            <button type="button" class="action-btn reject" data-team-status="rejected" data-team-player-id="${escapeHtml(playerId)}">Reject team</button>
+            <button
+              type="button"
+              class="action-btn accept"
+              data-team-status="accepted"
+              data-team-player-id="${escapeHtml(playerId)}"
+            >
+              Accept team
+            </button>
+
+            <button
+              type="button"
+              class="action-btn reject"
+              data-team-status="rejected"
+              data-team-player-id="${escapeHtml(playerId)}"
+            >
+              Reject team
+            </button>
+
+            <button
+              type="button"
+              class="action-btn"
+              data-manual-toggle="${escapeHtml(playerId)}"
+            >
+              Add manually
+            </button>
+          </div>
+
+          <div class="team-manual-add hidden" data-manual-wrap="${escapeHtml(playerId)}">
+            <select class="team-manual-select" data-manual-select="${escapeHtml(playerId)}">
+              <option value="">Select player</option>
+              ${
+                eligiblePlayers.length
+                  ? eligiblePlayers
+                      .map((player) => {
+                        const eligibleId = String(getPlayerId(player) || "");
+                        const eligibleName = String(getPlayerDisplayName(player) || "").trim();
+                        return `<option value="${escapeHtml(eligibleId)}">${escapeHtml(eligibleName)}</option>`;
+                      })
+                      .join("")
+                  : `<option value="" disabled>No players available</option>`
+              }
+            </select>
+
+            <button
+              type="button"
+              class="action-btn"
+              data-manual-add="${escapeHtml(playerId)}"
+              ${eligiblePlayers.length ? "" : "disabled"}
+            >
+              Add
+            </button>
           </div>
         </div>
       `;
+
       captainsSummaryList.appendChild(card);
     });
 
@@ -1319,8 +1452,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       btn.addEventListener("click", () => {
         const playerId = String(btn.getAttribute("data-team-card-toggle") || "");
         if (!playerId) return;
+
         if (expandedTeamIds.has(playerId)) expandedTeamIds.delete(playerId);
         else expandedTeamIds.add(playerId);
+
         renderCaptainsSummary();
       });
     });
@@ -1328,14 +1463,56 @@ document.addEventListener("DOMContentLoaded", async () => {
     captainsSummaryList.querySelectorAll("[data-team-status]").forEach((btn) => {
       btn.addEventListener("click", async (event) => {
         event.stopPropagation();
+
         const playerId = String(btn.getAttribute("data-team-player-id") || "");
         const nextStatus = String(btn.getAttribute("data-team-status") || "pending");
         if (!playerId) return;
+
         try {
           await updateCaptainTeamStatus(playerId, nextStatus);
           renderCaptainsSummary();
         } catch (err) {
           alert(err.message || "Could not update team status.");
+        }
+      });
+    });
+
+    captainsSummaryList.querySelectorAll("[data-manual-toggle]").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+
+        const playerId = String(btn.getAttribute("data-manual-toggle") || "");
+        if (!playerId) return;
+
+        const wrap = captainsSummaryList.querySelector(
+          `[data-manual-wrap="${CSS.escape(playerId)}"]`
+        );
+        wrap?.classList.toggle("hidden");
+      });
+    });
+
+    captainsSummaryList.querySelectorAll("[data-manual-add]").forEach((btn) => {
+      btn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+
+        const playerId = String(btn.getAttribute("data-manual-add") || "");
+        if (!playerId) return;
+
+        const select = captainsSummaryList.querySelector(
+          `[data-manual-select="${CSS.escape(playerId)}"]`
+        );
+        const addedPlayerId = String(select?.value || "");
+
+        if (!addedPlayerId) {
+          alert("Please select a player first.");
+          return;
+        }
+
+        try {
+          await addManualPlayerToCaptainTeam(playerId, addedPlayerId);
+          renderCaptainsSummary();
+        } catch (err) {
+          alert(err.message || "Could not add player manually.");
         }
       });
     });
