@@ -190,6 +190,153 @@ document.addEventListener("DOMContentLoaded", async () => {
     return data;
   }
 
+  async function apiPost(url, body) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + getToken(),
+      },
+      body: JSON.stringify(body || {}),
+    });
+
+    const raw = await res.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = { _nonJson: true, raw };
+    }
+
+    if (!res.ok) {
+      throw new Error(`POST ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`);
+    }
+    return data;
+  }
+
+  function unwrapFixturesPayload(raw) {
+    return raw?.data?.data || raw?.data || raw || null;
+  }
+
+  function getTeamAggregateStatus(teamTieState) {
+    const categories = toArray(teamTieState?.categories);
+    if (!categories.length) return "pending";
+
+    const allCompleted = categories.every((category) => category?.categoryLocked || category?.winnerSide);
+    if (allCompleted) return "completed";
+
+    const anyProgress = categories.some((category) => {
+      if (!category || typeof category !== "object") return false;
+      if (category.lineupStatus === "accepted") return true;
+      if (category.categoryLocked) return true;
+      if (category.winnerSide) return true;
+      if (safeText(category.homePlayer) || safeText(category.awayPlayer)) return true;
+
+      const totals = getCategoryMatchPoints(category);
+      if (Number(totals?.home || 0) > 0 || Number(totals?.away || 0) > 0) return true;
+
+      const sportData = category.sportData || {};
+      if (sportData.currentSetIndex != null) return true;
+      if (
+        Array.isArray(sportData.sets) &&
+        sportData.sets.some(
+          (set) =>
+            Number(set?.homePoints || 0) > 0 ||
+            Number(set?.awayPoints || 0) > 0 ||
+            set?.started ||
+            set?.completed
+        )
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
+    return anyProgress ? "live" : "pending";
+  }
+
+  function getTeamAggregateWinner(summary, status) {
+    if (status !== "completed") return null;
+
+    const homeCategoryWins = Number(summary?.homeCategoryWins ?? summary?.homeWins ?? 0);
+    const awayCategoryWins = Number(summary?.awayCategoryWins ?? summary?.awayWins ?? 0);
+
+    if (homeCategoryWins > awayCategoryWins) return homeLabel;
+    if (awayCategoryWins > homeCategoryWins) return awayLabel;
+
+    const homeMatchPoints = Number(summary?.homeMatchPoints ?? summary?.homePoints ?? 0);
+    const awayMatchPoints = Number(summary?.awayMatchPoints ?? summary?.awayPoints ?? 0);
+
+    if (homeMatchPoints > awayMatchPoints) return homeLabel;
+    if (awayMatchPoints > homeMatchPoints) return awayLabel;
+
+    return null;
+  }
+
+  async function patchFixtureStatusInBackend({
+    explicitCategoryId,
+    roundIndex,
+    matchIndex,
+    status,
+    winnerName = null,
+    computed = null,
+  }) {
+    try {
+      const rawFixtures = await apiGet(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`
+      );
+      const fixturesDoc = unwrapFixturesPayload(rawFixtures);
+      if (!fixturesDoc?.categories) return;
+
+      const found = findFirstMatch(fixturesDoc, explicitCategoryId, roundIndex, matchIndex);
+      if (!found?.match) return;
+
+      const targetCategoryId = found.categoryId;
+      const targetMatch = found.match;
+
+      targetMatch.status = status || "pending";
+      if (winnerName) targetMatch.winner = winnerName;
+      else delete targetMatch.winner;
+
+      targetMatch.score =
+        targetMatch.score && typeof targetMatch.score === "object" ? targetMatch.score : {};
+      targetMatch.score.computed = {
+        ...(targetMatch.score.computed || {}),
+        ...(computed || {}),
+        status: status || "pending",
+        winnerName: winnerName || null,
+      };
+
+      const categoryBucket = fixturesDoc.categories?.[targetCategoryId];
+      if (Array.isArray(categoryBucket?.matches) && categoryBucket.matches[matchIndex]) {
+        categoryBucket.matches[matchIndex].status = targetMatch.status;
+        if (winnerName) categoryBucket.matches[matchIndex].winner = winnerName;
+        else delete categoryBucket.matches[matchIndex].winner;
+
+        categoryBucket.matches[matchIndex].score =
+          categoryBucket.matches[matchIndex].score &&
+          typeof categoryBucket.matches[matchIndex].score === "object"
+            ? categoryBucket.matches[matchIndex].score
+            : {};
+
+        categoryBucket.matches[matchIndex].score.computed = {
+          ...(categoryBucket.matches[matchIndex].score.computed || {}),
+          ...(computed || {}),
+          status: status || "pending",
+          winnerName: winnerName || null,
+        };
+      }
+
+      await apiPost(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
+        fixturesDoc
+      );
+    } catch (err) {
+      console.warn("Could not patch fixture status in fixtures backend", err);
+    }
+  }
+
   function clear(el) {
     if (el) el.innerHTML = "";
   }
@@ -1735,32 +1882,52 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
         }
 
-        if (!hasSubmatches) {
-          const aggregatePayload = {
-            tournamentId,
-            categoryId: resolvedCategoryId,
+          if (!hasSubmatches) {
+            const aggregatePayload = {
+              tournamentId,
+              categoryId: resolvedCategoryId,
+              roundIndex,
+              matchIndex,
+              round: roundIndex,
+              match: matchIndex,
+              scoreIndex: 0,
+              score: {
+                config: { targetPoints: Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1)), winByTwo: false },
+                state: {
+                  A: { points: Number(summary.homeMatchPoints || 0) },
+                  B: { points: Number(summary.awayMatchPoints || 0) },
+                  meta: { teamTieState },
+                },
+                computed: {
+                  status: summary.allCompleted ? "completed" : (summary.readyLineups ? "live" : "pending"),
+                  winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
+                  winnerName: summary.homeWins > summary.awayWins ? homeLabel : summary.awayWins > summary.homeWins ? awayLabel : null,
+                },
+              },
+            };
+            await apiPut(candidateUrls[0], aggregatePayload);
+          }
+
+          const aggregateStatus = getTeamAggregateStatus(teamTieState);
+          const aggregateWinner = getTeamAggregateWinner(summary, aggregateStatus);
+
+          await patchFixtureStatusInBackend({
+            explicitCategoryId: resolvedCategoryId,
             roundIndex,
             matchIndex,
-            round: roundIndex,
-            match: matchIndex,
-            scoreIndex: 0,
-            score: {
-              config: { targetPoints: Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1)), winByTwo: false },
-              state: {
-                A: { points: Number(summary.homeMatchPoints || 0) },
-                B: { points: Number(summary.awayMatchPoints || 0) },
-                meta: { teamTieState },
-              },
-              computed: {
-                status: summary.allCompleted ? "completed" : (summary.readyLineups ? "live" : "pending"),
-                winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
-                winnerName: summary.homeWins > summary.awayWins ? homeLabel : summary.awayWins > summary.homeWins ? awayLabel : null,
-              },
+            status: aggregateStatus,
+            winnerName: aggregateWinner,
+            computed: {
+              status: aggregateStatus,
+              winnerName: aggregateWinner,
+              homeCategoryWins: Number(summary?.homeCategoryWins ?? summary?.homeWins ?? 0),
+              awayCategoryWins: Number(summary?.awayCategoryWins ?? summary?.awayWins ?? 0),
+              homeMatchPoints: Number(summary?.homeMatchPoints ?? summary?.homePoints ?? 0),
+              awayMatchPoints: Number(summary?.awayMatchPoints ?? summary?.awayPoints ?? 0),
+              tieLocked: Boolean(teamTieState?.tieLocked),
             },
-          };
-          await apiPut(candidateUrls[0], aggregatePayload);
-        }
-      } catch (err) {
+          });
+        } catch (err) {
         console.error(err);
         if (!silent) alert(err?.message || "Could not auto-save tie data.");
       } finally {
@@ -2304,6 +2471,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!silent) alert(lastError?.message || "Could not save score.");
       return;
     }
+
+    await patchFixtureStatusInBackend({
+      explicitCategoryId: resolvedCategoryId,
+      roundIndex,
+      matchIndex,
+      status: computed?.status || "pending",
+      winnerName: computed?.winnerName || null,
+      computed,
+    });
 
     if (saveMsg) saveMsg.textContent = "Saved";
     suppressIndividualAutoSave = true;

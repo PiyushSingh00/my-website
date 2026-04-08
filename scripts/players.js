@@ -629,19 +629,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     return "pending";
   }
 
-  function getMatchStatus(match, roundIndex = 0, matchIndex = 0) {
-    const raw = String(match?.status || match?.score?.computed?.status || "").trim().toLowerCase();
-    if (["completed", "complete", "done", "finished"].includes(raw) || match?.winner) return "completed";
-    if (["live", "in_progress", "in-progress", "ongoing", "started"].includes(raw)) return "live";
+    function getMatchStatus(match, roundIndex = 0, matchIndex = 0) {
+      const raw = String(match?.status || match?.score?.computed?.status || "").trim().toLowerCase();
+      if (["completed", "complete", "done", "finished"].includes(raw) || match?.winner) return "completed";
+      if (["live", "in_progress", "in-progress", "ongoing", "started"].includes(raw)) return "live";
 
-    if (isTournamentTeamEvent()) {
-      const stored = readStoredTeamTieState(roundIndex, matchIndex);
-      return getTeamTieStatusFromState(stored);
+      if (match?.score?.state) return "live";
+      return "pending";
     }
-
-    if (match?.score?.state) return "live";
-    return "pending";
-  }
 
   function getStatusPillMarkup(status) {
     const key = status === "completed" ? "accepted" : status === "live" ? "live" : "pending";
@@ -2625,6 +2620,54 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  let fixturesBackendPollTimer = null;
+
+  async function refreshFixturesFromBackendSilently() {
+    if (fixturesState.bulkEditMode) return;
+
+    const existing = await loadFixturesFromDb();
+    if (!existing) return;
+
+    fixturesState.fixtures = migrateFixtures(existing);
+
+    if (isTournamentTeamEvent()) {
+      fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
+      renderCategoryToggles();
+      if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
+      renderTeamEventFixtures();
+      updateFixturesEditButtonState();
+      return;
+    }
+
+    renderCategoryToggles();
+
+    if (fixturesState.activeCategoryId) {
+      if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
+      renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
+    } else if (fixturesUi.noneSelectedEl) {
+      fixturesUi.noneSelectedEl.style.display = "flex";
+    }
+
+    updateFixturesEditButtonState();
+  }
+
+  function startFixturesBackendPolling() {
+    if (fixturesBackendPollTimer) clearInterval(fixturesBackendPollTimer);
+
+    fixturesBackendPollTimer = setInterval(async () => {
+      if (document.hidden) return;
+      if (isFixturesCollapsed) return;
+      if (fixturesState.bulkEditMode) return;
+      if (!fixturesUi.wrap || fixturesUi.wrap.classList.contains("hidden")) return;
+
+      try {
+        await refreshFixturesFromBackendSilently();
+      } catch (err) {
+        console.warn("Fixture polling failed", err);
+      }
+    }, 4000);
+  }
+
   async function openAndLoadFixtures() {
     fixturesUi.wrap?.classList.remove("hidden");
     await initFixturesIfNeeded();
@@ -2678,4 +2721,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   syncTeamSetupUi();
   syncLeaderboardUi();
   syncFixturesUi();
+  startFixturesBackendPolling();
 });
