@@ -586,6 +586,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       completed: Boolean(set.completed),
       currentServer: set.currentServer || null,
       currentServerName: set.currentServerName || null,
+      currentReceiver: set.currentReceiver || null,
+      currentReceiverName: set.currentReceiverName || null,
       homePoints: Number(set.homePoints || 0),
       awayPoints: Number(set.awayPoints || 0),
       winnerSide: set.winnerSide || null,
@@ -603,6 +605,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       startingServer: null,
       startingServerPlayer: null,
       nextServerIndex: { A: 0, B: 0 },
+      startingReceiver: null,
+      startingReceiverPlayer: null,
+      nextReceiverIndex: { A: 0, B: 0 },
       currentSetIndex: null,
       categoryLocked: false,
       sets: Array.from({ length: totalSets }, (_, index) => ({
@@ -611,6 +616,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         completed: false,
         currentServer: null,
         currentServerName: null,
+        currentReceiver: null,
+        currentReceiverName: null,  
         homePoints: 0,
         awayPoints: 0,
         winnerSide: null,
@@ -634,6 +641,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         completed: false,
         currentServer: null,
         currentServerName: null,
+        currentReceiver: null,
+        currentReceiverName: null,
         homePoints: 0,
         awayPoints: 0,
         winnerSide: null,
@@ -654,6 +663,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       startingServer: existing.startingServer || null,
       startingServerPlayer: existing.startingServerPlayer || null,
       nextServerIndex: existing.nextServerIndex || { A: 0, B: 0 },
+      startingReceiver: existing.startingReceiver || null,
+      startingReceiverPlayer: existing.startingReceiverPlayer || null,
+      nextReceiverIndex: existing.nextReceiverIndex || { A: 0, B: 0 },
       currentSetIndex,
       categoryLocked: Boolean(existing.categoryLocked),
       sets,
@@ -786,6 +798,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     return nextPlayer;
   }
 
+  function getNextReceiverForSide(category, pickleballData, side) {
+    const labels = getPickleballPlayerLabels(category, "Home", "Away");
+    const players = side === "A" ? labels.homePlayers : labels.awayPlayers;
+    if (!players.length) return side === "A" ? labels.homePlayerLabel : labels.awayPlayerLabel;
+
+    pickleballData.nextReceiverIndex = pickleballData.nextReceiverIndex || { A: 0, B: 0 };
+    const nextIndex = Number(pickleballData.nextReceiverIndex[side] || 0) % players.length;
+    const nextPlayer = players[nextIndex];
+    pickleballData.nextReceiverIndex[side] = (nextIndex + 1) % players.length;
+    return nextPlayer;
+  }
+
   function hasAnyPickleballSetStarted(pickleballData) {
     return toArray(pickleballData?.sets).some((set) => set?.started);
   }
@@ -833,11 +857,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         return { chipClass: "category-result-chip pending", text: `Sets ${aWins}-${bWins}` };
       }
 
-      if (pb.tossWinner || pb.startingServer || pb.startingServerPlayer) {
+      if (
+        pb.tossWinner &&
+        pb.startingServer &&
+        pb.startingServerPlayer &&
+        pb.startingReceiver &&
+        pb.startingReceiverPlayer
+      ) {
         return { chipClass: "category-result-chip pending", text: "Ready to start 1st set" };
       }
 
-      return { chipClass: "category-result-chip pending", text: "Awaiting toss & first server" };
+      return {
+        chipClass: "category-result-chip pending",
+        text: "Awaiting toss, first server & first receiver",
+      };
     }
 
     return { chipClass: "category-result-chip pending", text: "Ready to score" };
@@ -1081,6 +1114,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       ...homePlayers.map((name) => ({ side: "A", name })),
       ...awayPlayers.map((name) => ({ side: "B", name })),
     ];
+    const receiverOptions =
+      pb.startingServer === "A"
+        ? awayPlayers.map((name) => ({ side: "B", name }))
+        : pb.startingServer === "B"
+          ? homePlayers.map((name) => ({ side: "A", name }))
+          : [];
 
     const declareWinnerRow =
       !pb.categoryLocked && (aWins >= neededWins || bWins >= neededWins)
@@ -1109,6 +1148,19 @@ document.addEventListener("DOMContentLoaded", async () => {
           })
           .join("")
       : `<option value="">Select server</option>`;
+
+    const receiverSelectOptions = receiverOptions.length
+      ? receiverOptions
+          .map((option) => {
+            const value = `${option.side}::${option.name}`;
+            const selected =
+              pb.startingReceiver === option.side && pb.startingReceiverPlayer === option.name
+                ? "selected"
+                : "";
+            return `<option value="${escapeHtml(value)}" ${selected}>${escapeHtml(option.name)}</option>`;
+          })
+          .join("")
+      : `<option value="">Select receiver</option>`;
 
     return `
       <div class="preset-sport-tag">Team Event Pickleball</div>
@@ -1154,6 +1206,19 @@ document.addEventListener("DOMContentLoaded", async () => {
               ${serverSelectOptions}
             </select>
           </div>
+
+          <div class="pickle-choice-group pickle-server-picker">
+            <div class="pickle-choice-label">Who is receiving first?</div>
+            <select
+              class="pickle-server-select"
+              data-pickle-action="pick-receiver-name"
+              ${setupLocked || !pb.startingServer ? "disabled" : ""}
+            >
+              <option value="">Select player</option>
+              ${receiverSelectOptions}
+            </select>
+          </div>
+
         </div>
 
         <div class="pickle-next-set-row">
@@ -1162,9 +1227,14 @@ document.addEventListener("DOMContentLoaded", async () => {
               ? `<div class="pickle-locked-note">Category locked after winner declaration.</div>`
               : currentSet && currentSet.started && !currentSet.completed
                 ? `<div class="pickle-note">${escapeHtml(ordinal(currentSet.number))} set is live.</div>`
-                : pb.tossWinner && pb.startingServer && pb.startingServerPlayer && nextSetIndex !== -1
+                : pb.tossWinner &&
+                  pb.startingServer &&
+                  pb.startingServerPlayer &&
+                  pb.startingReceiver &&
+                  pb.startingReceiverPlayer &&
+                  nextSetIndex !== -1
                   ? `<button type="button" class="pickle-start-set-btn" data-pickle-action="start-set" data-set-index="${nextSetIndex}">Start ${escapeHtml(ordinal(nextSetIndex + 1))} Set</button>`
-                  : `<div class="pickle-note">Select toss winner and the exact first server to begin.</div>`
+                  : `<div class="pickle-note">Select toss winner, first server, and first receiver to begin.</div>`
           }
         </div>
       </div>
@@ -1316,6 +1386,42 @@ document.addEventListener("DOMContentLoaded", async () => {
         const players = side === "A" ? labels.homePlayers : labels.awayPlayers;
         const idx = Math.max(0, players.indexOf(name));
         pb.nextServerIndex[side || "A"] = players.length ? (idx + 1) % players.length : 0;
+        
+        pb.startingReceiver = null;
+        pb.startingReceiverPlayer = null;
+
+        const oppositeSide = side === "A" ? "B" : "A";
+        const oppositePlayers = oppositeSide === "A" ? labels.homePlayers : labels.awayPlayers;
+        if (oppositePlayers.length) {
+          pb.startingReceiver = oppositeSide;
+          pb.startingReceiverPlayer = oppositePlayers[0];
+          pb.nextReceiverIndex = pb.nextReceiverIndex || { A: 0, B: 0 };
+          pb.nextReceiverIndex[oppositeSide] = 1 % oppositePlayers.length;
+        }
+
+        category.sportData = pb;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-pickle-action="pick-receiver-name"]').forEach((select) => {
+      select.addEventListener("change", () => {
+        const raw = String(select.value || "");
+        const pb = ensurePickleballTeamData(category.sportData, fixtures);
+        if (hasAnyPickleballSetStarted(pb) || teamTieState.tieLocked) return;
+
+        const [side, ...rest] = raw.split("::");
+        const name = rest.join("::");
+
+        pb.startingReceiver = side || null;
+        pb.startingReceiverPlayer = name || null;
+        pb.nextReceiverIndex = pb.nextReceiverIndex || { A: 0, B: 0 };
+
+        const labels = getPickleballPlayerLabels(category, "Home", "Away");
+        const players = side === "A" ? labels.homePlayers : labels.awayPlayers;
+        const idx = Math.max(0, players.indexOf(name));
+        pb.nextReceiverIndex[side || "A"] = players.length ? (idx + 1) % players.length : 0;
+
         category.sportData = pb;
         rerender();
       });
@@ -1621,7 +1727,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pb = ensurePickleballTeamData(category?.sportData, fixtures);
 
     if (pb.categoryLocked || category?.categoryLocked) return;
-    if (!pb.tossWinner || !pb.startingServer || !pb.startingServerPlayer) return;
+    if (
+      !pb.tossWinner ||
+      !pb.startingServer ||
+      !pb.startingServerPlayer ||
+      !pb.startingReceiver ||
+      !pb.startingReceiverPlayer
+    ) return;
     if (!Number.isInteger(setIndex) || setIndex < 0 || setIndex >= pb.sets.length) return;
 
     const set = pb.sets[setIndex];
@@ -1646,6 +1758,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     set.completed = false;
     set.currentServer = pb.startingServer;
     set.currentServerName = pb.startingServerPlayer;
+    set.currentReceiver = pb.startingReceiver;
+    set.currentReceiverName = pb.startingReceiverPlayer;
     set.homePoints = Number(set.homePoints || 0);
     set.awayPoints = Number(set.awayPoints || 0);
     set.winnerSide = null;
@@ -1678,6 +1792,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
       set.currentServer = winnerSide;
       set.currentServerName = getNextServerForSide(category, pb, winnerSide);
+
+      const receiverSide = winnerSide === "A" ? "B" : "A";
+      set.currentReceiver = receiverSide;
+      set.currentReceiverName = getNextReceiverForSide(category, pb, receiverSide);
     }
 
     const target = Number(pb.targetPoints || 11);
@@ -1710,6 +1828,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     set.completed = Boolean(previous.snapshot.completed);
     set.currentServer = previous.snapshot.currentServer || null;
     set.currentServerName = previous.snapshot.currentServerName || null;
+    set.currentReceiver = previous.snapshot.currentReceiver || null;
+    set.currentReceiverName = previous.snapshot.currentReceiverName || null;
     set.homePoints = Number(previous.snapshot.homePoints || 0);
     set.awayPoints = Number(previous.snapshot.awayPoints || 0);
     set.winnerSide = previous.snapshot.winnerSide || null;
@@ -1735,6 +1855,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       completed: false,
       currentServer: null,
       currentServerName: null,
+      currentReceiver: null,
+      currentReceiverName: null,
       homePoints: 0,
       awayPoints: 0,
       winnerSide: null,
