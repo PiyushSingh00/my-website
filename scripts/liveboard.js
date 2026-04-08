@@ -569,22 +569,149 @@ document.addEventListener("DOMContentLoaded", async () => {
     return null;
   }
 
-  async function loadLeaderboardRows(categoryId) {
-    if (!categoryId) return [];
-    const urls = [
-      `/api/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`,
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`,
-    ];
+    function isTournamentTeamEventLiveboard() {
+    const rawType = String(
+      state.tournamentMeta?.tournamentType ||
+      state.fixtures?.tournamentType ||
+      state.fixtures?.meta?.tournamentType ||
+      state.fixtures?.tournament?.tournamentType ||
+      ""
+    ).toLowerCase();
 
-    for (const url of urls) {
-      const response = await apiGet(url);
-      if (!response.ok) continue;
-      const parsed = unwrapPayload(response.data);
-      if (Array.isArray(parsed?.rows)) return parsed.rows;
-      if (Array.isArray(parsed?.data)) return parsed.data;
-      if (Array.isArray(parsed)) return parsed;
+    if (rawType.includes("team")) return true;
+
+    const entries = getFixtureCategoryEntries();
+    return entries.some((entry) => {
+      const displayMode = String(entry?.cat?.displayMode || "").toLowerCase();
+      return displayMode === "team_schedule" || String(entry?.id) === TEAM_EVENT_CATEGORY_ID;
+    });
+  }
+
+  function getTeamEventFixtureBucket() {
+    const entries = getFixtureCategoryEntries();
+    const found = entries.find((entry) => {
+      const displayMode = String(entry?.cat?.displayMode || "").toLowerCase();
+      return displayMode === "team_schedule" || String(entry?.id) === TEAM_EVENT_CATEGORY_ID;
+    });
+    return found?.cat || null;
+  }
+
+  function isRealLeaderboardTeamName(name) {
+    const value = String(name || "").trim();
+    const upper = value.toUpperCase();
+    return Boolean(value && upper !== "BYE" && upper !== "TBD");
+  }
+
+  function getFixtureMatchPoints(match, side) {
+    const computed = match?.score?.computed || {};
+    const stateScore = match?.score?.state || {};
+
+    const candidates = side === "home"
+      ? [
+          computed.homeMatchPoints,
+          computed.homePoints,
+          stateScore?.A?.points,
+          stateScore?.home?.points,
+        ]
+      : [
+          computed.awayMatchPoints,
+          computed.awayPoints,
+          stateScore?.B?.points,
+          stateScore?.away?.points,
+        ];
+
+    for (const value of candidates) {
+      const num = Number(value);
+      if (Number.isFinite(num)) return num;
     }
 
+    return 0;
+  }
+
+  function buildTeamLeaderboardRowsFromFixturesLiveboard() {
+    const cat = getTeamEventFixtureBucket();
+    const matches = Array.isArray(cat?.matches)
+      ? cat.matches
+      : Array.isArray(cat?.rounds?.[0])
+        ? cat.rounds[0]
+        : [];
+
+    const stats = new Map();
+
+    function ensureTeam(teamName) {
+      const key = String(teamName || "").trim();
+      if (!isRealLeaderboardTeamName(key)) return null;
+
+      if (!stats.has(key)) {
+        stats.set(key, {
+          rank: 0,
+          teamName: key,
+          matchPoints: 0,
+          matchesPlayed: 0,
+          qualified: false,
+        });
+      }
+
+      return stats.get(key);
+    }
+
+    matches.forEach((match, matchIndex) => {
+      const homeTeam = String(match?.home || "").trim();
+      const awayTeam = String(match?.away || "").trim();
+
+      const homeRow = ensureTeam(homeTeam);
+      const awayRow = ensureTeam(awayTeam);
+
+      if (homeRow) {
+        homeRow.matchPoints += getFixtureMatchPoints(match, "home");
+      }
+
+      if (awayRow) {
+        awayRow.matchPoints += getFixtureMatchPoints(match, "away");
+      }
+
+      const status = getTeamScheduleStatus(match, 0, matchIndex);
+      const countsAsPlayed =
+        status !== "pending" &&
+        isRealLeaderboardTeamName(homeTeam) &&
+        isRealLeaderboardTeamName(awayTeam);
+
+      if (countsAsPlayed) {
+        if (homeRow) homeRow.matchesPlayed += 1;
+        if (awayRow) awayRow.matchesPlayed += 1;
+      }
+    });
+
+    const sorted = [...stats.values()].sort((a, b) => {
+      if (b.matchPoints !== a.matchPoints) return b.matchPoints - a.matchPoints;
+      if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed;
+      return a.teamName.localeCompare(b.teamName);
+    });
+
+    return sorted.map((row, index) => ({
+      ...row,
+      rank: index + 1,
+      qualified: index < 4,
+    }));
+  }
+
+  async function loadLeaderboardRows(categoryId) {
+    if (isTournamentTeamEventLiveboard()) {
+      return buildTeamLeaderboardRowsFromFixturesLiveboard();
+    }
+
+    if (!categoryId) return [];
+
+    const response = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`
+    );
+
+    if (!response.ok) return [];
+
+    const parsed = unwrapPayload(response.data);
+    if (Array.isArray(parsed?.rows)) return parsed.rows;
+    if (Array.isArray(parsed?.data)) return parsed.data;
+    if (Array.isArray(parsed)) return parsed;
     return [];
   }
 
@@ -809,59 +936,52 @@ document.addEventListener("DOMContentLoaded", async () => {
       .join("");
   }
 
-  function getRowTeamName(row) {
-    return row.teamName || row.team || row.name || row.captainName || "-";
-  }
+    function getRowTeamName(row) {
+      return row.teamName || row.team || "—";
+    }
 
-  function getRowMatchPoints(row) {
-    const candidates = [row.matchPoints, row.points, row.totalPoints, row.matchPoint, row.mp];
-    const found = candidates.find((value) => value !== undefined && value !== null && value !== "");
-    return found ?? 0;
-  }
+    function getRowMatchPoints(row) {
+      return Number(row.matchPoints ?? 0);
+    }
 
-  function getRowMatchesPlayed(row) {
-    const direct = [
-      row.matchesPlayed,
-      row.played,
-      row.matches,
-      row.matchPlayed,
-      row.matchCount,
-      row.mpPlayed,
-    ].find((value) => value !== undefined && value !== null && value !== "");
+    function getRowMatchesPlayed(row) {
+      return Number(row.matchesPlayed ?? 0);
+    }
 
-    if (direct !== undefined) return direct;
+    function getRowQualified(row) {
+      return row.qualified === true || row.qualified === "Yes";
+    }
 
-    const wins = Number(row.wins ?? row.matchesWon ?? row.won ?? 0);
-    const losses = Number(row.losses ?? row.matchesLost ?? row.lost ?? 0);
-    const draws = Number(row.draws ?? row.matchesDrawn ?? row.drawn ?? 0);
-    const total = wins + losses + draws;
-    return total > 0 ? total : "-";
-  }
+    async function renderLeaderboardBoard() {
+      leaderboardListEl.innerHTML = "";
 
-  function getRowQualified(row) {
-    return row.qualified === true || row.qualified === "Yes" || row.isQualified === true;
-  }
+      const entries = getFixtureCategoryEntries();
+      const filteredEntries = state.activeCategoryId
+        ? entries.filter((entry) => String(entry.id) === String(state.activeCategoryId))
+        : entries;
 
-  async function renderLeaderboardBoard() {
-    leaderboardListEl.innerHTML = "";
-    const entries = getFixtureCategoryEntries();
-    const filteredEntries = state.activeCategoryId
-      ? entries.filter((entry) => String(entry.id) === String(state.activeCategoryId))
-      : entries;
+      if (!filteredEntries.length) {
+        leaderboardEmptyEl?.classList.remove("hidden");
+        return;
+      }
 
-    const rowsByCategory = await Promise.all(filteredEntries.map(async (entry) => ({
-      entry,
-      rows: await loadLeaderboardRows(entry.id),
-    })));
+      const rowsByCategory = await Promise.all(
+        filteredEntries.map(async (entry) => ({
+          entry,
+          rows: await loadLeaderboardRows(entry.id),
+        }))
+      );
 
-    const populated = rowsByCategory.filter((item) => Array.isArray(item.rows) && item.rows.length);
-    leaderboardEmptyEl?.classList.toggle("hidden", populated.length > 0);
+      const populated = rowsByCategory.filter(
+        (item) => Array.isArray(item.rows) && item.rows.length
+      );
 
-    if (!populated.length) return;
+      leaderboardEmptyEl?.classList.toggle("hidden", populated.length > 0);
 
-    leaderboardListEl.innerHTML = populated
-      .map(({ entry, rows }) => {
-        return `
+      if (!populated.length) return;
+
+      leaderboardListEl.innerHTML = populated
+        .map(({ entry, rows }) => `
           <section class="leaderboard-card">
             <div class="leaderboard-head">
               <div>
@@ -902,10 +1022,9 @@ document.addEventListener("DOMContentLoaded", async () => {
               </table>
             </div>
           </section>
-        `;
-      })
-      .join("");
-  }
+        `)
+        .join("");
+    }
 
   function renderHeader() {
     titleEl.textContent = state.tournamentMeta?.tournamentName || "Live board";
