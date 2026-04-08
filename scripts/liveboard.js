@@ -110,10 +110,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function apiGet(url) {
-    const res = await fetch(url, {
+    const hasQuery = url.includes("?");
+    const freshUrl = `${url}${hasQuery ? "&" : "?"}_ts=${Date.now()}`;
+    const res = await fetch(freshUrl, {
       headers: {
         Authorization: "Bearer " + getToken(),
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
       },
+      cache: "no-store",
     });
 
     const raw = await res.text();
@@ -125,6 +130,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     return { ok: res.ok, status: res.status, data };
+  }
+
+  function unwrapPayload(raw) {
+    let current = raw;
+    for (let i = 0; i < 5; i += 1) {
+      if (!current || typeof current !== "object") break;
+      if (current.categories || current.rows || Array.isArray(current)) break;
+      if (current.data !== undefined) {
+        current = current.data;
+        continue;
+      }
+      break;
+    }
+    return current;
   }
 
   function escapeHtml(value) {
@@ -250,33 +269,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function getSimpleStatus(match) {
     const score = match?.score || {};
-    const computedStatus = String(score?.computed?.status || "").toLowerCase();
+    const computedStatus = String(score?.computed?.status || match?.status || "").toLowerCase();
     if (["completed", "live", "pending"].includes(computedStatus)) return computedStatus;
 
     const a = getBucketScore(score?.state?.A);
     const b = getBucketScore(score?.state?.B);
     if (a !== null || b !== null) return "live";
     return "pending";
-  }
-
-  function getTeamScheduleStatus(match) {
-    const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
-    if (!submatches.length) return getSimpleStatus(match);
-
-    let anyStarted = false;
-    let allCompleted = true;
-
-    submatches.forEach((submatch) => {
-      const score = submatch?.score || {};
-      const hasPoints = getBucketScore(score?.state?.A) !== null || getBucketScore(score?.state?.B) !== null;
-      const status = String(score?.computed?.status || (hasPoints ? "live" : "pending")).toLowerCase();
-      if (status !== "pending") anyStarted = true;
-      if (status !== "completed") allCompleted = false;
-    });
-
-    if (!anyStarted) return "pending";
-    if (allCompleted) return "completed";
-    return "live";
   }
 
   function getSafeJoinedNames(value, fallback = "") {
@@ -289,7 +288,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getSubmatchSnapshot(submatch) {
-    return submatch?.score?.state?.meta?.categorySnapshot || null;
+    return submatch?.score?.state?.meta?.categorySnapshot || submatch?.categorySnapshot || null;
   }
 
   function getSubmatchPlayerLabel(submatch, side, fallbackTeam) {
@@ -297,6 +296,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const direct = side === "A"
       ? [
           snapshot?.homePlayer,
+          snapshot?.homePlayersSelected,
           submatch?.homePlayer,
           submatch?.homeLineup,
           submatch?.homeName,
@@ -305,6 +305,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ]
       : [
           snapshot?.awayPlayer,
+          snapshot?.awayPlayersSelected,
           submatch?.awayPlayer,
           submatch?.awayLineup,
           submatch?.awayName,
@@ -324,6 +325,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return (
       String(
         snapshot?.name ||
+        snapshot?.categoryName ||
         submatch?.roundLabel ||
         submatch?.label ||
         submatch?.name ||
@@ -371,19 +373,182 @@ document.addEventListener("DOMContentLoaded", async () => {
     return finalEntries;
   }
 
+  function getTeamStorageKey(roundIndex, matchIndex) {
+    return `score_team_tie_state::${tournamentId}::${roundIndex}::${matchIndex}`;
+  }
+
+  function readLocalTeamTieState(roundIndex, matchIndex) {
+    try {
+      const raw = localStorage.getItem(getTeamStorageKey(roundIndex, matchIndex));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function getSubmatchStatus(submatch) {
+    const score = submatch?.score || {};
+    const hasPoints = getBucketScore(score?.state?.A) !== null || getBucketScore(score?.state?.B) !== null;
+    const status = String(score?.computed?.status || submatch?.status || (hasPoints ? "live" : "pending")).toLowerCase();
+    if (["live", "completed", "pending"].includes(status)) return status;
+    return hasPoints ? "live" : "pending";
+  }
+
+  function categoriesFromLocalTieState(localTieState, match) {
+    const categories = toArray(localTieState?.categories).map((category, index) => {
+      const totalsHome = Number(category?.sportData?.sets?.reduce?.((sum, set) => sum + Number(set?.homePoints || 0), 0) || 0);
+      const totalsAway = Number(category?.sportData?.sets?.reduce?.((sum, set) => sum + Number(set?.awayPoints || 0), 0) || 0);
+      return {
+        name: category?.name || category?.eventName || `Submatch ${index + 1}`,
+        homePlayer: getSafeJoinedNames(category?.homePlayersSelected || category?.homePlayer, match?.home || "Home"),
+        awayPlayer: getSafeJoinedNames(category?.awayPlayersSelected || category?.awayPlayer, match?.away || "Away"),
+        score: {
+          state: {
+            A: { points: Number.isFinite(totalsHome) ? totalsHome : 0 },
+            B: { points: Number.isFinite(totalsAway) ? totalsAway : 0 },
+            meta: { categorySnapshot: category },
+          },
+          computed: {
+            status: category?.winnerSide ? "completed" : ((category?.sportData?.currentSetIndex != null || totalsHome > 0 || totalsAway > 0) ? "live" : "pending"),
+            winnerSide: category?.winnerSide || null,
+          },
+        },
+      };
+    });
+
+    return categories;
+  }
+
+  function getTeamScheduleStatus(match, roundIndex, matchIndex) {
+    const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
+    if (submatches.length) {
+      let anyStarted = false;
+      let allCompleted = true;
+
+      submatches.forEach((submatch) => {
+        const status = getSubmatchStatus(submatch);
+        if (status !== "pending") anyStarted = true;
+        if (status !== "completed") allCompleted = false;
+      });
+
+      if (!anyStarted) return "pending";
+      if (allCompleted) return "completed";
+      return "live";
+    }
+
+    const matchStatus = String(match?.score?.computed?.status || match?.status || "").toLowerCase();
+    if (["live", "completed", "pending"].includes(matchStatus)) return matchStatus;
+
+    const localTieState = readLocalTeamTieState(roundIndex, matchIndex);
+    if (localTieState) {
+      const categories = toArray(localTieState?.categories);
+      if (categories.some((category) => category?.winnerSide || category?.categoryLocked)) return "live";
+      if (categories.some((category) => Number(category?.sportData?.currentSetIndex) >= 0)) return "live";
+      if (categories.some((category) => getSafeJoinedNames(category?.homePlayer) || getSafeJoinedNames(category?.awayPlayer))) return "live";
+    }
+
+    return "pending";
+  }
+
+  function getTeamTotals(match, roundIndex, matchIndex) {
+    const submatches = toArray(match?.submatches);
+    if (submatches.length) {
+      return submatches.reduce(
+        (acc, submatch) => {
+          const home = getBucketScore(submatch?.score?.state?.A);
+          const away = getBucketScore(submatch?.score?.state?.B);
+          const winnerSide = String(
+            submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || ""
+          ).toUpperCase();
+
+          if (home !== null) acc.homePoints += home;
+          if (away !== null) acc.awayPoints += away;
+          if (winnerSide === "A") acc.homeWins += 1;
+          if (winnerSide === "B") acc.awayWins += 1;
+          return acc;
+        },
+        { homePoints: 0, awayPoints: 0, homeWins: 0, awayWins: 0 }
+      );
+    }
+
+    const computed = match?.score?.computed || {};
+    const localTieState = readLocalTeamTieState(roundIndex, matchIndex);
+    const localCategories = toArray(localTieState?.categories);
+    if (localCategories.length) {
+      return localCategories.reduce((acc, category) => {
+        const sets = toArray(category?.sportData?.sets);
+        acc.homePoints += sets.reduce((sum, set) => sum + Number(set?.homePoints || 0), 0);
+        acc.awayPoints += sets.reduce((sum, set) => sum + Number(set?.awayPoints || 0), 0);
+        if (category?.winnerSide === "A") acc.homeWins += 1;
+        if (category?.winnerSide === "B") acc.awayWins += 1;
+        return acc;
+      }, { homePoints: 0, awayPoints: 0, homeWins: 0, awayWins: 0 });
+    }
+
+    return {
+      homePoints: Number(computed.homeMatchPoints ?? computed.homePoints ?? 0),
+      awayPoints: Number(computed.awayMatchPoints ?? computed.awayPoints ?? 0),
+      homeWins: Number(computed.homeCategoryWins ?? computed.homeWins ?? 0),
+      awayWins: Number(computed.awayCategoryWins ?? computed.awayWins ?? 0),
+    };
+  }
+
+  function pickFeaturedSubmatch(match, roundIndex, matchIndex) {
+    const submatches = toArray(match?.submatches);
+    if (submatches.length) {
+      const live = submatches.find((submatch) => getSubmatchStatus(submatch) === "live");
+      if (live) return live;
+
+      const completedWithPoints = submatches.find((submatch) => {
+        return getBucketScore(submatch?.score?.state?.A) !== null || getBucketScore(submatch?.score?.state?.B) !== null;
+      });
+      if (completedWithPoints) return completedWithPoints;
+
+      return submatches[0] || null;
+    }
+
+    const localTieState = readLocalTeamTieState(roundIndex, matchIndex);
+    const localSubmatches = categoriesFromLocalTieState(localTieState, match);
+    if (localSubmatches.length) {
+      const live = localSubmatches.find((submatch) => getSubmatchStatus(submatch) === "live");
+      if (live) return live;
+      return localSubmatches[0];
+    }
+
+    const computed = match?.score?.computed || {};
+    const fallbackHome = Number(computed.homeMatchPoints ?? computed.homePoints ?? 0);
+    const fallbackAway = Number(computed.awayMatchPoints ?? computed.awayPoints ?? 0);
+    return {
+      name: "Current tie total",
+      homePlayer: match?.home || "Home",
+      awayPlayer: match?.away || "Away",
+      score: {
+        state: {
+          A: { points: fallbackHome },
+          B: { points: fallbackAway },
+        },
+        computed: {
+          status: computed.status || match?.status || "live",
+        },
+      },
+    };
+  }
+
   async function loadTournamentMeta() {
     const direct = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}`);
-    if (direct.ok && direct.data) return direct.data;
+    const directParsed = unwrapPayload(direct.data);
+    if (direct.ok && directParsed) return directParsed;
 
     const fallback = await apiGet("/api/tournaments");
     if (!fallback.ok) return null;
-    const list = Array.isArray(fallback.data)
-      ? fallback.data
-      : Array.isArray(fallback.data?.data)
-        ? fallback.data.data
-        : Array.isArray(fallback.data?.tournaments)
-          ? fallback.data.tournaments
-          : [];
+    const parsed = unwrapPayload(fallback.data);
+    const list = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.tournaments)
+        ? parsed.tournaments
+        : [];
 
     return list.find((item) => String(item.tournamentId ?? item.id) === String(tournamentId)) || null;
   }
@@ -397,7 +562,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const url of urls) {
       const response = await apiGet(url);
       if (!response.ok) continue;
-      const parsed = response.data?.data || response.data || null;
+      const parsed = unwrapPayload(response.data);
       if (parsed?.categories) return migrateFixtures(parsed);
     }
 
@@ -414,55 +579,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const url of urls) {
       const response = await apiGet(url);
       if (!response.ok) continue;
-      if (Array.isArray(response.data?.rows)) return response.data.rows;
-      if (Array.isArray(response.data?.data)) return response.data.data;
-      if (Array.isArray(response.data)) return response.data;
+      const parsed = unwrapPayload(response.data);
+      if (Array.isArray(parsed?.rows)) return parsed.rows;
+      if (Array.isArray(parsed?.data)) return parsed.data;
+      if (Array.isArray(parsed)) return parsed;
     }
 
     return [];
-  }
-
-  function getSubmatchStatus(submatch) {
-    const score = submatch?.score || {};
-    const hasPoints = getBucketScore(score?.state?.A) !== null || getBucketScore(score?.state?.B) !== null;
-    const status = String(score?.computed?.status || (hasPoints ? "live" : "pending")).toLowerCase();
-    if (["live", "completed", "pending"].includes(status)) return status;
-    return hasPoints ? "live" : "pending";
-  }
-
-  function getTeamTotals(match) {
-    const submatches = toArray(match?.submatches);
-    return submatches.reduce(
-      (acc, submatch) => {
-        const home = getBucketScore(submatch?.score?.state?.A);
-        const away = getBucketScore(submatch?.score?.state?.B);
-        const winnerSide = String(
-          submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || ""
-        ).toUpperCase();
-
-        if (home !== null) acc.homePoints += home;
-        if (away !== null) acc.awayPoints += away;
-        if (winnerSide === "A") acc.homeWins += 1;
-        if (winnerSide === "B") acc.awayWins += 1;
-        return acc;
-      },
-      { homePoints: 0, awayPoints: 0, homeWins: 0, awayWins: 0 }
-    );
-  }
-
-  function pickFeaturedSubmatch(match) {
-    const submatches = toArray(match?.submatches);
-    if (!submatches.length) return null;
-
-    const live = submatches.find((submatch) => getSubmatchStatus(submatch) === "live");
-    if (live) return live;
-
-    const completedWithPoints = submatches.find((submatch) => {
-      return getBucketScore(submatch?.score?.state?.A) !== null || getBucketScore(submatch?.score?.state?.B) !== null;
-    });
-    if (completedWithPoints) return completedWithPoints;
-
-    return submatches[0] || null;
   }
 
   function getStatusClass(status) {
@@ -481,7 +604,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         toArray(round).forEach((match, matchIndex) => {
           const displayMode = String(entry.cat?.displayMode || "").toLowerCase();
           const isTeamSchedule = displayMode === "team_schedule" || String(entry.id) === TEAM_EVENT_CATEGORY_ID;
-          const status = isTeamSchedule ? getTeamScheduleStatus(match) : getSimpleStatus(match);
+          const status = isTeamSchedule
+            ? getTeamScheduleStatus(match, roundIndex, matchIndex)
+            : getSimpleStatus(match);
           if (status === "pending") return;
 
           cards.push({
@@ -554,10 +679,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     liveEmptyEl?.classList.add("hidden");
 
     liveListEl.innerHTML = cards
-      .map(({ entry, match, isTeamSchedule, status }) => {
+      .map(({ entry, match, isTeamSchedule, status, roundIndex, matchIndex }) => {
         if (isTeamSchedule) {
-          const featuredSubmatch = pickFeaturedSubmatch(match);
-          const totals = getTeamTotals(match);
+          const featuredSubmatch = pickFeaturedSubmatch(match, roundIndex, matchIndex);
+          const totals = getTeamTotals(match, roundIndex, matchIndex);
           const featuredStatus = getSubmatchStatus(featuredSubmatch);
           const featuredHomeScore = getBucketScore(featuredSubmatch?.score?.state?.A);
           const featuredAwayScore = getBucketScore(featuredSubmatch?.score?.state?.B);
@@ -570,7 +695,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               <div class="live-card-head">
                 <div class="live-card-badges">
                   <span class="badge">${escapeHtml(entry.label)}</span>
-                  <span class="badge">${escapeHtml(match?.matchNo || match?.matchNumber || `Match ${match?.matchId || ""}`)}</span>
+                  <span class="badge">${escapeHtml(match?.matchNo || match?.matchNumber || `Match ${matchIndex + 1}`)}</span>
                   ${match?.court ? `<span class="badge">${escapeHtml(match.court)}</span>` : ""}
                   ${match?.time ? `<span class="badge">${escapeHtml(match.time)}</span>` : ""}
                 </div>
@@ -684,6 +809,39 @@ document.addEventListener("DOMContentLoaded", async () => {
       .join("");
   }
 
+  function getRowTeamName(row) {
+    return row.teamName || row.team || row.name || row.captainName || "-";
+  }
+
+  function getRowMatchPoints(row) {
+    const candidates = [row.matchPoints, row.points, row.totalPoints, row.matchPoint, row.mp];
+    const found = candidates.find((value) => value !== undefined && value !== null && value !== "");
+    return found ?? 0;
+  }
+
+  function getRowMatchesPlayed(row) {
+    const direct = [
+      row.matchesPlayed,
+      row.played,
+      row.matches,
+      row.matchPlayed,
+      row.matchCount,
+      row.mpPlayed,
+    ].find((value) => value !== undefined && value !== null && value !== "");
+
+    if (direct !== undefined) return direct;
+
+    const wins = Number(row.wins ?? row.matchesWon ?? row.won ?? 0);
+    const losses = Number(row.losses ?? row.matchesLost ?? row.lost ?? 0);
+    const draws = Number(row.draws ?? row.matchesDrawn ?? row.drawn ?? 0);
+    const total = wins + losses + draws;
+    return total > 0 ? total : "-";
+  }
+
+  function getRowQualified(row) {
+    return row.qualified === true || row.qualified === "Yes" || row.isQualified === true;
+  }
+
   async function renderLeaderboardBoard() {
     leaderboardListEl.innerHTML = "";
     const entries = getFixtureCategoryEntries();
@@ -719,21 +877,19 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <th>Rank</th>
                     <th>Team</th>
                     <th>Match points</th>
-                    <th>Ties won</th>
-                    <th>Head-to-head</th>
+                    <th>Matches played</th>
                     <th>Qualified</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${rows.map((row, index) => {
-                    const qualified = row.qualified === true || row.qualified === "Yes";
+                    const qualified = getRowQualified(row);
                     return `
                       <tr>
                         <td>${escapeHtml(String(row.rank ?? index + 1))}</td>
-                        <td>${escapeHtml(row.teamName || row.team || "-")}</td>
-                        <td>${escapeHtml(String(row.matchPoints ?? 0))}</td>
-                        <td>${escapeHtml(String(row.tiesWon ?? 0))}</td>
-                        <td>${escapeHtml(String(row.headToHead ?? "-"))}</td>
+                        <td>${escapeHtml(getRowTeamName(row))}</td>
+                        <td>${escapeHtml(String(getRowMatchPoints(row)))}</td>
+                        <td>${escapeHtml(String(getRowMatchesPlayed(row)))}</td>
                         <td>
                           <span class="qualified-pill ${qualified ? "qualified-pill--yes" : "qualified-pill--no"}">
                             ${qualified ? "Yes" : "No"}
