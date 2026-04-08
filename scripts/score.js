@@ -1722,7 +1722,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   try {
     const fixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-    fixtures = fixturesResp?.ok ? fixturesResp.data : fixturesResp;
+    fixtures = unwrapFixturesPayload(fixturesResp);
   } catch (e) {
     console.error(e);
     titleEl.textContent = "Failed to load fixtures";
