@@ -667,6 +667,105 @@ document.addEventListener("DOMContentLoaded", async () => {
     return sorted.slice(0, fallbackCount);
   }
 
+    function isRealLeaderboardTeamName(name) {
+      const value = String(name || "").trim();
+      const upper = value.toUpperCase();
+      return Boolean(value && upper !== "BYE" && upper !== "TBD");
+    }
+
+    function getFixtureMatchPoints(match, side) {
+      const computed = match?.score?.computed || {};
+      const state = match?.score?.state || {};
+
+      const candidates = side === "home"
+        ? [
+            computed.homeMatchPoints,
+            computed.homePoints,
+            state?.A?.points,
+            state?.home?.points,
+          ]
+        : [
+            computed.awayMatchPoints,
+            computed.awayPoints,
+            state?.B?.points,
+            state?.away?.points,
+          ];
+
+      for (const value of candidates) {
+        const num = Number(value);
+        if (Number.isFinite(num)) return num;
+      }
+
+      return 0;
+    }
+
+    function buildTeamLeaderboardRowsFromFixtures() {
+      const cat = getTeamEventFixtureBucket();
+      const matches = Array.isArray(cat?.matches)
+        ? cat.matches
+        : Array.isArray(cat?.rounds?.[0])
+          ? cat.rounds[0]
+          : [];
+
+      const stats = new Map();
+
+      function ensureTeam(teamName) {
+        const key = String(teamName || "").trim();
+        if (!isRealLeaderboardTeamName(key)) return null;
+
+        if (!stats.has(key)) {
+          stats.set(key, {
+            rank: 0,
+            teamName: key,
+            matchPoints: 0,
+            matchesPlayed: 0,
+            qualified: false,
+          });
+        }
+
+        return stats.get(key);
+      }
+
+      matches.forEach((match, matchIndex) => {
+        const homeTeam = String(match?.home || "").trim();
+        const awayTeam = String(match?.away || "").trim();
+
+        const homeRow = ensureTeam(homeTeam);
+        const awayRow = ensureTeam(awayTeam);
+
+        if (homeRow) {
+          homeRow.matchPoints += getFixtureMatchPoints(match, "home");
+        }
+
+        if (awayRow) {
+          awayRow.matchPoints += getFixtureMatchPoints(match, "away");
+        }
+
+        const status = getMatchStatus(match, 0, matchIndex);
+        const countsAsPlayed =
+          status !== "pending" &&
+          isRealLeaderboardTeamName(homeTeam) &&
+          isRealLeaderboardTeamName(awayTeam);
+
+        if (countsAsPlayed) {
+          if (homeRow) homeRow.matchesPlayed += 1;
+          if (awayRow) awayRow.matchesPlayed += 1;
+        }
+      });
+
+      const sorted = [...stats.values()].sort((a, b) => {
+        if (b.matchPoints !== a.matchPoints) return b.matchPoints - a.matchPoints;
+        if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed;
+        return a.teamName.localeCompare(b.teamName);
+      });
+
+      return sorted.map((row, index) => ({
+        ...row,
+        rank: index + 1,
+        qualified: index < 4,
+      }));
+    }
+
   function buildSeededKnockoutRounds(teamNames) {
     const entrants = [...teamNames].filter(Boolean);
     if (entrants.length < 2) return null;
@@ -1742,48 +1841,65 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  async function loadLeaderboardFromDb() {
-    const categoryId = isTournamentTeamEvent()
-      ? TEAM_EVENT_CATEGORY_ID
-      : String(activeFilter === "all" ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "") : activeFilter);
+    async function loadLeaderboardFromDb() {
+      if (isTournamentTeamEvent()) {
+        leaderboardState.rows = buildTeamLeaderboardRowsFromFixtures();
+        return;
+      }
 
-    if (!categoryId) {
-      leaderboardState.rows = [];
-      return;
+      const categoryId = String(
+        activeFilter === "all"
+          ? (tournamentCategories?.[0]?.categoryId || tournamentCategories?.[0]?.id || "")
+          : activeFilter
+      );
+
+      if (!categoryId) {
+        leaderboardState.rows = [];
+        return;
+      }
+
+      const r = await apiGet(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`
+      );
+
+      leaderboardState.rows = r.ok
+        ? Array.isArray(r.data?.rows)
+          ? r.data.rows
+          : Array.isArray(r.data)
+            ? r.data
+            : []
+        : [];
     }
 
-    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`);
-    leaderboardState.rows = r.ok
-      ? Array.isArray(r.data?.rows)
-        ? r.data.rows
-        : Array.isArray(r.data)
-          ? r.data
-          : []
-      : [];
-  }
+    function renderLeaderboard() {
+      if (!leaderboardSection || !leaderboardTableBody) return;
 
-  function renderLeaderboard() {
-    if (!leaderboardSection || !leaderboardTableBody) return;
-    leaderboardTableBody.innerHTML = "";
-    if (!leaderboardState.rows.length) {
-      leaderboardTableBody.innerHTML = `<tr><td colspan="6" class="muted">No leaderboard data yet.</td></tr>`;
+      if (isTournamentTeamEvent()) {
+        leaderboardState.rows = buildTeamLeaderboardRowsFromFixtures();
+      }
+
+      leaderboardTableBody.innerHTML = "";
+
+      if (!leaderboardState.rows.length) {
+        leaderboardTableBody.innerHTML = `<tr><td colspan="5" class="muted">No leaderboard data yet.</td></tr>`;
+        updateGoToKnockoutButton();
+        return;
+      }
+
+      leaderboardState.rows.forEach((row, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(row.rank ?? idx + 1)}</td>
+          <td>${escapeHtml(row.teamName || row.team || "—")}</td>
+          <td>${escapeHtml(row.matchPoints ?? 0)}</td>
+          <td>${escapeHtml(row.matchesPlayed ?? 0)}</td>
+          <td>${escapeHtml(row.qualified ? "Yes" : "No")}</td>
+        `;
+        leaderboardTableBody.appendChild(tr);
+      });
+
       updateGoToKnockoutButton();
-      return;
     }
-    leaderboardState.rows.forEach((row, idx) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${escapeHtml(row.rank ?? idx + 1)}</td>
-        <td>${escapeHtml(row.teamName || row.team || "—")}</td>
-        <td>${escapeHtml(row.matchPoints ?? 0)}</td>
-        <td>${escapeHtml(row.tiesWon ?? 0)}</td>
-        <td>${escapeHtml(row.headToHead ?? "—")}</td>
-        <td>${escapeHtml(row.qualified ? "Yes" : "No")}</td>
-      `;
-      leaderboardTableBody.appendChild(tr);
-    });
-    updateGoToKnockoutButton();
-  }
 
   function makeMatchId() {
     if (window.crypto && crypto.randomUUID) return "M-" + crypto.randomUUID();
@@ -2622,34 +2738,38 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let fixturesBackendPollTimer = null;
 
-  async function refreshFixturesFromBackendSilently() {
-    if (fixturesState.bulkEditMode) return;
+    async function refreshFixturesFromBackendSilently() {
+      if (fixturesState.bulkEditMode) return;
 
-    const existing = await loadFixturesFromDb();
-    if (!existing) return;
+      const existing = await loadFixturesFromDb();
+      if (!existing) return;
 
-    fixturesState.fixtures = migrateFixtures(existing);
+      fixturesState.fixtures = migrateFixtures(existing);
 
-    if (isTournamentTeamEvent()) {
-      fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
+      if (isTournamentTeamEvent()) {
+        fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
+        renderCategoryToggles();
+        if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
+        renderTeamEventFixtures();
+        await loadLeaderboardFromDb();
+        renderLeaderboard();
+        updateFixturesEditButtonState();
+        return;
+      }
+
       renderCategoryToggles();
-      if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
-      renderTeamEventFixtures();
+
+      if (fixturesState.activeCategoryId) {
+        if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
+        renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
+      } else if (fixturesUi.noneSelectedEl) {
+        fixturesUi.noneSelectedEl.style.display = "flex";
+      }
+
+      await loadLeaderboardFromDb();
+      renderLeaderboard();
       updateFixturesEditButtonState();
-      return;
     }
-
-    renderCategoryToggles();
-
-    if (fixturesState.activeCategoryId) {
-      if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
-      renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
-    } else if (fixturesUi.noneSelectedEl) {
-      fixturesUi.noneSelectedEl.style.display = "flex";
-    }
-
-    updateFixturesEditButtonState();
-  }
 
   function startFixturesBackendPolling() {
     if (fixturesBackendPollTimer) clearInterval(fixturesBackendPollTimer);
@@ -2668,38 +2788,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 4000);
   }
 
-  async function openAndLoadFixtures() {
-    fixturesUi.wrap?.classList.remove("hidden");
-    await initFixturesIfNeeded();
-    updateEmbeddedFixturesHeader();
+    async function openAndLoadFixtures() {
+      fixturesUi.wrap?.classList.remove("hidden");
+      await initFixturesIfNeeded();
+      updateEmbeddedFixturesHeader();
 
-    fixturesState.categories = tournamentCategories || [];
-    computeAcceptedByCategory();
+      fixturesState.categories = tournamentCategories || [];
+      computeAcceptedByCategory();
 
-    const existing = await loadFixturesFromDb();
-    fixturesState.fixtures = existing ? migrateFixtures(existing) : { categories: {} };
+      const existing = await loadFixturesFromDb();
+      fixturesState.fixtures = existing ? migrateFixtures(existing) : { categories: {} };
 
-    if (isTournamentTeamEvent()) {
-      fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
+      if (isTournamentTeamEvent()) {
+        fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
+        renderCategoryToggles();
+        if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
+        renderTeamEventFixtures();
+        await loadLeaderboardFromDb();
+        renderLeaderboard();
+        updateFixturesEditButtonState();
+        return;
+      }
+
+      fixturesState.activeCategoryId =
+        fixturesState.activeCategoryId ||
+        String(fixturesState.categories?.[0]?.categoryId || fixturesState.categories?.[0]?.id || "");
+
       renderCategoryToggles();
-      if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
-      renderTeamEventFixtures();
+
+      if (fixturesState.activeCategoryId) {
+        if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
+        renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
+      } else if (fixturesUi.noneSelectedEl) {
+        fixturesUi.noneSelectedEl.style.display = "flex";
+      }
+
+      await loadLeaderboardFromDb();
+      renderLeaderboard();
       updateFixturesEditButtonState();
-      return;
     }
-
-    fixturesState.activeCategoryId = fixturesState.activeCategoryId || String(fixturesState.categories?.[0]?.categoryId || fixturesState.categories?.[0]?.id || "");
-    renderCategoryToggles();
-
-    if (fixturesState.activeCategoryId) {
-      if (fixturesUi.noneSelectedEl) fixturesUi.noneSelectedEl.style.display = "none";
-      renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
-    } else if (fixturesUi.noneSelectedEl) {
-      fixturesUi.noneSelectedEl.style.display = "flex";
-    }
-
-    updateFixturesEditButtonState();
-  }
 
   addPlayersExcelBtn?.addEventListener("click", () => {
     alert("Excel player upload button added. Bulk upload wiring is not connected yet.");
