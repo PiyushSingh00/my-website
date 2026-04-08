@@ -1420,6 +1420,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     card.querySelectorAll('[data-pickle-action="pick-server-name"]').forEach((select) => {
       select.addEventListener("change", () => {
+        const raw = String(select.value || "");
+        const pb = ensurePickleballTeamData(category.sportData, fixtures);
+        if (hasAnyPickleballSetStarted(pb) || teamTieState.tieLocked) return;
+
         const [side, ...rest] = raw.split("::");
         const name = rest.join("::");
 
@@ -1465,7 +1469,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         category.sportData = pb;
         rerender();
       });
-    });
     });
 
     card.querySelectorAll('[data-pickle-action="start-set"]').forEach((btn) => {
