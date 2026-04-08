@@ -1723,6 +1723,63 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     const fixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
     fixtures = unwrapFixturesPayload(fixturesResp);
+
+    try {
+      const tournamentResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}`);
+      const tournament =
+        tournamentResp?.data?.data ||
+        tournamentResp?.data ||
+        tournamentResp ||
+        {};
+
+      fixtures = {
+        ...(fixtures || {}),
+        sportName: fixtures?.sportName || tournament?.sportName || "",
+        tournamentType: fixtures?.tournamentType || tournament?.tournamentType || "",
+        advancedSettings: fixtures?.advancedSettings || tournament?.advancedSettings || null,
+
+        meta: {
+          ...(fixtures?.meta || {}),
+          sportName:
+            fixtures?.meta?.sportName ||
+            fixtures?.sportName ||
+            tournament?.sportName ||
+            "",
+          tournamentType:
+            fixtures?.meta?.tournamentType ||
+            fixtures?.tournamentType ||
+            tournament?.tournamentType ||
+            "",
+          advancedSettings:
+            fixtures?.meta?.advancedSettings ||
+            fixtures?.advancedSettings ||
+            tournament?.advancedSettings ||
+            null,
+        },
+
+        tournament: {
+          ...(fixtures?.tournament || {}),
+          ...tournament,
+          sportName:
+            fixtures?.tournament?.sportName ||
+            fixtures?.sportName ||
+            tournament?.sportName ||
+            "",
+          tournamentType:
+            fixtures?.tournament?.tournamentType ||
+            fixtures?.tournamentType ||
+            tournament?.tournamentType ||
+            "",
+          advancedSettings:
+            fixtures?.tournament?.advancedSettings ||
+            fixtures?.advancedSettings ||
+            tournament?.advancedSettings ||
+            null,
+        },
+      };
+    } catch (err) {
+      console.warn("Could not load tournament meta for sport detection", err);
+    }
   } catch (e) {
     console.error(e);
     titleEl.textContent = "Failed to load fixtures";
