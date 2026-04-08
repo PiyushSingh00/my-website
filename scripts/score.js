@@ -548,8 +548,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const raw =
       rawFixtures?.meta?.pickleballTargetPoints ||
       rawFixtures?.meta?.pointsToWin ||
+      rawFixtures?.meta?.tournamentRules?.pointsPerSet ||
       rawFixtures?.tournament?.pickleballTargetPoints ||
       rawFixtures?.tournament?.pointsToWin ||
+      rawFixtures?.tournament?.tournamentRules?.pointsPerSet ||
+      rawFixtures?.tournamentRules?.pointsPerSet ||
       params.get("targetPoints") ||
       11;
 
@@ -561,8 +564,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const raw =
       rawFixtures?.meta?.pickleballTotalSets ||
       rawFixtures?.meta?.bestOf ||
+      rawFixtures?.meta?.tournamentRules?.bestOfSets ||
       rawFixtures?.tournament?.pickleballTotalSets ||
       rawFixtures?.tournament?.bestOf ||
+      rawFixtures?.tournament?.tournamentRules?.bestOfSets ||
+      rawFixtures?.tournamentRules?.bestOfSets ||
       params.get("totalSets") ||
       3;
 
