@@ -1290,6 +1290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const playerId = String(getPlayerId(player));
       const existing = captainState.confirmedCaptains.find((c) => String(c.playerId) === playerId) || {};
       const teamNameInput = confirmCaptainsList.querySelector(`.confirm-team-name-input[data-player-id="${CSS.escape(playerId)}"]`);
+
       return {
         ...existing,
         playerId,
@@ -1297,6 +1298,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         categoryId: getPlayerCategoryId(player),
         teamName: teamNameInput?.value?.trim() || existing.teamName || `Team ${index + 1}`,
         teamStatus: existing.teamStatus || "pending",
+        teamPlayers: Array.isArray(existing.teamPlayers)
+          ? existing.teamPlayers
+          : Array.isArray(existing.players)
+            ? existing.players
+            : Array.isArray(existing.members)
+              ? existing.members
+              : Array.isArray(existing.submittedPlayers)
+                ? existing.submittedPlayers
+                : Array.isArray(existing.roster)
+                  ? existing.roster
+                  : [],
       };
     });
 
