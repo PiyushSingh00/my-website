@@ -1204,6 +1204,44 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
+    function bindPresetHandlers(card, category, rerender, teamTieState) {
+      if (!category || typeof category !== "object") return;
+
+      category.sportData =
+        category.sportData && typeof category.sportData === "object"
+          ? category.sportData
+          : {};
+
+      card.querySelectorAll("[data-preset-field]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (teamTieState?.tieLocked) return;
+
+          const field = String(btn.dataset.presetField || "").trim();
+          const step = Number(btn.dataset.step || 0);
+
+          if (!field || !Number.isFinite(step)) return;
+
+          const currentValue = Number(category.sportData[field] ?? 0);
+          const nextValue = Math.max(0, currentValue + step);
+
+          category.sportData[field] = nextValue;
+          rerender();
+        });
+      });
+
+      card.querySelectorAll("[data-preset-input]").forEach((input) => {
+        input.addEventListener("change", () => {
+          if (teamTieState?.tieLocked) return;
+
+          const field = String(input.dataset.presetInput || "").trim();
+          if (!field) return;
+
+          category.sportData[field] = String(input.value ?? "").trim();
+          rerender();
+        });
+      });
+    }
+
   function bindPickleballHandlers(card, category, categoryIndex, teamTieState, rerender) {
     card.querySelectorAll('[data-pickle-action="pick-toss"]').forEach((btn) => {
       btn.addEventListener("click", () => {
