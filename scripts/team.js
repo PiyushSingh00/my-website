@@ -30,6 +30,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentAcceptedInvite = null;
   let currentCaptainSubmission = null;
   let teamRequestsCache = [];
+  let canonicalTeams = [];
+  let currentCanonicalTeam = null;
 
   const draftKey = `scheduleit_team_draft_${tournamentId}_${user.username || user.name || "user"}`;
 
@@ -475,6 +477,91 @@ document.addEventListener("DOMContentLoaded", async () => {
     return tournamentMeta?.captains || tournamentMeta?.captainState || null;
   }
 
+  async function loadCanonicalTeamsForTournament() {
+  const candidates = [
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/teams`,
+    `/api/tournaments/${encodeURIComponent(tournamentId)}`,
+  ];
+
+  for (const url of candidates) {
+    const resp = await apiGet(url);
+    if (!resp.ok) continue;
+
+    if (url.includes("/teams")) {
+      if (Array.isArray(resp.data?.teams)) return resp.data.teams;
+      if (Array.isArray(resp.data)) return resp.data;
+    }
+
+    const t = resp.data || null;
+    if (Array.isArray(t?.teams)) return t.teams;
+  }
+
+  return [];
+}
+
+function getMyTournamentPlayerIds() {
+  return new Set(
+    getMyTournamentPlayerRecords()
+      .map((p) => String(getPlayerId(p) || "").trim())
+      .filter(Boolean)
+  );
+}
+
+function normalizeCanonicalTeamPlayer(player = {}) {
+  return {
+    playerId: String(player?.playerId || "").trim(),
+    playerName: String(player?.playerName || player?.name || player?.username || "").trim(),
+    username: String(player?.username || "").trim(),
+    phone: String(player?.phone || "").trim(),
+    inviteStatus: String(player?.inviteStatus || "accepted").trim().toLowerCase(),
+    isCaptain: Boolean(player?.isCaptain),
+  };
+}
+
+function getCanonicalTeamPlayers(team) {
+  return Array.isArray(team?.players)
+    ? team.players.map(normalizeCanonicalTeamPlayer).filter((p) => p.playerName || p.playerId || p.username)
+    : [];
+}
+
+function teamMatchesCurrentCaptain(team) {
+  const myPlayerIds = getMyTournamentPlayerIds();
+  return (
+    myPlayerIds.has(String(team?.captainPlayerId || "").trim()) ||
+    identitiesMatch(team?.captainUsername, user?.username) ||
+    identitiesMatch(team?.captainName, user?.name) ||
+    identitiesMatch(team?.captainName, user?.username)
+  );
+}
+
+function teamContainsCurrentUser(team) {
+  const myPlayerIds = getMyTournamentPlayerIds();
+  const players = getCanonicalTeamPlayers(team);
+
+  if (teamMatchesCurrentCaptain(team)) return true;
+
+  return players.some((player) => {
+    return (
+      (player.playerId && myPlayerIds.has(player.playerId)) ||
+      identitiesMatch(player.username, user?.username) ||
+      identitiesMatch(player.playerName, user?.name) ||
+      identitiesMatch(player.playerName, user?.username)
+    );
+  });
+}
+
+function findMyCanonicalCaptainTeam() {
+  return canonicalTeams.find((team) => teamMatchesCurrentCaptain(team)) || null;
+}
+
+function findMyCanonicalTeam() {
+  return canonicalTeams.find((team) => teamContainsCurrentUser(team)) || null;
+}
+
+function getActiveDisplayTeam() {
+  return currentCanonicalTeam || currentCaptainSubmission || currentAcceptedInvite || null;
+}
+
   function loadDraft() {
     try {
       const raw = localStorage.getItem(draftKey);
@@ -498,54 +585,67 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function hydrateSubmissionState() {
-    teamRequestsCache = await loadTeamRequestsForTournament();
-    const captainState = await loadCaptainStateForTournament();
+  teamRequestsCache = await loadTeamRequestsForTournament();
+  canonicalTeams = await loadCanonicalTeamsForTournament();
 
-    if (captainState && tournamentMeta) {
-      tournamentMeta.captainState = captainState;
-    }
+  const captainState = await loadCaptainStateForTournament();
 
-    const confirmedCaptains = Array.isArray(captainState?.confirmedCaptains) ? captainState.confirmedCaptains : [];
+  if (captainState && tournamentMeta) {
+    tournamentMeta.captainState = captainState;
+  }
 
-    const myCaptainRequest = teamRequestsCache.find((req) => isSameCaptain(req, user));
+  const confirmedCaptains = Array.isArray(captainState?.confirmedCaptains)
+    ? captainState.confirmedCaptains
+    : [];
 
-    const myConfirmedCaptain = confirmedCaptains.find((c) => {
+  const myCaptainRequest = teamRequestsCache.find((req) => isSameCaptain(req, user));
+
+  const myConfirmedCaptain = confirmedCaptains.find((c) => {
+    return (
+      identitiesMatch(c?.username, user?.username) ||
+      identitiesMatch(c?.captainUsername, user?.username) ||
+      identitiesMatch(c?.playerName, user?.name) ||
+      identitiesMatch(c?.playerName, user?.username)
+    );
+  });
+
+  if (myCaptainRequest) {
+    currentUserIsCaptain = true;
+    currentCaptainSubmission = normalizeTeamRequest(myCaptainRequest);
+  } else if (myConfirmedCaptain) {
+    currentUserIsCaptain = true;
+    currentCaptainSubmission = normalizeTeamRequest({
+      captainName: myConfirmedCaptain.playerName || user.name || user.username || "Captain",
+      captainUsername: myConfirmedCaptain.username || user.username || "",
+      captainPlayerId: myConfirmedCaptain.playerId || "",
+      categoryId: myConfirmedCaptain.categoryId || "",
+      teamName: myConfirmedCaptain.teamName || "",
+      invitedPlayers: [],
+      categoryLabel: tournamentMeta?.tournamentType === "team" ? "Team event" : "",
+    });
+  } else {
+    currentUserIsCaptain = false;
+    currentCaptainSubmission = null;
+  }
+
+  const acceptedInvite = teamRequestsCache.find((req) => {
+    const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+    return invited.some((invite) => {
       return (
-        identitiesMatch(c?.username, user?.username) ||
-        identitiesMatch(c?.captainUsername, user?.username) ||
-        identitiesMatch(c?.playerName, user?.name) ||
-        identitiesMatch(c?.playerName, user?.username)
+        isSameUserByInviteFields(invite, user) &&
+        String(invite.inviteStatus || "").toLowerCase() === "accepted"
       );
     });
+  });
 
-    if (myCaptainRequest) {
-      currentUserIsCaptain = true;
-      currentCaptainSubmission = normalizeTeamRequest(myCaptainRequest);
-    } else if (myConfirmedCaptain) {
-      currentUserIsCaptain = true;
-      currentCaptainSubmission = normalizeTeamRequest({
-        captainName: myConfirmedCaptain.playerName || user.name || user.username || "Captain",
-        captainUsername: myConfirmedCaptain.username || user.username || "",
-        captainPlayerId: myConfirmedCaptain.playerId || "",
-        categoryId: myConfirmedCaptain.categoryId || "",
-        teamName: myConfirmedCaptain.teamName || "",
-        invitedPlayers: [],
-        categoryLabel: tournamentMeta?.tournamentType === "team" ? "Team event" : "",
-      });
-    } else {
-      currentUserIsCaptain = false;
-      currentCaptainSubmission = null;
-    }
+  currentAcceptedInvite = acceptedInvite ? normalizeTeamRequest(acceptedInvite) : null;
 
-    const acceptedInvite = teamRequestsCache.find((req) => {
-      const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
-      return invited.some((invite) => {
-        return isSameUserByInviteFields(invite, user) && String(invite.inviteStatus || "").toLowerCase() === "accepted";
-      });
-    });
-
-    currentAcceptedInvite = acceptedInvite ? normalizeTeamRequest(acceptedInvite) : null;
+  if (currentUserIsCaptain) {
+    currentCanonicalTeam = findMyCanonicalCaptainTeam();
+  } else {
+    currentCanonicalTeam = findMyCanonicalTeam();
   }
+}
 
   function getRuleForCategory(category) {
     if (!tournamentMeta) {
@@ -739,22 +839,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function buildMemberCards(activeTeam) {
-    const cards = [];
-    const captainName = activeTeam?.captainName || "-";
+  const cards = [];
+  const canonicalPlayers = getCanonicalTeamPlayers(activeTeam);
 
-    cards.push(`
-      <div class="my-team-player-card">
-        <div class="my-team-player-left">
-          <div class="my-team-player-name">${escapeHtml(captainName)}</div>
-          <div class="my-team-player-meta">Captain</div>
-        </div>
-        <div class="status-pill status-pill--accepted">captain</div>
+  const captainCard =
+    canonicalPlayers.find((player) => player.isCaptain) || {
+      playerName: activeTeam?.captainName || "-",
+      inviteStatus: "accepted",
+      isCaptain: true,
+    };
+
+  cards.push(`
+    <div class="my-team-player-card">
+      <div class="my-team-player-left">
+        <div class="my-team-player-name">${escapeHtml(captainCard.playerName || "-")}</div>
+        <div class="my-team-player-meta">Captain</div>
       </div>
-    `);
+      <div class="status-pill status-pill--accepted">captain</div>
+    </div>
+  `);
 
-    const invitedPlayers = Array.isArray(activeTeam?.invitedPlayers) ? activeTeam.invitedPlayers : [];
-    invitedPlayers.forEach((player) => {
-      const status = String(player?.inviteStatus || "pending").toLowerCase();
+  const nonCaptainPlayers = canonicalPlayers.filter((player) => !player.isCaptain);
+
+  if (nonCaptainPlayers.length) {
+    nonCaptainPlayers.forEach((player) => {
+      const status = String(player?.inviteStatus || "accepted").toLowerCase();
       const statusClass =
         status === "accepted"
           ? "status-pill status-pill--accepted"
@@ -765,8 +874,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       cards.push(`
         <div class="my-team-player-card">
           <div class="my-team-player-left">
-            <div class="my-team-player-name">${escapeHtml(player.playerName || player.inviteeName || player.name || player.username || "Player")}</div>
-            <div class="my-team-player-meta">${escapeHtml(player.phone || player.playerPhone || "")}</div>
+            <div class="my-team-player-name">${escapeHtml(player.playerName || "Player")}</div>
+            <div class="my-team-player-meta">${escapeHtml(player.phone || "")}</div>
           </div>
           <div class="${statusClass}">${escapeHtml(status)}</div>
         </div>
@@ -776,31 +885,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     return cards.join("");
   }
 
-  function renderMyTeamPanel() {
-    myTeamPlayerListEl.innerHTML = "";
+  const invitedPlayers = Array.isArray(activeTeam?.invitedPlayers) ? activeTeam.invitedPlayers : [];
+  invitedPlayers.forEach((player) => {
+    const status = String(player?.inviteStatus || "pending").toLowerCase();
+    const statusClass =
+      status === "accepted"
+        ? "status-pill status-pill--accepted"
+        : status === "rejected"
+          ? "status-pill status-pill--rejected"
+          : "status-pill status-pill--pending";
 
-    const activeTeam = currentCaptainSubmission || currentAcceptedInvite;
+    cards.push(`
+      <div class="my-team-player-card">
+        <div class="my-team-player-left">
+          <div class="my-team-player-name">${escapeHtml(player.playerName || player.inviteeName || player.name || player.username || "Player")}</div>
+          <div class="my-team-player-meta">${escapeHtml(player.phone || player.playerPhone || "")}</div>
+        </div>
+        <div class="${statusClass}">${escapeHtml(status)}</div>
+      </div>
+    `);
+  });
 
-    if (!activeTeam) {
-      myTeamNameEl.textContent = "-";
-      myTeamCaptainEl.textContent = "-";
-      myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
-      myTeamCategoryEl.textContent = "-";
-      myTeamEmptyStateEl.classList.remove("hidden");
-      myTeamEmptyTextEl.textContent = currentUserIsCaptain
-        ? "You have not submitted a team for this tournament yet."
-        : "You are not part of any accepted team for this tournament yet.";
-      return;
-    }
+  return cards.join("");
+}
 
-    myTeamEmptyStateEl.classList.add("hidden");
-    myTeamNameEl.textContent = activeTeam.teamName || "-";
-    myTeamCaptainEl.textContent = activeTeam.captainName || "-";
+function renderMyTeamPanel() {
+  myTeamPlayerListEl.innerHTML = "";
+
+  const activeTeam = getActiveDisplayTeam();
+
+  if (!activeTeam) {
+    myTeamNameEl.textContent = "-";
+    myTeamCaptainEl.textContent = "-";
     myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
-    myTeamCategoryEl.textContent = activeTeam.categoryLabel || (tournamentMeta?.tournamentType === "team" ? "Team event" : "-");
-
-    myTeamPlayerListEl.innerHTML = buildMemberCards(activeTeam);
+    myTeamCategoryEl.textContent = "-";
+    myTeamEmptyStateEl.classList.remove("hidden");
+    myTeamEmptyTextEl.textContent = currentUserIsCaptain
+      ? "You have not submitted a team for this tournament yet."
+      : "You are not part of any accepted team for this tournament yet.";
+    return;
   }
+
+  myTeamEmptyStateEl.classList.add("hidden");
+  myTeamNameEl.textContent = activeTeam.teamName || "-";
+  myTeamCaptainEl.textContent = activeTeam.captainName || "-";
+  myTeamRoleEl.textContent = currentUserIsCaptain ? "Captain" : "Player";
+  myTeamCategoryEl.textContent =
+    activeTeam.categoryLabel ||
+    (tournamentMeta?.tournamentType === "team" ? "Team event" : "-");
+
+  myTeamPlayerListEl.innerHTML = buildMemberCards(activeTeam);
+}
 
   function hydratePage() {
     tournamentNameEl.textContent = tournamentMeta?.tournamentName || "-";
@@ -832,23 +967,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (currentUserIsCaptain) {
-      pageTitleEl.textContent = currentCaptainSubmission?.invitedPlayers?.length
-        ? "Create / Manage team"
-        : "Create team";
-      pageSubtitleEl.textContent = "Invite players to your team and manage pending team requests.";
-      createTeamTabBtn?.classList.remove("hidden");
-      lineupTabBtn?.classList.toggle("hidden", !isPickleballLeagueMode());
-    } else if (currentAcceptedInvite) {
-      pageTitleEl.textContent = "My team";
-      pageSubtitleEl.textContent = "View the team you are part of for this tournament.";
-      createTeamTabBtn?.classList.add("hidden");
-      lineupTabBtn?.classList.add("hidden");
-    } else {
-      pageTitleEl.textContent = "My team";
-      pageSubtitleEl.textContent = "View your team or manage invites if you are the captain.";
-      createTeamTabBtn?.classList.add("hidden");
-      lineupTabBtn?.classList.add("hidden");
-    }
+  const rosterCount = getCanonicalTeamPlayers(currentCanonicalTeam).filter((player) => !player.isCaptain).length;
+  pageTitleEl.textContent = rosterCount ? "Create / Manage team" : "Create team";
+  pageSubtitleEl.textContent = "Invite players to your team and manage pending team requests.";
+  createTeamTabBtn?.classList.remove("hidden");
+  lineupTabBtn?.classList.toggle("hidden", !isPickleballLeagueMode());
+} else if (currentCanonicalTeam || currentAcceptedInvite) {
+  pageTitleEl.textContent = "My team";
+  pageSubtitleEl.textContent = "View the team you are part of for this tournament.";
+  createTeamTabBtn?.classList.add("hidden");
+  lineupTabBtn?.classList.add("hidden");
+} else {
+  pageTitleEl.textContent = "My team";
+  pageSubtitleEl.textContent = "View your team or manage invites if you are the captain.";
+  createTeamTabBtn?.classList.add("hidden");
+  lineupTabBtn?.classList.add("hidden");
+}
 
     renderMyTeamPanel();
   }
@@ -995,20 +1129,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function getMyActiveTeamForLineup() {
-    return currentCaptainSubmission || currentAcceptedInvite || null;
-  }
+  return currentCanonicalTeam || currentCaptainSubmission || currentAcceptedInvite || null;
+}
 
-  function getTeamRosterForLineup(payloadTeam = null) {
-    const rosterNames = [];
-    const activeTeam = getMyActiveTeamForLineup();
+ function getTeamRosterForLineup(payloadTeam = null) {
+  const rosterNames = [];
+  const activeTeam = getMyActiveTeamForLineup();
 
-    if (Array.isArray(payloadTeam?.players)) {
-      payloadTeam.players.forEach((player) => {
-        const name = String(player?.playerName || player?.name || player?.username || "").trim();
+  const canonicalPlayers = getCanonicalTeamPlayers(payloadTeam || currentCanonicalTeam);
+
+  if (canonicalPlayers.length) {
+    canonicalPlayers.forEach((player) => {
+      if (player.isCaptain || player.inviteStatus === "accepted") {
+        const name = String(player.playerName || "").trim();
         if (name) rosterNames.push(name);
-      });
-    }
-
+      }
+    });
+  } else {
     if (activeTeam?.captainName) rosterNames.unshift(String(activeTeam.captainName).trim());
 
     const invited = Array.isArray(activeTeam?.invitedPlayers) ? activeTeam.invitedPlayers : [];
@@ -1019,15 +1156,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       ).trim();
       if (name) rosterNames.push(name);
     });
-
-    const seen = new Set();
-    return rosterNames.filter((name) => {
-      const key = normalizeIdentity(name);
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
   }
+
+  const seen = new Set();
+  return rosterNames.filter((name) => {
+    const key = normalizeIdentity(name);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
   function getCategoryDefinitionsForLineup() {
     const categories = normalizeCategories(tournamentMeta?.categories);
