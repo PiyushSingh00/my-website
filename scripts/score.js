@@ -623,8 +623,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const defaults = createDefaultPickleballTeamData(rawFixtures);
     const existing = existingData && typeof existingData === "object" ? existingData : {};
 
-    const totalSets = Number(existing.totalSets || defaults.totalSets);
-    const safeTotalSets = Number.isFinite(totalSets) && totalSets > 0 ? totalSets : defaults.totalSets;
+    const totalSets = Number(defaults.totalSets || existing.totalSets || 3);
+    const safeTotalSets = Number.isFinite(totalSets) && totalSets > 0 ? totalSets : 3;
 
     const sets = Array.from({ length: safeTotalSets }, (_, index) => {
       const existingSet = Array.isArray(existing.sets) ? existing.sets[index] : null;
@@ -648,7 +648,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (currentSetIndex != null && sets[currentSetIndex]?.completed) currentSetIndex = null;
 
     return {
-      targetPoints: Number(existing.targetPoints || defaults.targetPoints) || defaults.targetPoints,
+      targetPoints: Number(defaults.targetPoints || existing.targetPoints || 11) || 11,
       totalSets: safeTotalSets,
       tossWinner: existing.tossWinner || null,
       startingServer: existing.startingServer || null,
