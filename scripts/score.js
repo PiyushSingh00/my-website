@@ -1582,8 +1582,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       teamTieState.tieLocked = Boolean(aggregateTie.tieLocked || teamTieState.tieLocked);
     }
 
-    const forcedSportKey = detectEffectiveSportKey(rawFixtures) || teamTieState.tournamentSportKey || "";
-
     teamTieState.categories.forEach((category) => {
       category.sportKey = forcedSportKey || category.sportKey || "";
 
