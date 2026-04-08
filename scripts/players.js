@@ -152,6 +152,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fixturesTournamentDatesEl = document.getElementById("fixtures-tournament-dates");
   const fixturesTournamentCodeEl = document.getElementById("fixtures-tournament-code");
   const embeddedFixturesHelperTextEl = document.getElementById("embedded-fixtures-helper-text");
+  const bulkPlayerModal = document.getElementById("host-bulk-player-modal");
+const bulkPlayerClose = document.getElementById("host-bulk-player-close");
+const bulkPlayerCloseFooter = document.getElementById("host-bulk-player-close-footer");
+const bulkPlayerFile = document.getElementById("host-bulk-player-file");
+const bulkPlayerPreviewWrap = document.getElementById("bulk-player-preview-wrap");
+const bulkPlayerPreviewBody = document.getElementById("bulk-player-preview-body");
+const bulkPlayerSelectAll = document.getElementById("bulk-player-select-all");
+const bulkPlayerSaveBtn = document.getElementById("bulk-player-save-btn");
+const bulkPlayerClearBtn = document.getElementById("bulk-player-clear-btn");
+const bulkPlayerSummary = document.getElementById("bulk-player-summary");
 
   let allPlayers = [];
   let activeFilter = "all";
@@ -191,7 +201,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     activeCategoryId: null,
     bulkEditMode: false,
   };
-
+  let bulkPlayerRows = [];
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -1165,6 +1175,275 @@ document.addEventListener("DOMContentLoaded", async () => {
     addPlayerModal?.classList.add("hidden");
     addPlayerModal?.setAttribute("aria-hidden", "true");
   }
+
+  function openBulkPlayerModal() {
+  resetBulkPlayerState();
+  bulkPlayerModal?.classList.remove("hidden");
+  bulkPlayerModal?.setAttribute("aria-hidden", "false");
+}
+
+function closeBulkPlayerModal() {
+  bulkPlayerModal?.classList.add("hidden");
+  bulkPlayerModal?.setAttribute("aria-hidden", "true");
+}
+
+function resetBulkPlayerState() {
+  bulkPlayerRows = [];
+  if (bulkPlayerFile) bulkPlayerFile.value = "";
+  if (bulkPlayerPreviewBody) bulkPlayerPreviewBody.innerHTML = "";
+  bulkPlayerPreviewWrap?.classList.add("hidden");
+  if (bulkPlayerSummary) {
+    bulkPlayerSummary.textContent =
+      "Expected columns: playerName, age, gender, phone, categoryId. For team events, categoryId can be blank.";
+  }
+  if (bulkPlayerSelectAll) bulkPlayerSelectAll.checked = false;
+}
+
+function splitCsvLine(line) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    const next = line[i + 1];
+
+    if (ch === '"' && inQuotes && next === '"') {
+      current += '"';
+      i += 1;
+      continue;
+    }
+
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (ch === "," && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += ch;
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+function parseCsvText(text) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return [];
+
+  const headers = splitCsvLine(lines[0]).map((h) => h.trim());
+  const rows = [];
+
+  for (let i = 1; i < lines.length; i += 1) {
+    const values = splitCsvLine(lines[i]);
+    const row = {};
+    headers.forEach((header, idx) => {
+      row[header] = values[idx] ?? "";
+    });
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function normalizeImportedPlayerRow(row, index) {
+  const isTeam = isTournamentTeamEvent();
+  const rawCategory = String(row.categoryId || row.category || "").trim();
+
+  const normalized = {
+    __rowIndex: index,
+    __selected: true,
+    __valid: true,
+    __message: "Ready",
+    playerName: String(row.playerName || row.name || "").trim(),
+    age: String(row.age || "").trim(),
+    gender: String(row.gender || "").trim(),
+    phone: String(row.phone || row.phoneNumber || "").trim(),
+    categoryId: isTeam ? TEAM_EVENT_CATEGORY_ID : rawCategory,
+  };
+
+  if (!normalized.playerName) {
+    normalized.__valid = false;
+    normalized.__message = "Missing name";
+  } else if (!normalized.phone) {
+    normalized.__valid = false;
+    normalized.__message = "Missing phone";
+  } else if (!isTeam && !normalized.categoryId) {
+    normalized.__valid = false;
+    normalized.__message = "Missing category";
+  }
+
+  return normalized;
+}
+
+function renderBulkCategoryCell(row, idx) {
+  if (isTournamentTeamEvent()) {
+    return `<span class="muted">${escapeHtml(TEAM_EVENT_CATEGORY_ID)}</span>`;
+  }
+
+  return `
+    <select data-bulk-field="categoryId" data-bulk-idx="${idx}">
+      <option value="">Select category</option>
+      ${tournamentCategories.map((cat) => {
+        const value = String(cat.categoryId || cat.id || "");
+        const selected = value === String(row.categoryId || "");
+        return `<option value="${escapeHtml(value)}" ${selected ? "selected" : ""}>${escapeHtml(categoryLabel(cat))}</option>`;
+      }).join("")}
+    </select>
+  `;
+}
+
+function syncBulkSummary() {
+  if (!bulkPlayerSummary) return;
+  const total = bulkPlayerRows.length;
+  const selected = bulkPlayerRows.filter((r) => r.__selected).length;
+  const valid = bulkPlayerRows.filter((r) => r.__selected && r.__valid).length;
+  bulkPlayerSummary.textContent = `${selected} selected out of ${total}. ${valid} selected row(s) are valid.`;
+}
+
+function revalidateBulkRow(idx) {
+  bulkPlayerRows[idx] = normalizeImportedPlayerRow(bulkPlayerRows[idx], idx);
+}
+
+function bindBulkPreviewInputs() {
+  bulkPlayerPreviewBody?.querySelectorAll("[data-bulk-field]").forEach((el) => {
+    el.addEventListener("input", () => {
+      const idx = Number(el.dataset.bulkIdx);
+      const field = el.dataset.bulkField;
+      bulkPlayerRows[idx][field] = el.value;
+      revalidateBulkRow(idx);
+      renderBulkPlayerPreview();
+    });
+
+    el.addEventListener("change", () => {
+      const idx = Number(el.dataset.bulkIdx);
+      const field = el.dataset.bulkField;
+      bulkPlayerRows[idx][field] = el.value;
+      revalidateBulkRow(idx);
+      renderBulkPlayerPreview();
+    });
+  });
+
+  bulkPlayerPreviewBody?.querySelectorAll("[data-bulk-check]").forEach((el) => {
+    el.addEventListener("change", () => {
+      const idx = Number(el.dataset.bulkCheck);
+      bulkPlayerRows[idx].__selected = el.checked;
+      syncBulkSummary();
+    });
+  });
+}
+
+function renderBulkPlayerPreview() {
+  if (!bulkPlayerPreviewBody) return;
+
+  bulkPlayerPreviewBody.innerHTML = "";
+
+  if (!bulkPlayerRows.length) {
+    bulkPlayerPreviewWrap?.classList.add("hidden");
+    return;
+  }
+
+  bulkPlayerPreviewWrap?.classList.remove("hidden");
+
+  bulkPlayerRows.forEach((row, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <input type="checkbox" data-bulk-check="${idx}" ${row.__selected ? "checked" : ""} />
+      </td>
+      <td><input type="text" data-bulk-field="playerName" data-bulk-idx="${idx}" value="${escapeHtml(row.playerName)}" /></td>
+      <td><input type="number" data-bulk-field="age" data-bulk-idx="${idx}" value="${escapeHtml(row.age)}" /></td>
+      <td>
+        <select data-bulk-field="gender" data-bulk-idx="${idx}">
+          <option value="">Select</option>
+          <option value="Male" ${row.gender === "Male" ? "selected" : ""}>Male</option>
+          <option value="Female" ${row.gender === "Female" ? "selected" : ""}>Female</option>
+          <option value="Other" ${row.gender === "Other" ? "selected" : ""}>Other</option>
+        </select>
+      </td>
+      <td><input type="tel" data-bulk-field="phone" data-bulk-idx="${idx}" value="${escapeHtml(row.phone)}" /></td>
+      <td>${renderBulkCategoryCell(row, idx)}</td>
+      <td>${escapeHtml(row.__message)}</td>
+    `;
+    bulkPlayerPreviewBody.appendChild(tr);
+  });
+
+  bindBulkPreviewInputs();
+  syncBulkSummary();
+}
+
+function buildBulkSavePayload() {
+  return bulkPlayerRows
+    .filter((row) => row.__selected && row.__valid)
+    .map((row) => ({
+      playerName: row.playerName,
+      age: row.age ? Number(row.age) : null,
+      gender: row.gender,
+      phone: row.phone,
+      categoryId: isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : row.categoryId,
+      status: "accepted",
+      addedByHost: true,
+    }));
+}
+
+bulkPlayerClose?.addEventListener("click", closeBulkPlayerModal);
+bulkPlayerCloseFooter?.addEventListener("click", closeBulkPlayerModal);
+
+bulkPlayerModal?.addEventListener("click", (e) => {
+  if (e.target === bulkPlayerModal) closeBulkPlayerModal();
+});
+
+bulkPlayerClearBtn?.addEventListener("click", resetBulkPlayerState);
+
+bulkPlayerSelectAll?.addEventListener("change", () => {
+  bulkPlayerRows = bulkPlayerRows.map((row) => ({
+    ...row,
+    __selected: bulkPlayerSelectAll.checked,
+  }));
+  renderBulkPlayerPreview();
+});
+
+bulkPlayerFile?.addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const text = await file.text();
+  const parsed = parseCsvText(text);
+
+  bulkPlayerRows = parsed.map((row, idx) => normalizeImportedPlayerRow(row, idx));
+  renderBulkPlayerPreview();
+});
+
+bulkPlayerSaveBtn?.addEventListener("click", async () => {
+  const players = buildBulkSavePayload();
+
+  if (!players.length) {
+    alert("No valid selected players to save.");
+    return;
+  }
+
+  const r = await apiPost(
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/players/bulk`,
+    { players }
+  );
+
+  if (!r.ok) {
+    alert(r.data?.message || "Bulk add backend route is not ready yet.");
+    return;
+  }
+
+  closeBulkPlayerModal();
+  await loadPlayers();
+});
 
   addPlayerBtn?.addEventListener("click", openAddPlayerModal);
   addPlayerClose?.addEventListener("click", closeAddPlayerModal);
@@ -2829,8 +3108,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
   addPlayersExcelBtn?.addEventListener("click", () => {
-    alert("Excel player upload button added. Bulk upload wiring is not connected yet.");
-  });
+  openBulkPlayerModal();
+});
 
   await loadTournamentMeta();
   await loadPlayers();
