@@ -363,6 +363,71 @@ document.addEventListener("DOMContentLoaded", async () => {
     return Array.isArray(value) ? value : [];
   }
 
+  let teamRosterLookup = new Map();
+
+    function unwrapCaptainsPayload(raw) {
+      return raw?.data || raw || {};
+    }
+
+    function normalizeTeamRosterNames(raw) {
+      return toArray(raw)
+        .map((item) =>
+          typeof item === "string"
+            ? safeText(item)
+            : safeText(item?.playerName || item?.name || item?.fullName || item?.username)
+        )
+        .filter(Boolean);
+    }
+
+    function buildTeamRosterLookupFromCaptains(raw) {
+      const payload = unwrapCaptainsPayload(raw);
+      const confirmedCaptains = Array.isArray(payload?.confirmedCaptains) ? payload.confirmedCaptains : [];
+      const lookup = new Map();
+
+      confirmedCaptains.forEach((captain) => {
+        const teamName = safeText(captain?.teamName || captain?.playerName);
+        if (!teamName) return;
+
+        const roster = normalizeTeamRosterNames(
+          captain?.teamPlayers ||
+          captain?.players ||
+          captain?.members ||
+          captain?.submittedPlayers ||
+          captain?.roster
+        );
+
+        if (roster.length) {
+          lookup.set(teamName, roster);
+        }
+      });
+
+      teamRosterLookup = lookup;
+    }
+
+    async function loadTeamRosterLookup() {
+      try {
+        const captainsRaw = await apiGet(
+          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`
+        );
+        buildTeamRosterLookupFromCaptains(captainsRaw);
+      } catch (err) {
+        console.warn("Could not load team rosters from captains route", err);
+        teamRosterLookup = new Map();
+      }
+    }
+
+    function isRosterJustTeamLabel(roster, teamLabel) {
+      const list = toArray(roster).map((name) => safeText(name)).filter(Boolean);
+      const label = safeText(teamLabel);
+      return Boolean(label && list.length === 1 && list[0].toLowerCase() === label.toLowerCase());
+    }
+
+    function resolveRosterList(roster, fallbackRoster, teamLabel) {
+      const list = toArray(roster).map((name) => safeText(name)).filter(Boolean);
+      if (list.length && !isRosterJustTeamLabel(list, teamLabel)) return list;
+      return toArray(fallbackRoster).map((name) => safeText(name)).filter(Boolean);
+    }
+
   function ordinal(n) {
     const s = ["th", "st", "nd", "rd"];
     const v = n % 100;
@@ -1243,12 +1308,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function inferTeamRoster(matchObj, side) {
+    const teamLabel = side === "A" ? matchObj?.home : matchObj?.away;
+    const normalizedTeamLabel = safeText(teamLabel);
+
+    const rosterFromCaptains = normalizedTeamLabel
+      ? resolveRosterList(teamRosterLookup.get(normalizedTeamLabel), [], normalizedTeamLabel)
+      : [];
+
+    if (rosterFromCaptains.length) return rosterFromCaptains;
+
     const rosterFromMatch = side === "A" ? matchObj?.homePlayers : matchObj?.awayPlayers;
     const fromMatchList = toArray(rosterFromMatch).map((p) => safeText(p)).filter(Boolean);
-    if (fromMatchList.length) return fromMatchList;
+    if (fromMatchList.length && !isRosterJustTeamLabel(fromMatchList, normalizedTeamLabel)) {
+      return fromMatchList;
+    }
 
-    const label = side === "A" ? matchObj?.home : matchObj?.away;
-    const split = splitTeamLabel(label);
+    const split = splitTeamLabel(teamLabel);
     if (split.length) return split;
 
     return Array.from({ length: 8 }, (_, index) => `${side === "A" ? "Home" : "Away"} Player ${index + 1}`);
@@ -1296,8 +1371,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const saved = JSON.parse(localStorage.getItem(key) || "null");
       if (saved && Array.isArray(saved.categories)) {
-        saved.homeRoster = Array.isArray(saved.homeRoster) ? saved.homeRoster : fresh.homeRoster;
-        saved.awayRoster = Array.isArray(saved.awayRoster) ? saved.awayRoster : fresh.awayRoster;
+        saved.homeRoster = resolveRosterList(saved.homeRoster, fresh.homeRoster, matchObj?.home);
+        saved.awayRoster = resolveRosterList(saved.awayRoster, fresh.awayRoster, matchObj?.away);
         saved.tournamentSportKey = saved.tournamentSportKey || fresh.tournamentSportKey;
         saved.lineupCollapsed = Boolean(saved.lineupCollapsed);
         saved.tieLocked = Boolean(saved.tieLocked);
@@ -1542,6 +1617,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const homeLabel = match?.home ?? "Home";
   const awayLabel = match?.away ?? "Away";
   const isTeamEvent = detectTeamEvent(fixtures);
+
+  if (isTeamEvent) {
+    await loadTeamRosterLookup();
+  }
 
   if (!match) {
     titleEl.textContent = "Match not found";
