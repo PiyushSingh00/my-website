@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ScheduleIt – Live Board</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles/liveboard.css" />
+  </head>
+  <body>
+    <div class="app-shell liveboard-shell">
+      <header class="topbar">
+        <a class="brand brand-link" href="index.html" aria-label="Go to homepage">ScheduleIt</a>
+
+        <div class="topbar-right">
+          <div class="user-menu">
+            <button
+              type="button"
+              class="user-avatar-btn"
+              id="liveboard-user-menu-trigger"
+              aria-label="User menu"
+            >
+              U
+            </button>
+
+            <div class="user-menu-dropdown" id="liveboard-user-menu-dropdown">
+              <button type="button" class="dropdown-item" id="dropdown-signout">
+                Sign out
+              </button>
+            </div>
+          </div>
+
+          <div class="mode-toggle" role="group" aria-label="Mode toggle">
+            <button class="mode-btn is-active" id="mode-player-btn" type="button">Join mode</button>
+            <button class="mode-btn" id="mode-host-btn" type="button">Host mode</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="liveboard-main">
+        <section class="hero-card">
+          <div class="hero-top">
+            <button type="button" class="hero-btn" id="back-btn">← Back</button>
+            <div class="hero-copy">
+              <p class="hero-kicker">Live scoring board</p>
+              <h1 id="page-title">Loading tournament...</h1>
+              <p id="page-subtitle" class="hero-subtitle">Fetching live scores and leaderboard.</p>
+            </div>
+            <button type="button" class="hero-btn hero-btn-primary" id="manual-refresh">Refresh</button>
+          </div>
+
+          <div class="hero-meta-row">
+            <span class="meta-chip" id="auto-refresh-pill">Auto refresh every 5s</span>
+            <span class="meta-chip" id="last-sync-pill">Waiting for first sync</span>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <div class="section-head">
+            <div>
+              <p class="section-label">Live scores</p>
+              <h2 class="section-title">Ongoing submatches</h2>
+              <p class="section-subtitle">
+                Big score shows the current submatch. Smaller lines show tie score and cumulative match points.
+              </p>
+            </div>
+          </div>
+
+          <div class="category-filter" id="category-filter"></div>
+
+          <div class="live-list" id="live-list"></div>
+
+          <div class="empty-state hidden" id="live-empty">
+            <div class="empty-icon">📡</div>
+            <h3>No live scores right now</h3>
+            <p class="empty-copy">As soon as a match or submatch starts scoring, it will appear here automatically.</p>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <div class="section-head section-head--leaderboard">
+            <div>
+              <p class="section-label">Leaderboard</p>
+              <h2 class="section-title">Updated standings</h2>
+              <p class="section-subtitle">This section refreshes automatically from the leaderboard endpoint.</p>
+            </div>
+          </div>
+
+          <div class="leaderboard-list" id="leaderboard-list"></div>
+
+          <div class="empty-state hidden" id="leaderboard-empty">
+            <div class="empty-icon">🏆</div>
+            <h3>No leaderboard rows yet</h3>
+            <p class="empty-copy">Leaderboard will appear once the backend starts returning rows for this tournament.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="scripts/liveboard.js"></script>
+  </body>
+</html>
