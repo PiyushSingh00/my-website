@@ -1582,9 +1582,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       teamTieState.tieLocked = Boolean(aggregateTie.tieLocked || teamTieState.tieLocked);
     }
 
+    const forcedSportKey = detectEffectiveSportKey(rawFixtures) || teamTieState.tournamentSportKey || "";
+
     teamTieState.categories.forEach((category) => {
+      category.sportKey = forcedSportKey || category.sportKey || "";
+
+      if (category.sportKey === "pickleball") {
+        category.sportData = ensurePickleballTeamData(category.sportData, rawFixtures);
+      }
+
       syncCategoryPlayerStrings(category);
       category.lineupStatus = isCategoryLineupComplete(category) ? "accepted" : "pending";
+
       if (teamTieState.tieLocked) {
         category.categoryLocked = true;
         category.isScoringOpen = false;
@@ -2088,7 +2097,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                 state: {
                   A: { points: Number(totals.home || 0) },
                   B: { points: Number(totals.away || 0) },
-                  meta: { categorySnapshot: category, tieLocked: teamTieState.tieLocked },
+                  meta: {
+                    categorySnapshot: {
+                      ...category,
+                      sportKey: detectEffectiveSportKey(fixtures) || teamTieState.tournamentSportKey || category.sportKey || "",
+                      sportData:
+                        (detectEffectiveSportKey(fixtures) || teamTieState.tournamentSportKey || category.sportKey || "") === "pickleball"
+                          ? ensurePickleballTeamData(category.sportData, fixtures)
+                          : category.sportData,
+                    },
+                    tieLocked: teamTieState.tieLocked,
+                  },
                 },
                 cricket: category.sportKey === "cricket" ? category.sportData : null,
                 football: category.sportKey === "football" ? category.sportData : null,
