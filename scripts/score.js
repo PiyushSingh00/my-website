@@ -501,6 +501,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     return value;
   }
 
+    function safeJsonObject(value) {
+      if (!value) return {};
+      if (typeof value === "object") return value;
+      if (typeof value !== "string") return {};
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function detectEffectiveSportKey(rawFixtures) {
+      const byName = normalizeSportKey(getTournamentSportName(rawFixtures));
+      if (byName) return byName;
+
+      const advanced =
+        safeJsonObject(rawFixtures?.meta?.advancedSettings) ||
+        safeJsonObject(rawFixtures?.tournament?.advancedSettings) ||
+        {};
+
+      const advancedMode = safeText(
+        advanced?.advancedMode ||
+        rawFixtures?.meta?.advancedMode ||
+        rawFixtures?.tournament?.advancedMode ||
+        params.get("advancedMode"),
+        ""
+      ).toLowerCase();
+
+      if (advancedMode.includes("pickle")) return "pickleball";
+
+      const directHint = safeText(
+        rawFixtures?.sportKey ||
+        rawFixtures?.meta?.sportKey ||
+        rawFixtures?.tournament?.sportKey,
+        ""
+      ).toLowerCase();
+
+      if (directHint.includes("pickle")) return "pickleball";
+
+      return "";
+    }
+
   function getPickleballTargetPoints(rawFixtures) {
     const raw =
       rawFixtures?.meta?.pickleballTargetPoints ||
@@ -1371,7 +1414,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const categories = inferCategoryDefinitions(rawFixtures);
     const homeRoster = inferTeamRoster(matchObj, "A");
     const awayRoster = inferTeamRoster(matchObj, "B");
-    const tournamentSportKey = normalizeSportKey(getTournamentSportName(rawFixtures));
+    const tournamentSportKey = detectEffectiveSportKey(rawFixtures);
 
     return {
       homeRoster,
@@ -1411,7 +1454,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (saved && Array.isArray(saved.categories)) {
         saved.homeRoster = resolveRosterList(saved.homeRoster, fresh.homeRoster, matchObj?.home);
         saved.awayRoster = resolveRosterList(saved.awayRoster, fresh.awayRoster, matchObj?.away);
-        saved.tournamentSportKey = saved.tournamentSportKey || fresh.tournamentSportKey;
+
+        const detectedSportKey = detectEffectiveSportKey(rawFixtures);
+        saved.tournamentSportKey = detectedSportKey || fresh.tournamentSportKey || saved.tournamentSportKey || "";
+
         saved.lineupCollapsed = Boolean(saved.lineupCollapsed);
         saved.tieLocked = Boolean(saved.tieLocked);
 
@@ -1428,7 +1474,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           const merged = {
             ...fresh.categories[index],
             ...category,
-            sportKey: category?.sportKey || fresh.categories[index]?.sportKey || saved.tournamentSportKey,
+            sportKey: saved.tournamentSportKey || fresh.categories[index]?.sportKey || category?.sportKey || "",
             slotCount: Number(category?.slotCount || fresh.categories[index]?.slotCount || 1),
           };
 
