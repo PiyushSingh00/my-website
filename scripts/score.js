@@ -1474,7 +1474,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           const merged = {
             ...fresh.categories[index],
             ...category,
-            sportKey: saved.tournamentSportKey || fresh.categories[index]?.sportKey || category?.sportKey || "",
+            sportKey: detectEffectiveSportKey(rawFixtures) || saved.tournamentSportKey || fresh.categories[index]?.sportKey || category?.sportKey || "",
             slotCount: Number(category?.slotCount || fresh.categories[index]?.slotCount || 1),
           };
 
@@ -1510,11 +1510,28 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function mergeCategorySnapshot(target, snapshot, rawFixtures) {
     if (!snapshot || typeof snapshot !== "object") return target;
+
+    const forcedSportKey =
+      detectEffectiveSportKey(rawFixtures) ||
+      target?.sportKey ||
+      snapshot?.sportKey ||
+      "";
+
     Object.assign(target, snapshot);
+
+    target.sportKey = forcedSportKey;
     target.slotCount = Number(snapshot.slotCount || target.slotCount || 1);
+
     if (target.sportKey === "pickleball") {
       target.sportData = ensurePickleballTeamData(snapshot.sportData, rawFixtures);
+    } else {
+      target.sportData =
+        snapshot?.sportData ??
+        (hasPresetSportSchema(target.sportKey)
+          ? cloneDefaultPresetSportData(target.sportKey, rawFixtures)
+          : null);
     }
+
     syncCategoryPlayerStrings(target);
     target.lineupStatus = isCategoryLineupComplete(target) ? "accepted" : "pending";
     return target;
@@ -1531,15 +1548,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     const homeAssignments = toArray(matchObj?.lineups?.home?.assignments);
     const awayAssignments = toArray(matchObj?.lineups?.away?.assignments);
 
+    const forcedSportKey = detectEffectiveSportKey(rawFixtures) || teamTieState.tournamentSportKey || "";
+
     teamTieState.categories.forEach((category, index) => {
       const homeAssignment = homeAssignments.find((item) => Number(item?.scoreIndex) === index);
       const awayAssignment = awayAssignments.find((item) => Number(item?.scoreIndex) === index);
+
+      category.sportKey = forcedSportKey || category.sportKey || "";
+
       if (homeAssignment && Array.isArray(homeAssignment.players)) {
         category.homePlayersSelected = homeAssignment.players.map((p) => safeText(p)).filter(Boolean);
       }
       if (awayAssignment && Array.isArray(awayAssignment.players)) {
         category.awayPlayersSelected = awayAssignment.players.map((p) => safeText(p)).filter(Boolean);
       }
+
+      if (category.sportKey === "pickleball") {
+        category.sportData = ensurePickleballTeamData(category.sportData, rawFixtures);
+      }
+
       syncCategoryPlayerStrings(category);
     });
 
