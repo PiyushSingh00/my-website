@@ -1377,6 +1377,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         saved.lineupCollapsed = Boolean(saved.lineupCollapsed);
         saved.tieLocked = Boolean(saved.tieLocked);
 
+        const hasSavedLockedEvidence =
+          saved.tieLocked &&
+          Array.isArray(saved.categories) &&
+          saved.categories.some((category) => Boolean(category?.categoryLocked || category?.winnerSide));
+
+        if (!hasSavedLockedEvidence) {
+          saved.tieLocked = false;
+        }
+
         saved.categories = saved.categories.map((category, index) => {
           const merged = {
             ...fresh.categories[index],
@@ -1398,7 +1407,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           syncCategoryPlayerStrings(merged);
           merged.lineupStatus = isCategoryLineupComplete(merged) ? "accepted" : "pending";
-          merged.categoryLocked = Boolean(merged.categoryLocked || merged.sportData?.categoryLocked);
+          merged.categoryLocked = hasSavedLockedEvidence
+            ? Boolean(merged.categoryLocked || merged.sportData?.categoryLocked)
+            : false;
           return merged;
         });
 
