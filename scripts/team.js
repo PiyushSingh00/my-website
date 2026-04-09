@@ -1031,18 +1031,18 @@ function renderMyTeamPanel() {
     tournamentSportEl.textContent = tournamentMeta?.sportName || "-";
     tournamentDatesEl.textContent = tournamentMeta?.tournamentDates || "-";
 
-    const draft = loadDraft();
+const draft = loadDraft();
 
-      const preferredTeamName =
-        draft?.teamName ||
-        currentCanonicalTeam?.teamName ||
-        currentCaptainSubmission?.teamName ||
-        currentAcceptedInvite?.teamName ||
-        "";
+const hydratedTeamName =
+  draft?.teamName ||
+  currentCanonicalTeam?.teamName ||
+  currentCaptainSubmission?.teamName ||
+  currentAcceptedInvite?.teamName ||
+  "";
 
-      if (teamNameInput) {
-        teamNameInput.value = preferredTeamName;
-      }
+if (teamNameInput) {
+  teamNameInput.value = hydratedTeamName;
+}
 
 
     if (tournamentMeta?.tournamentType === "team") {
