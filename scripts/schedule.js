@@ -262,24 +262,207 @@ document.addEventListener("DOMContentLoaded", async () => {
     return "pending";
   }
 
-  function getTeamScheduleStatus(match) {
+  function getTeamTieStateFromBackend(match) {
+    const direct = match?.score?.state?.meta?.teamTieState;
+    if (direct && typeof direct === "object") return direct;
+
     const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
-    if (!submatches.length) return getSimpleStatus(match);
+    const categories = submatches
+      .map((submatch, index) => {
+        const snapshot = getSubmatchSnapshot(submatch);
+        if (snapshot && typeof snapshot === "object") return snapshot;
 
-    let anyStarted = false;
-    let allCompleted = true;
+        const home = getBucketScore(submatch?.score?.state?.A);
+        const away = getBucketScore(submatch?.score?.state?.B);
+        const winnerSide = String(
+          submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || ""
+        ).toUpperCase();
 
-    submatches.forEach((submatch) => {
-      const score = submatch?.score || {};
-      const hasPoints = getBucketScore(score?.state?.A) !== null || getBucketScore(score?.state?.B) !== null;
-      const status = String(score?.computed?.status || (hasPoints ? "live" : "pending")).toLowerCase();
-      if (status !== "pending") anyStarted = true;
-      if (status !== "completed") allCompleted = false;
+        if (home === null && away === null && !winnerSide && !submatch?.status) return null;
+
+        return {
+          name: getSubmatchLabel(submatch, index),
+          homePlayer: getSubmatchPlayerLabel(submatch, "A", match?.home || "Home"),
+          awayPlayer: getSubmatchPlayerLabel(submatch, "B", match?.away || "Away"),
+          homeScore: Number(home || 0),
+          awayScore: Number(away || 0),
+          winnerSide: winnerSide || null,
+          sportKey: String(snapshot?.sportKey || "").trim(),
+          sportData: snapshot?.sportData || null,
+          categoryLocked: Boolean(snapshot?.categoryLocked),
+        };
+      })
+      .filter(Boolean);
+
+    if (!categories.length) return null;
+
+    return {
+      categories,
+      tieLocked: Boolean(match?.score?.computed?.tieLocked),
+    };
+  }
+
+  function getTeamTieCategoryPoints(category) {
+    const sportKey = String(category?.sportKey || "").trim().toLowerCase();
+    const data = category?.sportData || {};
+
+    if (sportKey === "pickleball") {
+      return (Array.isArray(data?.sets) ? data.sets : []).reduce(
+        (acc, set) => {
+          acc.home += Number(set?.homePoints || 0);
+          acc.away += Number(set?.awayPoints || 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    if (sportKey === "badminton") {
+      return (Array.isArray(data?.games) ? data.games : []).reduce(
+        (acc, game) => {
+          acc.home += Number(game?.a ?? game?.home ?? 0);
+          acc.away += Number(game?.b ?? game?.away ?? 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    if (sportKey === "tennis") {
+      return (Array.isArray(data?.sets) ? data.sets : []).reduce(
+        (acc, setRow) => {
+          acc.home += Number(setRow?.a ?? setRow?.home ?? 0);
+          acc.away += Number(setRow?.b ?? setRow?.away ?? 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    if (sportKey === "football") {
+      return {
+        home: Number(data?.homeGoals ?? data?.a ?? category?.homeScore ?? 0),
+        away: Number(data?.awayGoals ?? data?.b ?? category?.awayScore ?? 0),
+      };
+    }
+
+    if (sportKey === "cricket") {
+      return {
+        home: Number(data?.homeRuns ?? data?.a ?? category?.homeScore ?? 0),
+        away: Number(data?.awayRuns ?? data?.b ?? category?.awayScore ?? 0),
+      };
+    }
+
+    return {
+      home: Number(category?.homeScore ?? category?.score?.home ?? 0),
+      away: Number(category?.awayScore ?? category?.score?.away ?? 0),
+    };
+  }
+
+  function categoriesFromTeamTieState(teamTieState, match) {
+    return (Array.isArray(teamTieState?.categories) ? teamTieState.categories : []).map((category, index) => {
+      const totals = getTeamTieCategoryPoints(category);
+      const hasProgress =
+        Number(totals.home || 0) > 0 ||
+        Number(totals.away || 0) > 0 ||
+        Number(category?.sportData?.currentSetIndex) >= 0 ||
+        Boolean(category?.winnerSide);
+
+      return {
+        name: category?.name || category?.eventName || `Submatch ${index + 1}`,
+        homePlayer: getSafeJoinedNames(
+          category?.homePlayersSelected || category?.homePlayer,
+          match?.home || "Home"
+        ),
+        awayPlayer: getSafeJoinedNames(
+          category?.awayPlayersSelected || category?.awayPlayer,
+          match?.away || "Away"
+        ),
+        score: {
+          state: {
+            A: { points: Number(totals.home || 0) },
+            B: { points: Number(totals.away || 0) },
+            meta: { categorySnapshot: category },
+          },
+          computed: {
+            status: category?.winnerSide
+              ? "completed"
+              : (hasProgress ? "live" : "pending"),
+            winnerSide: category?.winnerSide || null,
+          },
+        },
+      };
+    });
+  }
+
+  function deriveTeamTieStatus(teamTieState) {
+    const categories = Array.isArray(teamTieState?.categories) ? teamTieState.categories : [];
+    if (!categories.length) return "pending";
+
+    const allCompleted = categories.every((category) => category?.categoryLocked || category?.winnerSide);
+    if (allCompleted) return "completed";
+
+    const anyProgress = categories.some((category) => {
+      if (!category || typeof category !== "object") return false;
+      if (category?.lineupStatus === "accepted") return true;
+      if (category?.categoryLocked) return true;
+      if (category?.winnerSide) return true;
+      if (getSafeJoinedNames(category?.homePlayersSelected || category?.homePlayer) || getSafeJoinedNames(category?.awayPlayersSelected || category?.awayPlayer)) {
+        return true;
+      }
+
+      const totals = getTeamTieCategoryPoints(category);
+      if (Number(totals.home || 0) > 0 || Number(totals.away || 0) > 0) return true;
+
+      const sportData = category?.sportData || {};
+      if (sportData.currentSetIndex != null) return true;
+      if (
+        Array.isArray(sportData.sets) &&
+        sportData.sets.some(
+          (set) =>
+            Number(set?.homePoints || 0) > 0 ||
+            Number(set?.awayPoints || 0) > 0 ||
+            set?.started ||
+            set?.completed
+        )
+      ) {
+        return true;
+      }
+
+      return false;
     });
 
-    if (!anyStarted) return "pending";
-    if (allCompleted) return "completed";
-    return "live";
+    return anyProgress ? "live" : "pending";
+  }
+
+  function getSubmatchStatus(submatch) {
+    const score = submatch?.score || {};
+    const hasPoints = getBucketScore(score?.state?.A) !== null || getBucketScore(score?.state?.B) !== null;
+    return String(score?.computed?.status || (hasPoints ? "live" : "pending")).toLowerCase();
+  }
+
+  function getTeamScheduleStatus(match) {
+    const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
+    if (submatches.length) {
+      let anyStarted = false;
+      let allCompleted = true;
+
+      submatches.forEach((submatch) => {
+        const status = getSubmatchStatus(submatch);
+        if (status !== "pending") anyStarted = true;
+        if (status !== "completed") allCompleted = false;
+      });
+
+      if (!anyStarted) return "pending";
+      if (allCompleted) return "completed";
+      return "live";
+    }
+
+    const matchStatus = String(match?.score?.computed?.status || match?.status || "").toLowerCase();
+    if (["live", "completed", "pending"].includes(matchStatus)) return matchStatus;
+
+    const backendTieState = getTeamTieStateFromBackend(match);
+    return deriveTeamTieStatus(backendTieState);
   }
 
   function getStatusClass(status) {
@@ -592,25 +775,59 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
-  function buildTeamScheduleLiveCard(entry, match, roundIndex, matchIndex, status) {
+  function getTeamTotals(match) {
     const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
-    let homeWins = 0;
-    let awayWins = 0;
-    let homePoints = 0;
-    let awayPoints = 0;
+    if (submatches.length) {
+      return submatches.reduce(
+        (acc, submatch) => {
+          const home = getBucketScore(submatch?.score?.state?.A);
+          const away = getBucketScore(submatch?.score?.state?.B);
+          const winnerSide = String(
+            submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || ""
+          ).toUpperCase();
+
+          if (home !== null) acc.homePoints += home;
+          if (away !== null) acc.awayPoints += away;
+          if (winnerSide === "A") acc.homeWins += 1;
+          if (winnerSide === "B") acc.awayWins += 1;
+          return acc;
+        },
+        { homePoints: 0, awayPoints: 0, homeWins: 0, awayWins: 0 }
+      );
+    }
+
+    const computed = match?.score?.computed || {};
+    const backendTieState = getTeamTieStateFromBackend(match);
+    const backendCategories = Array.isArray(backendTieState?.categories) ? backendTieState.categories : [];
+    if (backendCategories.length) {
+      return backendCategories.reduce((acc, category) => {
+        const totals = getTeamTieCategoryPoints(category);
+        acc.homePoints += Number(totals.home || 0);
+        acc.awayPoints += Number(totals.away || 0);
+        if (category?.winnerSide === "A") acc.homeWins += 1;
+        if (category?.winnerSide === "B") acc.awayWins += 1;
+        return acc;
+      }, { homePoints: 0, awayPoints: 0, homeWins: 0, awayWins: 0 });
+    }
+
+    return {
+      homePoints: Number(computed.homeMatchPoints ?? computed.homePoints ?? 0),
+      awayPoints: Number(computed.awayMatchPoints ?? computed.awayPoints ?? 0),
+      homeWins: Number(computed.homeCategoryWins ?? computed.homeWins ?? 0),
+      awayWins: Number(computed.awayCategoryWins ?? computed.awayWins ?? 0),
+    };
+  }
+
+  function buildTeamScheduleLiveCard(entry, match, roundIndex, matchIndex, status) {
+    const backendTieState = getTeamTieStateFromBackend(match);
+    const rawSubmatches = Array.isArray(match?.submatches) ? match.submatches : [];
+    const submatches = rawSubmatches.length ? rawSubmatches : categoriesFromTeamTieState(backendTieState, match);
+    const totals = getTeamTotals(match);
 
     const submatchRows = submatches.length
       ? submatches.map((submatch, idx) => {
           const sa = getBucketScore(submatch?.score?.state?.A);
           const sb = getBucketScore(submatch?.score?.state?.B);
-          const winnerSide = String(
-            submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || ""
-          ).toUpperCase();
-
-          if (winnerSide === "A") homeWins += 1;
-          if (winnerSide === "B") awayWins += 1;
-          if (sa !== null) homePoints += sa;
-          if (sb !== null) awayPoints += sb;
 
           return `
             <div class="live-tv-submatch-row">
@@ -619,7 +836,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               </div>
               <div class="live-tv-submatch-center">
                 <span class="live-tv-submatch-title">${escapeHtml(getSubmatchLabel(submatch, idx))}</span>
-                <span class="live-tv-submatch-score">${escapeHtml(String(sa ?? "-"))} - ${escapeHtml(String(sb ?? "-"))}</span>
+                <span class="live-tv-submatch-score">${escapeHtml(String(sa ?? 0))} - ${escapeHtml(String(sb ?? 0))}</span>
               </div>
               <div class="live-tv-submatch-side live-tv-submatch-side--right">
                 <span class="live-tv-submatch-player">${escapeHtml(getSubmatchPlayerLabel(submatch, "B", match?.away || "Away"))}</span>
@@ -646,15 +863,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="live-tv-teams">
           <div class="live-tv-team">
             <div class="live-tv-team-name">${escapeHtml(match?.home || "Home")}</div>
-            <div class="live-tv-team-total">Total match points ${escapeHtml(String(homePoints))}</div>
+            <div class="live-tv-team-total">Total match points ${escapeHtml(String(totals.homePoints || 0))}</div>
           </div>
           <div class="live-tv-tie-score-wrap">
             <div class="live-tv-tie-score-label">Tie score</div>
-            <div class="live-tv-tie-score">${escapeHtml(String(homeWins))} - ${escapeHtml(String(awayWins))}</div>
+            <div class="live-tv-tie-score">${escapeHtml(String(totals.homeWins || 0))} - ${escapeHtml(String(totals.awayWins || 0))}</div>
           </div>
           <div class="live-tv-team live-tv-team--right">
             <div class="live-tv-team-name">${escapeHtml(match?.away || "Away")}</div>
-            <div class="live-tv-team-total">Total match points ${escapeHtml(String(awayPoints))}</div>
+            <div class="live-tv-team-total">Total match points ${escapeHtml(String(totals.awayPoints || 0))}</div>
           </div>
         </div>
 
@@ -749,7 +966,107 @@ document.addEventListener("DOMContentLoaded", async () => {
       .join("");
   }
 
+  function isTournamentTeamEventSchedule() {
+    const rawType = String(
+      state.tournamentMeta?.tournamentType ||
+      state.fixtures?.tournamentType ||
+      state.fixtures?.meta?.tournamentType ||
+      state.fixtures?.tournament?.tournamentType ||
+      ""
+    ).toLowerCase();
+
+    if (rawType.includes("team")) return true;
+
+    const entries = getFixtureCategoryEntries();
+    return entries.some((entry) => {
+      const displayMode = String(entry?.cat?.displayMode || "").toLowerCase();
+      return displayMode === "team_schedule" || String(entry?.id) === TEAM_EVENT_CATEGORY_ID;
+    });
+  }
+
+  function getTeamEventFixtureBucket() {
+    const entries = getFixtureCategoryEntries();
+    const found = entries.find((entry) => {
+      const displayMode = String(entry?.cat?.displayMode || "").toLowerCase();
+      return displayMode === "team_schedule" || String(entry?.id) === TEAM_EVENT_CATEGORY_ID;
+    });
+    return found?.cat || null;
+  }
+
+  function isRealLeaderboardTeamName(name) {
+    const value = String(name || "").trim();
+    const upper = value.toUpperCase();
+    return Boolean(value && upper !== "BYE" && upper !== "TBD");
+  }
+
+  function buildTeamLeaderboardRowsFromFixturesSchedule() {
+    const cat = getTeamEventFixtureBucket();
+    const matches = Array.isArray(cat?.matches)
+      ? cat.matches
+      : Array.isArray(cat?.rounds?.[0])
+        ? cat.rounds[0]
+        : [];
+
+    const stats = new Map();
+
+    function ensureTeam(teamName) {
+      const key = String(teamName || "").trim();
+      if (!isRealLeaderboardTeamName(key)) return null;
+
+      if (!stats.has(key)) {
+        stats.set(key, {
+          rank: 0,
+          teamName: key,
+          matchPoints: 0,
+          matchesPlayed: 0,
+          qualified: false,
+        });
+      }
+
+      return stats.get(key);
+    }
+
+    matches.forEach((match) => {
+      const homeTeam = String(match?.home || "").trim();
+      const awayTeam = String(match?.away || "").trim();
+
+      const homeRow = ensureTeam(homeTeam);
+      const awayRow = ensureTeam(awayTeam);
+      const totals = getTeamTotals(match);
+
+      if (homeRow) homeRow.matchPoints += Number(totals.homePoints || 0);
+      if (awayRow) awayRow.matchPoints += Number(totals.awayPoints || 0);
+
+      const status = getTeamScheduleStatus(match);
+      const countsAsPlayed =
+        status !== "pending" &&
+        isRealLeaderboardTeamName(homeTeam) &&
+        isRealLeaderboardTeamName(awayTeam);
+
+      if (countsAsPlayed) {
+        if (homeRow) homeRow.matchesPlayed += 1;
+        if (awayRow) awayRow.matchesPlayed += 1;
+      }
+    });
+
+    const sorted = [...stats.values()].sort((a, b) => {
+      if (b.matchPoints !== a.matchPoints) return b.matchPoints - a.matchPoints;
+      if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed;
+      return a.teamName.localeCompare(b.teamName);
+    });
+
+    return sorted.map((row, index) => ({
+      ...row,
+      rank: index + 1,
+      qualified: index < 4,
+    }));
+  }
+
   async function loadLeaderboardRows(categoryId) {
+    if (isTournamentTeamEventSchedule()) {
+      return buildTeamLeaderboardRowsFromFixturesSchedule();
+    }
+
     if (!categoryId) return [];
     const urls = [
       `/api/tournaments/${encodeURIComponent(tournamentId)}/leaderboard?categoryId=${encodeURIComponent(categoryId)}`,
@@ -786,6 +1103,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     rowsByCategory.forEach(({ entry, rows }) => {
       if (!rows.length) return;
 
+      const hasMatchesPlayedColumn = rows.some((row) => row?.matchesPlayed != null);
+
       const section = document.createElement("section");
       section.className = "leaderboard-group";
       section.id = getSectionId("leaderboard", entry.id);
@@ -800,8 +1119,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <th>Rank</th>
                 <th>Team</th>
                 <th>Match points</th>
-                <th>Ties won</th>
-                <th>Head-to-head</th>
+                ${hasMatchesPlayedColumn ? '<th>Matches played</th>' : '<th>Ties won</th>'}
+                ${hasMatchesPlayedColumn ? '' : '<th>Head-to-head</th>'}
                 <th>Qualified</th>
               </tr>
             </thead>
@@ -811,8 +1130,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                   <td>${row.rank ?? index + 1}</td>
                   <td>${escapeHtml(row.teamName || row.team || "-")}</td>
                   <td>${row.matchPoints ?? 0}</td>
-                  <td>${row.tiesWon ?? 0}</td>
-                  <td>${escapeHtml(row.headToHead ?? "-")}</td>
+                  <td>${hasMatchesPlayedColumn ? (row.matchesPlayed ?? 0) : (row.tiesWon ?? 0)}</td>
+                  ${hasMatchesPlayedColumn ? '' : `<td>${escapeHtml(row.headToHead ?? "-")}</td>`}
                   <td>${row.qualified === true || row.qualified === "Yes" ? "Yes" : "No"}</td>
                 </tr>
               `).join("")}
