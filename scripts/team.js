@@ -472,21 +472,32 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function loadTeamRequestsForTournament() {
-    const candidates = [
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
-      `/api/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
-    ];
+  const candidates = [
+    `/api/player/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
+    `/api/player/team-requests`,
+    `/api/tournaments/${encodeURIComponent(tournamentId)}/team-requests`,
+  ];
 
-    for (const url of candidates) {
-      const resp = await apiGet(url);
-      if (!resp.ok) continue;
-      if (Array.isArray(resp.data)) return resp.data.map(normalizeTeamRequest).filter(Boolean);
-      if (Array.isArray(resp.data?.items)) return resp.data.items.map(normalizeTeamRequest).filter(Boolean);
-      if (Array.isArray(resp.data?.requests)) return resp.data.requests.map(normalizeTeamRequest).filter(Boolean);
+  for (const url of candidates) {
+    const resp = await apiGet(url);
+    if (!resp.ok) continue;
+
+    let rows = [];
+    if (Array.isArray(resp.data)) rows = resp.data;
+    else if (Array.isArray(resp.data?.items)) rows = resp.data.items;
+    else if (Array.isArray(resp.data?.requests)) rows = resp.data.requests;
+
+    if (!Array.isArray(rows)) continue;
+
+    if (url === `/api/player/team-requests`) {
+      rows = rows.filter((req) => String(req?.tournamentId || "").trim() === String(tournamentId));
     }
 
-    return [];
+    return rows.map(normalizeTeamRequest).filter(Boolean);
   }
+
+  return [];
+}
 
   async function loadCaptainStateForTournament() {
     const candidates = [
@@ -508,9 +519,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     return tournamentMeta?.captains || tournamentMeta?.captainState || null;
   }
 
-  async function loadCanonicalTeamsForTournament() {
+ async function loadCanonicalTeamsForTournament() {
   const candidates = [
-    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/teams`,
+    `/api/player/tournaments/${encodeURIComponent(tournamentId)}/teams`,
     `/api/tournaments/${encodeURIComponent(tournamentId)}`,
   ];
 
@@ -529,7 +540,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   return [];
 }
-
 function getMyTournamentPlayerIds() {
   return new Set(
     getMyTournamentPlayerRecords()
@@ -611,6 +621,27 @@ function teamMatchesCurrentCaptain(team) {
 
 function teamContainsCurrentUser(team) {
   const myPlayerIds = getMyTournamentPlayerIds();
+
+  const myUsernames = new Set(
+    getMyTournamentPlayerRecords()
+      .map((p) => normalizeIdentity(p?.username || ""))
+      .filter(Boolean)
+  );
+
+  const myPhones = new Set(
+    getMyTournamentPlayerRecords()
+      .map((p) => normalizePhone(p?.phone || p?.playerPhone || ""))
+      .filter(Boolean)
+  );
+
+  const authPhone = normalizePhone(
+    user?.phone ||
+    user?.phoneNumber ||
+    user?.mobile ||
+    ""
+  );
+  if (authPhone) myPhones.add(authPhone);
+
   const players = getCanonicalTeamPlayers(team);
 
   if (teamMatchesCurrentCaptain(team)) return true;
@@ -618,9 +649,8 @@ function teamContainsCurrentUser(team) {
   return players.some((player) => {
     return (
       (player.playerId && myPlayerIds.has(player.playerId)) ||
-      identitiesMatch(player.username, user?.username) ||
-      identitiesMatch(player.playerName, user?.name) ||
-      identitiesMatch(player.playerName, user?.username)
+      (player.username && myUsernames.has(normalizeIdentity(player.username))) ||
+      (player.phone && myPhones.has(normalizePhone(player.phone)))
     );
   });
 }
@@ -630,6 +660,22 @@ function findMyCanonicalCaptainTeam() {
 }
 
 function findMyCanonicalTeam() {
+  const acceptedRequestId = String(currentAcceptedInvite?.requestId || "").trim();
+  if (acceptedRequestId) {
+    const byRequest = canonicalTeams.find(
+      (team) => String(team?.requestId || "").trim() === acceptedRequestId
+    );
+    if (byRequest) return byRequest;
+  }
+
+  const acceptedCategoryId = String(currentAcceptedInvite?.categoryId || "").trim();
+  if (acceptedCategoryId) {
+    const byCategory = canonicalTeams.find(
+      (team) => String(team?.categoryId || "").trim() === acceptedCategoryId
+    );
+    if (byCategory) return byCategory;
+  }
+
   return canonicalTeams.find((team) => teamContainsCurrentUser(team)) || null;
 }
 
@@ -708,17 +754,13 @@ function getActiveDisplayTeam() {
   }
 
   const acceptedInvite = teamRequestsCache.find((req) => {
-    const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
-    return invited.some((invite) => {
-      return (
-        isSameUserByInviteFields(invite, user) &&
-        String(invite.inviteStatus || "").toLowerCase() === "accepted"
-      );
-    });
-  });
+  const invited = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
+  return invited.some(
+    (invite) => String(invite?.inviteStatus || "").toLowerCase() === "accepted"
+  );
+});
 
-  currentAcceptedInvite = acceptedInvite ? normalizeTeamRequest(acceptedInvite) : null;
-
+currentAcceptedInvite = acceptedInvite ? normalizeTeamRequest(acceptedInvite) : null;
   if (currentUserIsCaptain) {
     currentCanonicalTeam = findMyCanonicalCaptainTeam();
   } else {
