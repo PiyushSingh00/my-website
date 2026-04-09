@@ -278,9 +278,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     explicitCategoryId,
     roundIndex,
     matchIndex,
+    scoreIndex = null,
     status,
     winnerName = null,
     computed = null,
+    scorePayload = null,
   }) {
     try {
       const rawFixtures = await apiGet(
@@ -295,37 +297,76 @@ document.addEventListener("DOMContentLoaded", async () => {
       const targetCategoryId = found.categoryId;
       const targetMatch = found.match;
 
+      function cloneScorePayload(payload) {
+        if (!payload || typeof payload !== "object") return null;
+        try {
+          return JSON.parse(JSON.stringify(payload));
+        } catch {
+          return { ...payload };
+        }
+      }
+
+      function applyComputed(targetScore) {
+        targetScore.computed = {
+          ...(targetScore.computed || {}),
+          ...(computed || {}),
+          status: status || "pending",
+          winnerName: winnerName || null,
+        };
+      }
+
+      function applyScore(target, payload) {
+        if (!target || typeof target !== "object") return;
+
+        target.score =
+          target.score && typeof target.score === "object" ? target.score : {};
+
+        const clonedPayload = cloneScorePayload(payload);
+        if (clonedPayload && typeof clonedPayload === "object") {
+          Object.keys(target.score).forEach((key) => delete target.score[key]);
+          Object.assign(target.score, clonedPayload);
+        }
+
+        applyComputed(target.score);
+      }
+
       targetMatch.status = status || "pending";
       if (winnerName) targetMatch.winner = winnerName;
       else delete targetMatch.winner;
+      applyScore(targetMatch, scorePayload);
 
-      targetMatch.score =
-        targetMatch.score && typeof targetMatch.score === "object" ? targetMatch.score : {};
-      targetMatch.score.computed = {
-        ...(targetMatch.score.computed || {}),
-        ...(computed || {}),
-        status: status || "pending",
-        winnerName: winnerName || null,
-      };
+      if (
+        Number.isInteger(scoreIndex) &&
+        scoreIndex >= 0 &&
+        Array.isArray(targetMatch.submatches) &&
+        targetMatch.submatches[scoreIndex]
+      ) {
+        const targetSubmatch = targetMatch.submatches[scoreIndex];
+        targetSubmatch.status = status || "pending";
+        if (winnerName) targetSubmatch.winner = winnerName;
+        else delete targetSubmatch.winner;
+        applyScore(targetSubmatch, scorePayload);
+      }
 
       const categoryBucket = fixturesDoc.categories?.[targetCategoryId];
       if (Array.isArray(categoryBucket?.matches) && categoryBucket.matches[matchIndex]) {
         categoryBucket.matches[matchIndex].status = targetMatch.status;
         if (winnerName) categoryBucket.matches[matchIndex].winner = winnerName;
         else delete categoryBucket.matches[matchIndex].winner;
+        applyScore(categoryBucket.matches[matchIndex], scorePayload);
 
-        categoryBucket.matches[matchIndex].score =
-          categoryBucket.matches[matchIndex].score &&
-          typeof categoryBucket.matches[matchIndex].score === "object"
-            ? categoryBucket.matches[matchIndex].score
-            : {};
-
-        categoryBucket.matches[matchIndex].score.computed = {
-          ...(categoryBucket.matches[matchIndex].score.computed || {}),
-          ...(computed || {}),
-          status: status || "pending",
-          winnerName: winnerName || null,
-        };
+        if (
+          Number.isInteger(scoreIndex) &&
+          scoreIndex >= 0 &&
+          Array.isArray(categoryBucket.matches[matchIndex].submatches) &&
+          categoryBucket.matches[matchIndex].submatches[scoreIndex]
+        ) {
+          const categorySubmatch = categoryBucket.matches[matchIndex].submatches[scoreIndex];
+          categorySubmatch.status = status || "pending";
+          if (winnerName) categorySubmatch.winner = winnerName;
+          else delete categorySubmatch.winner;
+          applyScore(categorySubmatch, scorePayload);
+        }
       }
 
       await apiPost(
@@ -2790,46 +2831,44 @@ try {
               await apiPut(url, payload);
               break;
             }
+
+            await patchFixtureStatusInBackend({
+              explicitCategoryId: resolvedCategoryId,
+              roundIndex,
+              matchIndex,
+              scoreIndex: index,
+              status: category.winnerSide ? "completed" : (isCategoryLineupComplete(category) ? "live" : "pending"),
+              winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
+              computed: {
+                status: category.winnerSide ? "completed" : (isCategoryLineupComplete(category) ? "live" : "pending"),
+                winnerSide: category.winnerSide || null,
+                winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
+              },
+              scorePayload: payload.score,
+            });
           }
         }
 
-          if (!hasSubmatches) {
-            const aggregatePayload = {
-              tournamentId,
-              categoryId: resolvedCategoryId,
-              roundIndex,
-              matchIndex,
-              round: roundIndex,
-              match: matchIndex,
-              scoreIndex: 0,
-              score: {
-                config: { targetPoints: Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1)), winByTwo: false },
-                state: {
-                  A: { points: Number(summary.homeMatchPoints || 0) },
-                  B: { points: Number(summary.awayMatchPoints || 0) },
-                  meta: { teamTieState },
-                },
-                computed: {
-                  status: summary.allCompleted ? "completed" : (summary.readyLineups ? "live" : "pending"),
-                  winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
-                  winnerName: summary.homeWins > summary.awayWins ? homeLabel : summary.awayWins > summary.homeWins ? awayLabel : null,
-                },
-              },
-            };
-            await apiPut(candidateUrls[0], aggregatePayload);
-          }
-
-          const aggregateStatus = getTeamAggregateStatus(teamTieState);
-          const aggregateWinner = getTeamAggregateWinner(summary, aggregateStatus);
-
-          await patchFixtureStatusInBackend({
-            explicitCategoryId: resolvedCategoryId,
-            roundIndex,
-            matchIndex,
-            status: aggregateStatus,
-            winnerName: aggregateWinner,
+        const aggregateStatus = getTeamAggregateStatus(teamTieState);
+        const aggregateWinner = getTeamAggregateWinner(summary, aggregateStatus);
+        const aggregatePayload = {
+          tournamentId,
+          categoryId: resolvedCategoryId,
+          roundIndex,
+          matchIndex,
+          round: roundIndex,
+          match: matchIndex,
+          scoreIndex: 0,
+          score: {
+            config: { targetPoints: Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1)), winByTwo: false },
+            state: {
+              A: { points: Number(summary.homeMatchPoints || 0) },
+              B: { points: Number(summary.awayMatchPoints || 0) },
+              meta: { teamTieState },
+            },
             computed: {
               status: aggregateStatus,
+              winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
               winnerName: aggregateWinner,
               homeCategoryWins: Number(summary?.homeCategoryWins ?? summary?.homeWins ?? 0),
               awayCategoryWins: Number(summary?.awayCategoryWins ?? summary?.awayWins ?? 0),
@@ -2837,8 +2876,23 @@ try {
               awayMatchPoints: Number(summary?.awayMatchPoints ?? summary?.awayPoints ?? 0),
               tieLocked: Boolean(teamTieState?.tieLocked),
             },
-          });
-        } catch (err) {
+          },
+        };
+
+        if (!hasSubmatches) {
+          await apiPut(candidateUrls[0], aggregatePayload);
+        }
+
+        await patchFixtureStatusInBackend({
+          explicitCategoryId: resolvedCategoryId,
+          roundIndex,
+          matchIndex,
+          status: aggregateStatus,
+          winnerName: aggregateWinner,
+          computed: aggregatePayload.score.computed,
+          scorePayload: aggregatePayload.score,
+        });
+      } catch (err) {
         console.error(err);
         if (!silent) alert(err?.message || "Could not auto-save tie data.");
       } finally {
@@ -3394,9 +3448,11 @@ try {
       explicitCategoryId: resolvedCategoryId,
       roundIndex,
       matchIndex,
+      scoreIndex,
       status: computed?.status || "pending",
       winnerName: computed?.winnerName || null,
       computed,
+      scorePayload: payload.score,
     });
 
     if (saveMsg) saveMsg.textContent = "Saved";
