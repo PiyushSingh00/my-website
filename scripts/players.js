@@ -76,6 +76,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   document.getElementById("players-back-btn")?.addEventListener("click", () => {
+    const from = params.get("from");
+
+    if (from === "join" || isLoggedInUserUmpire()) {
+      window.location.href = `join.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+      return;
+    }
+
     window.location.href = "host.html";
   });
 
@@ -147,6 +154,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fixturesNoneSelected = document.getElementById("fixtures-none-selected");
   const fixturesToast = document.getElementById("fixtures-toast");
   const addPlayersExcelBtn = document.getElementById("add-players-excel-btn");
+  const makeUmpireBtn = document.getElementById("make-umpire-btn");
+  const addUmpireModal = document.getElementById("host-add-umpire-modal");
+  const addUmpireClose = document.getElementById("host-add-umpire-close");
+  const addUmpireForm = document.getElementById("host-add-umpire-form");
   const fixturesTournamentNameEl = document.getElementById("fixtures-tournament-name");
   const fixturesTournamentSportEl = document.getElementById("fixtures-tournament-sport");
   const fixturesTournamentDatesEl = document.getElementById("fixtures-tournament-dates");
@@ -221,6 +232,51 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
       return fallback;
     }
   }
+
+    function normalizeIdentity(value) {
+      return String(value || "").trim().toLowerCase();
+    }
+
+    function normalizePhone(value) {
+      return String(value || "").replace(/\D/g, "");
+    }
+
+    function getTournamentUmpires(tournament = tournamentMetaCache) {
+      return Array.isArray(tournament?.umpires) ? tournament.umpires : [];
+    }
+
+    function isLoggedInUserUmpire(tournament = tournamentMetaCache) {
+      const umpires = getTournamentUmpires(tournament);
+      if (!umpires.length) return false;
+
+      const myName = normalizeIdentity(user?.name);
+      const myUsername = normalizeIdentity(user?.username);
+      const myPhone = normalizePhone(user?.phone || user?.mobile || user?.phoneNumber);
+
+      return umpires.some((umpire) => {
+        const umpireName = normalizeIdentity(umpire?.name);
+        const umpireUsername = normalizeIdentity(umpire?.username);
+        const umpirePhone = normalizePhone(umpire?.phone);
+
+        return (
+          (myPhone && umpirePhone && myPhone === umpirePhone) ||
+          (myUsername && umpireUsername && myUsername === umpireUsername) ||
+          (myName && umpireName && myName === umpireName)
+        );
+      });
+    }
+
+    function openAddUmpireModal() {
+      addUmpireModal?.classList.remove("hidden");
+      addUmpireModal?.setAttribute("aria-hidden", "false");
+      document.getElementById("host-umpire-name")?.focus();
+    }
+
+    function closeAddUmpireModal() {
+      addUmpireModal?.classList.add("hidden");
+      addUmpireModal?.setAttribute("aria-hidden", "true");
+      addUmpireForm?.reset();
+    }
 
   function normalizeCategories(cats) {
     if (!cats) return [];
@@ -1533,6 +1589,44 @@ bulkPlayerSaveBtn?.addEventListener("click", async () => {
   closeBulkPlayerModal();
   await loadPlayers();
 });
+
+  makeUmpireBtn?.addEventListener("click", openAddUmpireModal);
+  addUmpireClose?.addEventListener("click", closeAddUmpireModal);
+
+  addUmpireModal?.addEventListener("click", (e) => {
+    if (e.target === addUmpireModal) closeAddUmpireModal();
+  });
+
+  addUmpireForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      name: document.getElementById("host-umpire-name")?.value?.trim() || "",
+      phone: document.getElementById("host-umpire-phone")?.value?.trim() || "",
+    };
+
+    if (!payload.name || !payload.phone) {
+      alert("Please fill umpire name and phone number.");
+      return;
+    }
+
+    const attempts = [
+      () => apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/umpires`, payload),
+      () => apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/officials`, { ...payload, role: "umpire" }),
+    ];
+
+    for (const attempt of attempts) {
+      const r = await attempt();
+      if (r.ok) {
+        closeAddUmpireModal();
+        await loadTournamentMeta();
+        alert("Umpire added successfully.");
+        return;
+      }
+    }
+
+    alert("Could not save umpire. Backend umpire route is not ready yet.");
+  });
 
   addPlayerBtn?.addEventListener("click", openAddPlayerModal);
   addPlayerClose?.addEventListener("click", closeAddPlayerModal);

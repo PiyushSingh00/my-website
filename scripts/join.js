@@ -70,6 +70,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     return String(tournament?.tournamentType || "").toLowerCase().includes("team");
   }
 
+    function normalizePhone(value) {
+      return String(value || "").replace(/\D/g, "");
+    }
+
+    function isTournamentUmpire(tournament) {
+      const umpires = Array.isArray(tournament?.umpires) ? tournament.umpires : [];
+      if (!umpires.length) return false;
+
+      const myName = normalizeIdentity(user?.name);
+      const myUsername = normalizeIdentity(user?.username);
+      const myPhone = normalizePhone(user?.phone || user?.mobile || user?.phoneNumber);
+
+      return umpires.some((umpire) => {
+        const umpireName = normalizeIdentity(umpire?.name);
+        const umpireUsername = normalizeIdentity(umpire?.username);
+        const umpirePhone = normalizePhone(umpire?.phone);
+
+        return (
+          (myPhone && umpirePhone && myPhone === umpirePhone) ||
+          (myUsername && umpireUsername && myUsername === umpireUsername) ||
+          (myName && umpireName && myName === umpireName)
+        );
+      });
+    }
+
   function normalizeTournamentList(raw) {
     if (Array.isArray(raw)) return raw;
     if (!raw || typeof raw !== "object") return [];
@@ -425,45 +450,56 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    myJoinedTournaments.forEach((tournament) => {
-      const tournamentId = tournament?.tournamentId || tournament?.id;
-      const myTeams = Array.isArray(tournament?.myTeams) ? tournament.myTeams : [];
-      const hasTeam = myTeams.length > 0;
-      const teamButtonText = hasTeam ? "View my team" : "View / Create my team";
-      const card = document.createElement("div");
-      card.className = "browse-card";
-      card.innerHTML = `
-        <div class="browse-card-top">
-          <div>
-            <p class="eyebrow">${escapeHtml(tournament?.sportName || "Tournament")}</p>
-            <h3>${escapeHtml(tournament?.tournamentName || "Untitled tournament")}</h3>
-          </div>
-          <div class="code-chip">${escapeHtml(tournament?.accessCode || (tournament?.isPublic === false ? "Private" : "Public"))}</div>
-        </div>
-        <p class="muted">${escapeHtml(tournament?.tournamentDates || "")}</p>
-        <p class="muted">${escapeHtml(tournament?.venue || "")}</p>
-        <div class="browse-actions">
-          <button type="button" class="btn-dark" data-action="schedule">View schedule</button>
-          <button type="button" class="btn-dark" data-action="team">${teamButtonText}</button>
-          <button type="button" class="btn-secondary danger-btn" data-action="leave">Leave tournament</button>
-        </div>
-      `;
+        myJoinedTournaments.forEach((tournament) => {
+          const tournamentId = tournament?.tournamentId || tournament?.id;
+          const myTeams = Array.isArray(tournament?.myTeams) ? tournament.myTeams : [];
+          const hasTeam = myTeams.length > 0;
+          const teamButtonText = hasTeam ? "View my team" : "View / Create my team";
+          const canGoToScoring = isTournamentUmpire(tournament);
 
-      card.querySelector('[data-action="schedule"]')?.addEventListener("click", () => {
-        window.location.href = `schedule.html?tournamentId=${encodeURIComponent(tournamentId)}`;
-      });
+          const card = document.createElement("div");
+          card.className = "browse-card";
+          card.innerHTML = `
+            <div class="browse-card-top">
+              <div>
+                <p class="eyebrow">${escapeHtml(tournament?.sportName || "Tournament")}</p>
+                <h3>${escapeHtml(tournament?.tournamentName || "Untitled tournament")}</h3>
+              </div>
+              <div class="code-chip">${escapeHtml(tournament?.accessCode || (tournament?.isPublic === false ? "Private" : "Public"))}</div>
+            </div>
+            <p class="muted">${escapeHtml(tournament?.tournamentDates || "")}</p>
+            <p class="muted">${escapeHtml(tournament?.venue || "")}</p>
+            <div class="browse-actions">
+              <button type="button" class="btn-dark" data-action="schedule">View schedule</button>
+              <button type="button" class="btn-dark" data-action="team">${teamButtonText}</button>
+              ${
+                canGoToScoring
+                  ? `<button type="button" class="btn-primary" data-action="scoring">Go to scoring</button>`
+                  : ""
+              }
+              <button type="button" class="btn-secondary danger-btn" data-action="leave">Leave tournament</button>
+            </div>
+          `;
 
-      card.querySelector('[data-action="team"]')?.addEventListener("click", () => {
-        window.location.href = `team.html?tournamentId=${encodeURIComponent(tournamentId)}`;
-      });
+          card.querySelector('[data-action="schedule"]')?.addEventListener("click", () => {
+            window.location.href = `schedule.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+          });
 
-      card.querySelector('[data-action="leave"]')?.addEventListener("click", async () => {
-        if (!confirm("Leave this tournament?")) return;
-        await leaveTournamentNow(tournament);
-      });
+          card.querySelector('[data-action="team"]')?.addEventListener("click", () => {
+            window.location.href = `team.html?tournamentId=${encodeURIComponent(tournamentId)}`;
+          });
 
-      myJoinedList.appendChild(card);
-    });
+          card.querySelector('[data-action="scoring"]')?.addEventListener("click", () => {
+            window.location.href = `players.html?tournamentId=${encodeURIComponent(tournamentId)}&from=join`;
+          });
+
+          card.querySelector('[data-action="leave"]')?.addEventListener("click", async () => {
+            if (!confirm("Leave this tournament?")) return;
+            await leaveTournamentNow(tournament);
+          });
+
+          myJoinedList.appendChild(card);
+        });
   }
 
   function renderNotifications() {
