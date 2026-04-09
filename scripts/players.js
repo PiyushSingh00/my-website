@@ -1068,27 +1068,57 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
   }
 
   async function loadTournamentMeta() {
-    const host = await apiGet("/api/host/tournaments");
-    if (host.ok) {
-      const list = normalizeTournamentList(host.data);
-      const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
-      if (found) {
-        tournamentMetaCache = found;
-        hydrateTournamentMetaUi(found);
-        return;
-      }
-    }
+  const directCandidates = [
+    `/api/tournaments/${encodeURIComponent(tournamentId)}`,
+  ];
 
-    const pub = await apiGet("/api/tournaments");
-    if (pub.ok) {
-      const list = normalizeTournamentList(pub.data);
-      const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
-      if (found) {
-        tournamentMetaCache = found;
-        hydrateTournamentMetaUi(found);
-      }
+  for (const url of directCandidates) {
+    const resp = await apiGet(url);
+    if (!resp.ok) continue;
+
+    const found = resp.data?.data || resp.data || null;
+    if (found && String(found.tournamentId ?? found.id) === String(tournamentId)) {
+      tournamentMetaCache = found;
+      hydrateTournamentMetaUi(found);
+      return found;
     }
   }
+
+  const mine = await apiGet("/api/player/tournaments");
+  if (mine.ok) {
+    const list = normalizeTournamentList(mine.data);
+    const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
+    if (found) {
+      tournamentMetaCache = found;
+      hydrateTournamentMetaUi(found);
+      return found;
+    }
+  }
+
+  const host = await apiGet("/api/host/tournaments");
+  if (host.ok) {
+    const list = normalizeTournamentList(host.data);
+    const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
+    if (found) {
+      tournamentMetaCache = found;
+      hydrateTournamentMetaUi(found);
+      return found;
+    }
+  }
+
+  const pub = await apiGet("/api/tournaments");
+  if (pub.ok) {
+    const list = normalizeTournamentList(pub.data);
+    const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
+    if (found) {
+      tournamentMetaCache = found;
+      hydrateTournamentMetaUi(found);
+      return found;
+    }
+  }
+
+  return null;
+}
 
   function hydrateTournamentMetaUi(tournament) {
     titleEl.textContent = tournament?.tournamentName || "Tournament";
