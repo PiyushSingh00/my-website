@@ -2367,7 +2367,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         } else if (summary.allCompleted) {
           teamCategoryHelp.textContent = "All category matches are completed. Lock scores to freeze this tie.";
         } else {
-          teamCategoryHelp.textContent = "Start scoring category by category. Previous completed category unlocks the next one.";
+          teamCategoryHelp.textContent = "You can start scoring any category once both team lineups are complete.";
         }
       }
 
@@ -2480,23 +2480,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         card.className = `category-card${category.isScoringOpen ? " open" : ""}`;
 
         const resultInfo = getCategoryResultInfo(category, homeLabel, awayLabel);
-        const previousCompleted = teamTieState.categories.slice(0, index).every((item) => Boolean(item.winnerSide));
+        const previousCompleted = true;
 
         const slotCount = getCategorySlotCount(category);
         const homeSelectedCount = getSelectedPlayers(category, "A").length;
         const awaySelectedCount = getSelectedPlayers(category, "B").length;
         const lineupComplete = isCategoryLineupComplete(category);
 
-        const canScore = lineupComplete && previousCompleted && !teamTieState.tieLocked;
+        const canScore = lineupComplete && !teamTieState.tieLocked;
         const canToggle = category.categoryLocked || category.isScoringOpen || canScore;
 
         const debugReason = teamTieState.tieLocked
           ? "LOCKED"
           : !lineupComplete
             ? `Need lineup • A ${homeSelectedCount}/${slotCount} • B ${awaySelectedCount}/${slotCount}`
-            : !previousCompleted
-              ? "Previous category incomplete"
-              : "Ready";
+            : "Ready";
 
         const buttonLabel = teamTieState.tieLocked
           ? "Locked"
@@ -2506,9 +2504,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               ? "View result"
               : !isCategoryLineupComplete(category)
                 ? "Complete lineup first"
-                : canScore
-                  ? "Start scoring"
-                  : "Complete previous category first";
+                : "Start scoring";
 
         const categoryBody =
           category.sportKey === "pickleball"
