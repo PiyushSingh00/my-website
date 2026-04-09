@@ -82,6 +82,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     return String(value || "").trim().toLowerCase();
   }
 
+  function normalizePhone(value) {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length === 10) return `91${digits}`;
+    return digits;
+  }
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -143,8 +150,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getMyTournamentPlayerRecords() {
+    const authUserIds = new Set(
+      [
+        user?.id,
+        user?.userId,
+        user?.sub,
+      ]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    );
+
+    const authPhone = normalizePhone(
+      user?.phone ||
+      user?.phoneNumber ||
+      user?.mobile ||
+      ""
+    );
+
     return allPlayers.filter((player) => {
+      const playerRecordId = String(player?.userId || "").trim();
+      const playerPhone = normalizePhone(player?.phone || player?.playerPhone || "");
+
       return (
+        (playerRecordId && authUserIds.has(playerRecordId)) ||
+        (authPhone && playerPhone && authPhone === playerPhone) ||
         identitiesMatch(player?.username, user?.username) ||
         identitiesMatch(player?.playerName, user?.name) ||
         identitiesMatch(player?.playerName, user?.username) ||
@@ -177,7 +206,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function isSameCaptain(submission, currentUser = user) {
+    const myPlayerIds = getMyTournamentPlayerIds();
     return (
+      (submission?.captainPlayerId && myPlayerIds.has(String(submission.captainPlayerId))) ||
       identitiesMatch(submission?.captainUsername, currentUser?.username) ||
       identitiesMatch(submission?.captainName, currentUser?.name) ||
       identitiesMatch(submission?.captainName, currentUser?.username) ||
@@ -644,8 +675,12 @@ function getActiveDisplayTeam() {
 
   const myCaptainRequest = teamRequestsCache.find((req) => isSameCaptain(req, user));
 
+  const myPlayerIds = getMyTournamentPlayerIds();
+
   const myConfirmedCaptain = confirmedCaptains.find((c) => {
     return (
+      (c?.playerId && myPlayerIds.has(String(c.playerId))) ||
+      (c?.captainPlayerId && myPlayerIds.has(String(c.captainPlayerId))) ||
       identitiesMatch(c?.username, user?.username) ||
       identitiesMatch(c?.captainUsername, user?.username) ||
       identitiesMatch(c?.playerName, user?.name) ||
