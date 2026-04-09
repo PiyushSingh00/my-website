@@ -443,6 +443,21 @@ function buildTeamRosterLookupFromCaptains(raw) {
       return toArray(fallbackRoster).map((name) => safeText(name)).filter(Boolean);
     }
 
+function mergeUniqueRoster(...sources) {
+  const merged = [];
+
+  sources.forEach((source) => {
+    toArray(source).forEach((name) => {
+      const clean = safeText(name);
+      if (clean && !merged.includes(clean)) {
+        merged.push(clean);
+      }
+    });
+  });
+
+  return merged;
+}
+
   function ordinal(n) {
     const s = ["th", "st", "nd", "rd"];
     const v = n % 100;
@@ -1659,9 +1674,17 @@ function buildTeamRosterLookupFromCaptains(raw) {
 
     const normalized = { ...candidate };
     const detectedSportKey = detectEffectiveSportKey(rawFixtures);
+normalized.homeRoster = mergeUniqueRoster(
+  resolveRosterList(fresh.homeRoster, [], matchObj?.home),
+  resolveRosterList(normalized.homeRoster, [], matchObj?.home)
+);
 
-    normalized.homeRoster = resolveRosterList(normalized.homeRoster, fresh.homeRoster, matchObj?.home);
-    normalized.awayRoster = resolveRosterList(normalized.awayRoster, fresh.awayRoster, matchObj?.away);
+normalized.awayRoster = mergeUniqueRoster(
+  resolveRosterList(fresh.awayRoster, [], matchObj?.away),
+  resolveRosterList(normalized.awayRoster, [], matchObj?.away)
+);
+
+
     normalized.tournamentSportKey =
       detectedSportKey || fresh.tournamentSportKey || normalized.tournamentSportKey || "";
     normalized.lineupCollapsed = Boolean(normalized.lineupCollapsed);
@@ -1774,11 +1797,16 @@ function buildTeamRosterLookupFromCaptains(raw) {
   function hydrateTeamTieStateFromMatch(matchObj, teamTieState, rawFixtures) {
     if (!matchObj || !teamTieState) return;
 
-    const homeUsage = toArray(matchObj?.lineups?.home?.usage).map((item) => safeText(item?.playerName || item?.name)).filter(Boolean);
-    const awayUsage = toArray(matchObj?.lineups?.away?.usage).map((item) => safeText(item?.playerName || item?.name)).filter(Boolean);
-    if (homeUsage.length) teamTieState.homeRoster = homeUsage;
-    if (awayUsage.length) teamTieState.awayRoster = awayUsage;
+const homeUsage = toArray(matchObj?.lineups?.home?.usage)
+  .map((item) => safeText(item?.playerName || item?.name))
+  .filter(Boolean);
 
+const awayUsage = toArray(matchObj?.lineups?.away?.usage)
+  .map((item) => safeText(item?.playerName || item?.name))
+  .filter(Boolean);
+
+teamTieState.homeRoster = mergeUniqueRoster(teamTieState.homeRoster, homeUsage);
+teamTieState.awayRoster = mergeUniqueRoster(teamTieState.awayRoster, awayUsage);
     const homeAssignments = toArray(matchObj?.lineups?.home?.assignments);
     const awayAssignments = toArray(matchObj?.lineups?.away?.assignments);
 
@@ -1813,16 +1841,15 @@ function buildTeamRosterLookupFromCaptains(raw) {
 
     const aggregateTie = matchObj?.score?.state?.meta?.teamTieState;
     if (aggregateTie && typeof aggregateTie === "object") {
-      teamTieState.homeRoster = resolveRosterList(
-        aggregateTie.homeRoster,
-        teamTieState.homeRoster,
-        matchObj?.home
-      );
-      teamTieState.awayRoster = resolveRosterList(
-        aggregateTie.awayRoster,
-        teamTieState.awayRoster,
-        matchObj?.away
-      );
+teamTieState.homeRoster = mergeUniqueRoster(
+  teamTieState.homeRoster,
+  resolveRosterList(aggregateTie.homeRoster, [], matchObj?.home)
+);
+
+teamTieState.awayRoster = mergeUniqueRoster(
+  teamTieState.awayRoster,
+  resolveRosterList(aggregateTie.awayRoster, [], matchObj?.away)
+);
       teamTieState.tournamentSportKey = safeText(
         aggregateTie.tournamentSportKey,
         teamTieState.tournamentSportKey || forcedSportKey || ""
