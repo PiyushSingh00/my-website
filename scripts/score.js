@@ -419,17 +419,69 @@ function buildTeamRosterLookupFromCaptains(raw) {
   teamRosterLookup = lookup;
 }
 
-    async function loadTeamRosterLookup() {
-      try {
-        const captainsRaw = await apiGet(
-          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`
-        );
-        buildTeamRosterLookupFromCaptains(captainsRaw);
-      } catch (err) {
-        console.warn("Could not load team rosters from captains route", err);
-        teamRosterLookup = new Map();
-      }
+function buildTeamRosterLookupFromTeams(raw) {
+  const payload = raw?.data || raw || {};
+  const teams = Array.isArray(payload?.teams)
+    ? payload.teams
+    : Array.isArray(payload)
+      ? payload
+      : [];
+
+  const lookup = new Map();
+
+  teams.forEach((team) => {
+    const teamName = safeText(team?.teamName || team?.captainName || team?.captainUsername);
+    if (!teamName) return;
+
+    const roster = toArray(team?.players || team?.teamRoster)
+      .map((item) =>
+        typeof item === "string"
+          ? safeText(item)
+          : safeText(item?.playerName || item?.name || item?.fullName || item?.username)
+      )
+      .filter(Boolean);
+
+    if (roster.length) {
+      lookup.set(teamName, Array.from(new Set(roster)));
     }
+  });
+
+  return lookup;
+}
+
+async function loadTeamRosterLookup() {
+  const merged = new Map();
+
+  try {
+    const teamsRaw = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/teams`
+    );
+
+    const fromTeams = buildTeamRosterLookupFromTeams(teamsRaw);
+    fromTeams.forEach((roster, teamName) => {
+      merged.set(teamName, roster);
+    });
+  } catch (err) {
+    console.warn("Could not load team rosters from teams route", err);
+  }
+
+  try {
+    const captainsRaw = await apiGet(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/captains`
+    );
+
+    buildTeamRosterLookupFromCaptains(captainsRaw);
+
+    teamRosterLookup.forEach((roster, teamName) => {
+      const existing = merged.get(teamName) || [];
+      merged.set(teamName, Array.from(new Set([...existing, ...roster])));
+    });
+  } catch (err) {
+    console.warn("Could not load team rosters from captains route", err);
+  }
+
+  teamRosterLookup = merged;
+}
 
     function isRosterJustTeamLabel(roster, teamLabel) {
       const list = toArray(roster).map((name) => safeText(name)).filter(Boolean);
