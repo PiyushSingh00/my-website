@@ -373,21 +373,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return finalEntries;
   }
 
-  function getTeamStorageKey(roundIndex, matchIndex) {
-    return `score_team_tie_state::${tournamentId}::${roundIndex}::${matchIndex}`;
-  }
-
-  function readLocalTeamTieState(roundIndex, matchIndex) {
-    try {
-      const raw = localStorage.getItem(getTeamStorageKey(roundIndex, matchIndex));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : null;
-    } catch {
-      return null;
-    }
-  }
-
   function getSubmatchStatus(submatch) {
     const score = submatch?.score || {};
     const hasPoints = getBucketScore(score?.state?.A) !== null || getBucketScore(score?.state?.B) !== null;
@@ -396,29 +381,177 @@ document.addEventListener("DOMContentLoaded", async () => {
     return hasPoints ? "live" : "pending";
   }
 
-  function categoriesFromLocalTieState(localTieState, match) {
-    const categories = toArray(localTieState?.categories).map((category, index) => {
-      const totalsHome = Number(category?.sportData?.sets?.reduce?.((sum, set) => sum + Number(set?.homePoints || 0), 0) || 0);
-      const totalsAway = Number(category?.sportData?.sets?.reduce?.((sum, set) => sum + Number(set?.awayPoints || 0), 0) || 0);
+  function getTeamTieStateFromBackend(match) {
+    const direct = match?.score?.state?.meta?.teamTieState;
+    if (direct && typeof direct === "object") return direct;
+
+    const submatches = toArray(match?.submatches);
+    const categories = submatches
+      .map((submatch, index) => {
+        const snapshot = getSubmatchSnapshot(submatch);
+        if (snapshot && typeof snapshot === "object") return snapshot;
+
+        const home = getBucketScore(submatch?.score?.state?.A);
+        const away = getBucketScore(submatch?.score?.state?.B);
+        const winnerSide = String(
+          submatch?.score?.computed?.winnerSide || submatch?.score?.winnerSide || ""
+        ).toUpperCase();
+
+        if (home === null && away === null && !winnerSide && !submatch?.status) return null;
+
+        return {
+          name: getSubmatchLabel(submatch, index),
+          homePlayer: getSubmatchPlayerLabel(submatch, "A", match?.home || "Home"),
+          awayPlayer: getSubmatchPlayerLabel(submatch, "B", match?.away || "Away"),
+          homeScore: Number(home || 0),
+          awayScore: Number(away || 0),
+          winnerSide: winnerSide || null,
+          sportKey: safeText(snapshot?.sportKey, ""),
+          sportData: snapshot?.sportData || null,
+          categoryLocked: Boolean(snapshot?.categoryLocked),
+        };
+      })
+      .filter(Boolean);
+
+    if (!categories.length) return null;
+
+    return {
+      categories,
+      tieLocked: Boolean(match?.score?.computed?.tieLocked),
+    };
+  }
+
+  function getTeamTieCategoryPoints(category) {
+    const sportKey = safeText(category?.sportKey, "").toLowerCase();
+    const data = category?.sportData || {};
+
+    if (sportKey === "pickleball") {
+      return toArray(data?.sets).reduce(
+        (acc, set) => {
+          acc.home += Number(set?.homePoints || 0);
+          acc.away += Number(set?.awayPoints || 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    if (sportKey === "badminton") {
+      return toArray(data?.games).reduce(
+        (acc, game) => {
+          acc.home += Number(game?.a ?? game?.home ?? 0);
+          acc.away += Number(game?.b ?? game?.away ?? 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    if (sportKey === "tennis") {
+      return toArray(data?.sets).reduce(
+        (acc, setRow) => {
+          acc.home += Number(setRow?.a ?? setRow?.home ?? 0);
+          acc.away += Number(setRow?.b ?? setRow?.away ?? 0);
+          return acc;
+        },
+        { home: 0, away: 0 }
+      );
+    }
+
+    if (sportKey === "football") {
+      return {
+        home: Number(data?.homeGoals ?? data?.a ?? 0),
+        away: Number(data?.awayGoals ?? data?.b ?? 0),
+      };
+    }
+
+    if (sportKey === "cricket") {
+      return {
+        home: Number(data?.homeRuns ?? data?.a ?? 0),
+        away: Number(data?.awayRuns ?? data?.b ?? 0),
+      };
+    }
+
+    return {
+      home: Number(category?.homeScore ?? category?.score?.home ?? 0),
+      away: Number(category?.awayScore ?? category?.score?.away ?? 0),
+    };
+  }
+
+  function categoriesFromTeamTieState(teamTieState, match) {
+    return toArray(teamTieState?.categories).map((category, index) => {
+      const totals = getTeamTieCategoryPoints(category);
+      const hasProgress =
+        Number(totals.home || 0) > 0 ||
+        Number(totals.away || 0) > 0 ||
+        Number(category?.sportData?.currentSetIndex) >= 0 ||
+        Boolean(category?.winnerSide);
+
       return {
         name: category?.name || category?.eventName || `Submatch ${index + 1}`,
-        homePlayer: getSafeJoinedNames(category?.homePlayersSelected || category?.homePlayer, match?.home || "Home"),
-        awayPlayer: getSafeJoinedNames(category?.awayPlayersSelected || category?.awayPlayer, match?.away || "Away"),
+        homePlayer: getSafeJoinedNames(
+          category?.homePlayersSelected || category?.homePlayer,
+          match?.home || "Home"
+        ),
+        awayPlayer: getSafeJoinedNames(
+          category?.awayPlayersSelected || category?.awayPlayer,
+          match?.away || "Away"
+        ),
         score: {
           state: {
-            A: { points: Number.isFinite(totalsHome) ? totalsHome : 0 },
-            B: { points: Number.isFinite(totalsAway) ? totalsAway : 0 },
+            A: { points: Number(totals.home || 0) },
+            B: { points: Number(totals.away || 0) },
             meta: { categorySnapshot: category },
           },
           computed: {
-            status: category?.winnerSide ? "completed" : ((category?.sportData?.currentSetIndex != null || totalsHome > 0 || totalsAway > 0) ? "live" : "pending"),
+            status: category?.winnerSide
+              ? "completed"
+              : (hasProgress ? "live" : "pending"),
             winnerSide: category?.winnerSide || null,
           },
         },
       };
     });
+  }
 
-    return categories;
+  function deriveTeamTieStatus(teamTieState) {
+    const categories = toArray(teamTieState?.categories);
+    if (!categories.length) return "pending";
+
+    const allCompleted = categories.every((category) => category?.categoryLocked || category?.winnerSide);
+    if (allCompleted) return "completed";
+
+    const anyProgress = categories.some((category) => {
+      if (!category || typeof category !== "object") return false;
+      if (category?.lineupStatus === "accepted") return true;
+      if (category?.categoryLocked) return true;
+      if (category?.winnerSide) return true;
+      if (getSafeJoinedNames(category?.homePlayersSelected || category?.homePlayer) || getSafeJoinedNames(category?.awayPlayersSelected || category?.awayPlayer)) {
+        return true;
+      }
+
+      const totals = getTeamTieCategoryPoints(category);
+      if (Number(totals.home || 0) > 0 || Number(totals.away || 0) > 0) return true;
+
+      const sportData = category?.sportData || {};
+      if (sportData.currentSetIndex != null) return true;
+      if (
+        Array.isArray(sportData.sets) &&
+        sportData.sets.some(
+          (set) =>
+            Number(set?.homePoints || 0) > 0 ||
+            Number(set?.awayPoints || 0) > 0 ||
+            set?.started ||
+            set?.completed
+        )
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
+    return anyProgress ? "live" : "pending";
   }
 
   function getTeamScheduleStatus(match, roundIndex, matchIndex) {
@@ -441,15 +574,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const matchStatus = String(match?.score?.computed?.status || match?.status || "").toLowerCase();
     if (["live", "completed", "pending"].includes(matchStatus)) return matchStatus;
 
-    const localTieState = readLocalTeamTieState(roundIndex, matchIndex);
-    if (localTieState) {
-      const categories = toArray(localTieState?.categories);
-      if (categories.some((category) => category?.winnerSide || category?.categoryLocked)) return "live";
-      if (categories.some((category) => Number(category?.sportData?.currentSetIndex) >= 0)) return "live";
-      if (categories.some((category) => getSafeJoinedNames(category?.homePlayer) || getSafeJoinedNames(category?.awayPlayer))) return "live";
-    }
-
-    return "pending";
+    const backendTieState = getTeamTieStateFromBackend(match);
+    return deriveTeamTieStatus(backendTieState);
   }
 
   function getTeamTotals(match, roundIndex, matchIndex) {
@@ -474,13 +600,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const computed = match?.score?.computed || {};
-    const localTieState = readLocalTeamTieState(roundIndex, matchIndex);
-    const localCategories = toArray(localTieState?.categories);
-    if (localCategories.length) {
-      return localCategories.reduce((acc, category) => {
-        const sets = toArray(category?.sportData?.sets);
-        acc.homePoints += sets.reduce((sum, set) => sum + Number(set?.homePoints || 0), 0);
-        acc.awayPoints += sets.reduce((sum, set) => sum + Number(set?.awayPoints || 0), 0);
+    const backendTieState = getTeamTieStateFromBackend(match);
+    const backendCategories = toArray(backendTieState?.categories);
+    if (backendCategories.length) {
+      return backendCategories.reduce((acc, category) => {
+        const totals = getTeamTieCategoryPoints(category);
+        acc.homePoints += Number(totals.home || 0);
+        acc.awayPoints += Number(totals.away || 0);
         if (category?.winnerSide === "A") acc.homeWins += 1;
         if (category?.winnerSide === "B") acc.awayWins += 1;
         return acc;
@@ -509,12 +635,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       return submatches[0] || null;
     }
 
-    const localTieState = readLocalTeamTieState(roundIndex, matchIndex);
-    const localSubmatches = categoriesFromLocalTieState(localTieState, match);
-    if (localSubmatches.length) {
-      const live = localSubmatches.find((submatch) => getSubmatchStatus(submatch) === "live");
+    const backendTieState = getTeamTieStateFromBackend(match);
+    const backendSubmatches = categoriesFromTeamTieState(backendTieState, match);
+    if (backendSubmatches.length) {
+      const live = backendSubmatches.find((submatch) => getSubmatchStatus(submatch) === "live");
       if (live) return live;
-      return localSubmatches[0];
+
+      const withPoints = backendSubmatches.find((submatch) => {
+        return getBucketScore(submatch?.score?.state?.A) !== null || getBucketScore(submatch?.score?.state?.B) !== null;
+      });
+      if (withPoints) return withPoints;
+
+      return backendSubmatches[0];
     }
 
     const computed = match?.score?.computed || {};
@@ -662,12 +794,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       const homeRow = ensureTeam(homeTeam);
       const awayRow = ensureTeam(awayTeam);
 
+      const totals = getTeamTotals(match, 0, matchIndex);
+
       if (homeRow) {
-        homeRow.matchPoints += getFixtureMatchPoints(match, "home");
+        homeRow.matchPoints += Number(totals.homePoints || 0);
       }
 
       if (awayRow) {
-        awayRow.matchPoints += getFixtureMatchPoints(match, "away");
+        awayRow.matchPoints += Number(totals.awayPoints || 0);
       }
 
       const status = getTeamScheduleStatus(match, 0, matchIndex);
