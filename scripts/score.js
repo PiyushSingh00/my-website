@@ -1601,66 +1601,119 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   }
 
+  function getTeamTieStateProgressScore(candidate) {
+    if (!candidate || !Array.isArray(candidate.categories)) return -1;
+
+    let score = candidate.tieLocked ? 1000 : 0;
+
+    candidate.categories.forEach((category) => {
+      if (!category || typeof category !== "object") return;
+
+      if (isCategoryLineupComplete(category)) score += 5;
+      if (safeText(category.homePlayer) || safeText(category.awayPlayer)) score += 2;
+      if (category.categoryLocked) score += 15;
+      if (category.winnerSide) score += 30;
+
+      const sportData = category.sportData || {};
+      if (sportData.currentSetIndex != null) score += 5;
+
+      if (Array.isArray(sportData.sets)) {
+        score += sportData.sets.reduce((sum, set) => {
+          return sum + Number(set?.homePoints || 0) + Number(set?.awayPoints || 0);
+        }, 0);
+      }
+
+      score += Number(category.homeScore || 0) + Number(category.awayScore || 0);
+    });
+
+    return score;
+  }
+
+  function normalizeLoadedTeamTieState(candidate, matchObj, fresh, rawFixtures) {
+    if (!candidate || !Array.isArray(candidate.categories)) return null;
+
+    const normalized = { ...candidate };
+    const detectedSportKey = detectEffectiveSportKey(rawFixtures);
+
+    normalized.homeRoster = resolveRosterList(normalized.homeRoster, fresh.homeRoster, matchObj?.home);
+    normalized.awayRoster = resolveRosterList(normalized.awayRoster, fresh.awayRoster, matchObj?.away);
+    normalized.tournamentSportKey =
+      detectedSportKey || fresh.tournamentSportKey || normalized.tournamentSportKey || "";
+    normalized.lineupCollapsed = Boolean(normalized.lineupCollapsed);
+    normalized.tieLocked = Boolean(normalized.tieLocked);
+
+    normalized.categories = fresh.categories.map((baseCategory, index) => {
+      const category = normalized.categories[index] || {};
+      const merged = {
+        ...baseCategory,
+        ...category,
+        sportKey:
+          detectedSportKey ||
+          normalized.tournamentSportKey ||
+          baseCategory?.sportKey ||
+          category?.sportKey ||
+          "",
+        slotCount: Number(category?.slotCount || baseCategory?.slotCount || 1),
+      };
+
+      if (merged.sportKey === "pickleball") {
+        merged.sportData = ensurePickleballTeamData(category?.sportData, rawFixtures);
+      } else {
+        merged.sportData =
+          category?.sportData ??
+          baseCategory?.sportData ??
+          (hasPresetSportSchema(merged.sportKey)
+            ? cloneDefaultPresetSportData(merged.sportKey, rawFixtures)
+            : null);
+      }
+
+      syncCategoryPlayerStrings(merged);
+      merged.lineupStatus = isCategoryLineupComplete(merged) ? "accepted" : "pending";
+
+      if (normalized.tieLocked) {
+        merged.categoryLocked = Boolean(
+          merged.categoryLocked || merged.sportData?.categoryLocked || merged.winnerSide
+        );
+      }
+
+      return merged;
+    });
+
+    return normalized;
+  }
+
   function loadTeamTieState(matchObj, rawFixtures) {
     const key = getTeamStorageKey();
     const fresh = buildInitialTeamState(matchObj, rawFixtures);
 
+    let saved = null;
     try {
-      const saved = JSON.parse(localStorage.getItem(key) || "null");
-      if (saved && Array.isArray(saved.categories)) {
-        saved.homeRoster = resolveRosterList(saved.homeRoster, fresh.homeRoster, matchObj?.home);
-        saved.awayRoster = resolveRosterList(saved.awayRoster, fresh.awayRoster, matchObj?.away);
-
-        const detectedSportKey = detectEffectiveSportKey(rawFixtures);
-        saved.tournamentSportKey = detectedSportKey || fresh.tournamentSportKey || saved.tournamentSportKey || "";
-
-        saved.lineupCollapsed = Boolean(saved.lineupCollapsed);
-        saved.tieLocked = Boolean(saved.tieLocked);
-
-        const hasSavedLockedEvidence =
-          saved.tieLocked &&
-          Array.isArray(saved.categories) &&
-          saved.categories.some((category) => Boolean(category?.categoryLocked || category?.winnerSide));
-
-        if (!hasSavedLockedEvidence) {
-          saved.tieLocked = false;
-        }
-
-        saved.categories = saved.categories.map((category, index) => {
-          const merged = {
-            ...fresh.categories[index],
-            ...category,
-            sportKey: detectEffectiveSportKey(rawFixtures) || saved.tournamentSportKey || fresh.categories[index]?.sportKey || category?.sportKey || "",
-            slotCount: Number(category?.slotCount || fresh.categories[index]?.slotCount || 1),
-          };
-
-          if (merged.sportKey === "pickleball") {
-            merged.sportData = ensurePickleballTeamData(category?.sportData, rawFixtures);
-          } else {
-            merged.sportData =
-              category?.sportData ??
-              fresh.categories[index]?.sportData ??
-              (hasPresetSportSchema(merged.sportKey)
-                ? cloneDefaultPresetSportData(merged.sportKey, rawFixtures)
-                : null);
-          }
-
-          syncCategoryPlayerStrings(merged);
-          merged.lineupStatus = isCategoryLineupComplete(merged) ? "accepted" : "pending";
-          merged.categoryLocked = hasSavedLockedEvidence
-            ? Boolean(merged.categoryLocked || merged.sportData?.categoryLocked)
-            : false;
-          return merged;
-        });
-
-        return saved;
-      }
+      saved = JSON.parse(localStorage.getItem(key) || "null");
     } catch {}
 
+    const normalizedSaved = normalizeLoadedTeamTieState(saved, matchObj, fresh, rawFixtures);
+
+    const backendCandidate = buildInitialTeamState(matchObj, rawFixtures);
+    hydrateTeamTieStateFromMatch(matchObj, backendCandidate, rawFixtures);
+    const normalizedBackend = normalizeLoadedTeamTieState(
+      backendCandidate,
+      matchObj,
+      fresh,
+      rawFixtures
+    );
+
+    const savedScore = getTeamTieStateProgressScore(normalizedSaved);
+    const backendScore = getTeamTieStateProgressScore(normalizedBackend);
+
+    if (backendScore >= savedScore && normalizedBackend) return normalizedBackend;
+    if (normalizedSaved) return normalizedSaved;
     return fresh;
   }
 
   function saveTeamTieState(teamState) {
+    if (teamState && typeof teamState === "object") {
+      teamState.updatedAt = new Date().toISOString();
+    }
     localStorage.setItem(getTeamStorageKey(), JSON.stringify(teamState));
   }
 
@@ -1735,7 +1788,30 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const aggregateTie = matchObj?.score?.state?.meta?.teamTieState;
     if (aggregateTie && typeof aggregateTie === "object") {
+      teamTieState.homeRoster = resolveRosterList(
+        aggregateTie.homeRoster,
+        teamTieState.homeRoster,
+        matchObj?.home
+      );
+      teamTieState.awayRoster = resolveRosterList(
+        aggregateTie.awayRoster,
+        teamTieState.awayRoster,
+        matchObj?.away
+      );
+      teamTieState.tournamentSportKey = safeText(
+        aggregateTie.tournamentSportKey,
+        teamTieState.tournamentSportKey || forcedSportKey || ""
+      );
+      teamTieState.lineupCollapsed = Boolean(aggregateTie.lineupCollapsed);
       teamTieState.tieLocked = Boolean(aggregateTie.tieLocked || teamTieState.tieLocked);
+
+      if (Array.isArray(aggregateTie.categories)) {
+        aggregateTie.categories.forEach((snapshot, index) => {
+          if (teamTieState.categories[index]) {
+            mergeCategorySnapshot(teamTieState.categories[index], snapshot, rawFixtures);
+          }
+        });
+      }
     }
 
     teamTieState.categories.forEach((category) => {
@@ -2296,9 +2372,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       if (lockTeamScoresBtn) {
-        lockTeamScoresBtn.classList.toggle("hidden", !(summary.allCompleted && !teamTieState.tieLocked));
-        lockTeamScoresBtn.disabled = teamTieState.tieLocked;
-        lockTeamScoresBtn.textContent = teamTieState.tieLocked ? "Scores locked" : "Lock scores";
+        lockTeamScoresBtn.classList.toggle("hidden", !(summary.allCompleted || teamTieState.tieLocked));
+        lockTeamScoresBtn.disabled = false;
+        lockTeamScoresBtn.textContent = teamTieState.tieLocked ? "Unlock scores" : "Lock scores";
       }
 
       syncLineupCollapseUi();
@@ -2646,11 +2722,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     lockTeamScoresBtn?.addEventListener("click", async () => {
-      teamTieState.tieLocked = true;
+      const shouldLock = !teamTieState.tieLocked;
+      teamTieState.tieLocked = shouldLock;
+
       teamTieState.categories.forEach((category) => {
-        category.categoryLocked = true;
+        category.categoryLocked = shouldLock ? true : false;
         category.isScoringOpen = false;
+
+        if (category?.sportData && typeof category.sportData === "object") {
+          category.sportData.categoryLocked = shouldLock;
+        }
       });
+
       saveTeamTieState(teamTieState);
       renderLineupReview();
       renderTeamCategoryBars();
