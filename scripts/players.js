@@ -597,17 +597,12 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
     return categories[TEAM_EVENT_CATEGORY_ID] || Object.values(categories)[0] || null;
   }
 
-  function getTeamTieStorageKeyForMatch(roundIndex, matchIndex) {
-    return `score_team_tie_state::${tournamentId}::${roundIndex}::${matchIndex}`;
-  }
-
-  function readStoredTeamTieState(roundIndex, matchIndex) {
-    try {
-      const raw = localStorage.getItem(getTeamTieStorageKeyForMatch(roundIndex, matchIndex));
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
+  function firstFiniteNumber(...values) {
+    for (const value of values) {
+      const num = Number(value);
+      if (Number.isFinite(num)) return num;
     }
+    return null;
   }
 
   function hasLiveCategoryProgress(category) {
@@ -619,7 +614,16 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
 
     const sportData = category.sportData || {};
     if (sportData.currentSetIndex != null) return true;
-    if (Array.isArray(sportData.sets) && sportData.sets.some((set) => Number(set?.homePoints || 0) > 0 || Number(set?.awayPoints || 0) > 0 || set?.started || set?.completed)) {
+    if (
+      Array.isArray(sportData.sets) &&
+      sportData.sets.some(
+        (set) =>
+          Number(set?.homePoints || 0) > 0 ||
+          Number(set?.awayPoints || 0) > 0 ||
+          set?.started ||
+          set?.completed
+      )
+    ) {
       return true;
     }
 
@@ -639,14 +643,92 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
     return "pending";
   }
 
-    function getMatchStatus(match, roundIndex = 0, matchIndex = 0) {
-      const raw = String(match?.status || match?.score?.computed?.status || "").trim().toLowerCase();
-      if (["completed", "complete", "done", "finished"].includes(raw) || match?.winner) return "completed";
-      if (["live", "in_progress", "in-progress", "ongoing", "started"].includes(raw)) return "live";
+  function getCategoryMatchPointsFromSnapshot(category) {
+    if (!category || typeof category !== "object") return { home: 0, away: 0 };
 
-      if (match?.score?.state) return "live";
-      return "pending";
+    const sportData = category.sportData || {};
+    if (Array.isArray(sportData.sets) && sportData.sets.length) {
+      return sportData.sets.reduce(
+        (acc, set) => ({
+          home: acc.home + Number(set?.homePoints || 0),
+          away: acc.away + Number(set?.awayPoints || 0),
+        }),
+        { home: 0, away: 0 }
+      );
     }
+
+    const preset = category.presetState || category.score || {};
+    return {
+      home: firstFiniteNumber(
+        category?.homeMatchPoints,
+        category?.homePoints,
+        category?.matchPointsHome,
+        category?.pointsHome,
+        category?.homeScore,
+        sportData?.homePoints,
+        sportData?.homeScore,
+        preset?.home,
+        preset?.A,
+        preset?.pointsA,
+        preset?.teamA,
+        0
+      ) || 0,
+      away: firstFiniteNumber(
+        category?.awayMatchPoints,
+        category?.awayPoints,
+        category?.matchPointsAway,
+        category?.pointsAway,
+        category?.awayScore,
+        sportData?.awayPoints,
+        sportData?.awayScore,
+        preset?.away,
+        preset?.B,
+        preset?.pointsB,
+        preset?.teamB,
+        0
+      ) || 0,
+    };
+  }
+
+  function buildTeamTieStateFromSubmatches(match) {
+    const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
+    const categories = submatches
+      .map((submatch) => submatch?.score?.state?.meta?.categorySnapshot)
+      .filter((snapshot) => snapshot && typeof snapshot === "object");
+
+    return categories.length ? { categories } : null;
+  }
+
+  function getBackendTeamTieState(match) {
+    const direct = match?.score?.state?.meta?.teamTieState;
+    if (direct && typeof direct === "object") return direct;
+    return buildTeamTieStateFromSubmatches(match);
+  }
+
+  function getTeamTieMatchPointsFromState(teamTieState) {
+    const categories = Array.isArray(teamTieState?.categories) ? teamTieState.categories : [];
+    return categories.reduce(
+      (acc, category) => {
+        const totals = getCategoryMatchPointsFromSnapshot(category);
+        acc.home += Number(totals?.home || 0);
+        acc.away += Number(totals?.away || 0);
+        return acc;
+      },
+      { home: 0, away: 0 }
+    );
+  }
+
+  function getMatchStatus(match, roundIndex = 0, matchIndex = 0) {
+    const raw = String(match?.status || match?.score?.computed?.status || "").trim().toLowerCase();
+    if (["completed", "complete", "done", "finished"].includes(raw) || match?.winner) return "completed";
+    if (["live", "in_progress", "in-progress", "ongoing", "started"].includes(raw)) return "live";
+
+    const teamTieState = getBackendTeamTieState(match);
+    if (teamTieState) return getTeamTieStatusFromState(teamTieState);
+
+    if (match?.score?.state) return "live";
+    return "pending";
+  }
 
   function getStatusPillMarkup(status) {
     const key = status === "completed" ? "accepted" : status === "live" ? "live" : "pending";
@@ -687,23 +769,28 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
       const computed = match?.score?.computed || {};
       const state = match?.score?.state || {};
 
-      const candidates = side === "home"
-        ? [
-            computed.homeMatchPoints,
-            computed.homePoints,
-            state?.A?.points,
-            state?.home?.points,
-          ]
-        : [
-            computed.awayMatchPoints,
-            computed.awayPoints,
-            state?.B?.points,
-            state?.away?.points,
-          ];
+      const directValue = firstFiniteNumber(
+        ...(side === "home"
+          ? [
+              computed.homeMatchPoints,
+              computed.homePoints,
+              state?.A?.points,
+              state?.home?.points,
+            ]
+          : [
+              computed.awayMatchPoints,
+              computed.awayPoints,
+              state?.B?.points,
+              state?.away?.points,
+            ])
+      );
 
-      for (const value of candidates) {
-        const num = Number(value);
-        if (Number.isFinite(num)) return num;
+      if (directValue !== null) return directValue;
+
+      const teamTieState = getBackendTeamTieState(match);
+      if (teamTieState) {
+        const totals = getTeamTieMatchPointsFromState(teamTieState);
+        return side === "home" ? Number(totals.home || 0) : Number(totals.away || 0);
       }
 
       return 0;
@@ -769,10 +856,12 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
         return a.teamName.localeCompare(b.teamName);
       });
 
+      const qualifierCount = Number(getAdvancedSettings()?.qualifierCount || 0) || Math.min(4, sorted.length);
+
       return sorted.map((row, index) => ({
         ...row,
         rank: index + 1,
-        qualified: index < 4,
+        qualified: index < qualifierCount,
       }));
     }
 
