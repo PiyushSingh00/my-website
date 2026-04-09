@@ -2730,10 +2730,21 @@ function renderCaptainsSummary() {
   }
 
   async function loadFixturesFromDb() {
-    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-    if (!r.ok) return null;
-    return r.data?.data || r.data;
+  const urls = [
+    `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+  ];
+
+  for (const url of urls) {
+    const r = await apiGet(url);
+    if (!r.ok) continue;
+
+    const parsed = r.data?.data || r.data;
+    if (parsed?.categories) return parsed;
   }
+
+  return null;
+}
 
   async function persistFixturesState() {
     const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`, fixturesState.fixtures || { categories: {} });
@@ -3540,14 +3551,16 @@ await loadPoolsFromDb();
 await loadLeaderboardFromDb();
 await openAndLoadFixtures();
 
-  renderPlayers();
-  renderCaptainsSummary();
-  renderLeaderboard();
-  refreshStageSpecificUi();
-  syncAddPlayerCategoryUi();
-  syncPlayersListUi();
-  syncTeamSetupUi();
-  syncLeaderboardUi();
-  syncFixturesUi();
-  startFixturesBackendPolling();
+applyUmpireViewMode();
+
+renderPlayers();
+renderCaptainsSummary();
+renderLeaderboard();
+refreshStageSpecificUi();
+syncAddPlayerCategoryUi();
+syncPlayersListUi();
+syncTeamSetupUi();
+syncLeaderboardUi();
+syncFixturesUi();
+startFixturesBackendPolling();
 });
