@@ -98,6 +98,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const datesEl = document.getElementById("players-tournament-dates");
   const codeEl = document.getElementById("players-tournament-code");
 
+  const playersToolbar = document.querySelector(".players-toolbar");
+const playersListSection = document.getElementById("players-list-section");
+
   const playersTabs = document.getElementById("players-tabs");
   const playersListToggleBtn = document.getElementById("players-list-toggle-btn");
   const playersListContent = document.getElementById("players-list-content");
@@ -265,6 +268,48 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
         );
       });
     }
+
+    function applyUmpireViewMode() {
+  if (!isLoggedInUserUmpire()) return;
+
+  // Keep join mode visually active for umpire
+  playerBtn?.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
+  // Hide host toolbar actions except Back
+  if (playersToolbar) {
+    playersToolbar.querySelectorAll("button").forEach((btn) => {
+      if (btn.id !== "players-back-btn") {
+        btn.classList.add("hidden");
+        btn.style.display = "none";
+      }
+    });
+  }
+
+  // Hide non-fixture sections
+  playersListSection?.classList.add("hidden");
+  captainsSummarySection?.classList.add("hidden");
+  poolsSection?.classList.add("hidden");
+  leaderboardSection?.classList.add("hidden");
+
+  // Show fixtures only
+  fixturesEmbed?.classList.remove("hidden");
+  isFixturesCollapsed = false;
+  syncFixturesUi();
+
+  // Optional: hide host-only fixture actions too
+  fixturesGenerateBtn?.classList.add("hidden");
+  fixturesGenerateBtn && (fixturesGenerateBtn.style.display = "none");
+
+  fixturesGoKnockoutBtn?.classList.add("hidden");
+  fixturesGoKnockoutBtn && (fixturesGoKnockoutBtn.style.display = "none");
+
+  fixturesConfigureBtn?.classList.add("hidden");
+  fixturesConfigureBtn && (fixturesConfigureBtn.style.display = "none");
+
+  fixturesEditBtn?.classList.add("hidden");
+  fixturesEditBtn && (fixturesEditBtn.style.display = "none");
+}
 
     function openAddUmpireModal() {
       addUmpireModal?.classList.remove("hidden");
@@ -1068,27 +1113,58 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
   }
 
   async function loadTournamentMeta() {
-    const host = await apiGet("/api/host/tournaments");
-    if (host.ok) {
-      const list = normalizeTournamentList(host.data);
-      const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
-      if (found) {
-        tournamentMetaCache = found;
-        hydrateTournamentMetaUi(found);
-        return;
-      }
-    }
+  const directCandidates = [
+    `/api/tournaments/${encodeURIComponent(tournamentId)}`,
+  ];
 
-    const pub = await apiGet("/api/tournaments");
-    if (pub.ok) {
-      const list = normalizeTournamentList(pub.data);
-      const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
-      if (found) {
-        tournamentMetaCache = found;
-        hydrateTournamentMetaUi(found);
-      }
+  for (const url of directCandidates) {
+    const resp = await apiGet(url);
+    if (!resp.ok) continue;
+
+    const found = resp.data?.data || resp.data || null;
+    if (found && String(found.tournamentId ?? found.id) === String(tournamentId)) {
+      tournamentMetaCache = found;
+      hydrateTournamentMetaUi(found);
+      applyUmpireViewMode();
+      return found;
     }
   }
+
+  const mine = await apiGet("/api/player/tournaments");
+  if (mine.ok) {
+    const list = normalizeTournamentList(mine.data);
+    const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
+    if (found) {
+      tournamentMetaCache = found;
+      hydrateTournamentMetaUi(found);
+      return found;
+    }
+  }
+
+  const host = await apiGet("/api/host/tournaments");
+  if (host.ok) {
+    const list = normalizeTournamentList(host.data);
+    const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
+    if (found) {
+      tournamentMetaCache = found;
+      hydrateTournamentMetaUi(found);
+      return found;
+    }
+  }
+
+  const pub = await apiGet("/api/tournaments");
+  if (pub.ok) {
+    const list = normalizeTournamentList(pub.data);
+    const found = list.find((x) => String(x.tournamentId ?? x.id) === String(tournamentId));
+    if (found) {
+      tournamentMetaCache = found;
+      hydrateTournamentMetaUi(found);
+      return found;
+    }
+  }
+
+  return null;
+}
 
   function hydrateTournamentMetaUi(tournament) {
     titleEl.textContent = tournament?.tournamentName || "Tournament";
@@ -2654,10 +2730,21 @@ function renderCaptainsSummary() {
   }
 
   async function loadFixturesFromDb() {
-    const r = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-    if (!r.ok) return null;
-    return r.data?.data || r.data;
+  const urls = [
+    `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+  ];
+
+  for (const url of urls) {
+    const r = await apiGet(url);
+    if (!r.ok) continue;
+
+    const parsed = r.data?.data || r.data;
+    if (parsed?.categories) return parsed;
   }
+
+  return null;
+}
 
   async function persistFixturesState() {
     const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`, fixturesState.fixtures || { categories: {} });
@@ -3464,14 +3551,16 @@ await loadPoolsFromDb();
 await loadLeaderboardFromDb();
 await openAndLoadFixtures();
 
-  renderPlayers();
-  renderCaptainsSummary();
-  renderLeaderboard();
-  refreshStageSpecificUi();
-  syncAddPlayerCategoryUi();
-  syncPlayersListUi();
-  syncTeamSetupUi();
-  syncLeaderboardUi();
-  syncFixturesUi();
-  startFixturesBackendPolling();
+applyUmpireViewMode();
+
+renderPlayers();
+renderCaptainsSummary();
+renderLeaderboard();
+refreshStageSpecificUi();
+syncAddPlayerCategoryUi();
+syncPlayersListUi();
+syncTeamSetupUi();
+syncLeaderboardUi();
+syncFixturesUi();
+startFixturesBackendPolling();
 });

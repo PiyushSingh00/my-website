@@ -2198,74 +2198,105 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   let fixtures = null;
-  let schema = null;
+let schema = null;
 
-  try {
-    const fixturesResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-    fixtures = unwrapFixturesPayload(fixturesResp);
+try {
+  let fixturesResp = null;
+  let tournamentResp = null;
 
+  const fixtureUrls = [
+    `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+  ];
+
+  for (const url of fixtureUrls) {
     try {
-      const tournamentResp = await apiGet(`/api/host/tournaments/${encodeURIComponent(tournamentId)}`);
-      const tournament =
-        tournamentResp?.data?.data ||
-        tournamentResp?.data ||
-        tournamentResp ||
-        {};
-
-      fixtures = {
-        ...(fixtures || {}),
-        sportName: fixtures?.sportName || tournament?.sportName || "",
-        tournamentType: fixtures?.tournamentType || tournament?.tournamentType || "",
-        advancedSettings: fixtures?.advancedSettings || tournament?.advancedSettings || null,
-
-        meta: {
-          ...(fixtures?.meta || {}),
-          sportName:
-            fixtures?.meta?.sportName ||
-            fixtures?.sportName ||
-            tournament?.sportName ||
-            "",
-          tournamentType:
-            fixtures?.meta?.tournamentType ||
-            fixtures?.tournamentType ||
-            tournament?.tournamentType ||
-            "",
-          advancedSettings:
-            fixtures?.meta?.advancedSettings ||
-            fixtures?.advancedSettings ||
-            tournament?.advancedSettings ||
-            null,
-        },
-
-        tournament: {
-          ...(fixtures?.tournament || {}),
-          ...tournament,
-          sportName:
-            fixtures?.tournament?.sportName ||
-            fixtures?.sportName ||
-            tournament?.sportName ||
-            "",
-          tournamentType:
-            fixtures?.tournament?.tournamentType ||
-            fixtures?.tournamentType ||
-            tournament?.tournamentType ||
-            "",
-          advancedSettings:
-            fixtures?.tournament?.advancedSettings ||
-            fixtures?.advancedSettings ||
-            tournament?.advancedSettings ||
-            null,
-        },
-      };
+      fixturesResp = await apiGet(url);
+      const parsed = unwrapFixturesPayload(fixturesResp);
+      if (parsed?.categories) {
+        fixtures = parsed;
+        break;
+      }
     } catch (err) {
-      console.warn("Could not load tournament meta for sport detection", err);
+      // try next candidate
     }
-  } catch (e) {
-    console.error(e);
-    titleEl.textContent = "Failed to load fixtures";
-    subEl.textContent = String(e?.message || e);
-    return;
   }
+
+  if (!fixtures) {
+    throw new Error("Could not load fixtures for this tournament");
+  }
+
+  const tournamentUrls = [
+    `/api/tournaments/${encodeURIComponent(tournamentId)}`,
+    `/api/host/tournaments/${encodeURIComponent(tournamentId)}`,
+  ];
+
+  for (const url of tournamentUrls) {
+    try {
+      tournamentResp = await apiGet(url);
+      break;
+    } catch (err) {
+      // try next candidate
+    }
+  }
+
+  const tournament =
+    tournamentResp?.data?.data ||
+    tournamentResp?.data ||
+    tournamentResp ||
+    {};
+
+  fixtures = {
+    ...(fixtures || {}),
+    sportName: fixtures?.sportName || tournament?.sportName || "",
+    tournamentType: fixtures?.tournamentType || tournament?.tournamentType || "",
+    advancedSettings: fixtures?.advancedSettings || tournament?.advancedSettings || null,
+
+    meta: {
+      ...(fixtures?.meta || {}),
+      sportName:
+        fixtures?.meta?.sportName ||
+        fixtures?.sportName ||
+        tournament?.sportName ||
+        "",
+      tournamentType:
+        fixtures?.meta?.tournamentType ||
+        fixtures?.tournamentType ||
+        tournament?.tournamentType ||
+        "",
+      advancedSettings:
+        fixtures?.meta?.advancedSettings ||
+        fixtures?.advancedSettings ||
+        tournament?.advancedSettings ||
+        null,
+    },
+
+    tournament: {
+      ...(fixtures?.tournament || {}),
+      ...tournament,
+      sportName:
+        fixtures?.tournament?.sportName ||
+        fixtures?.sportName ||
+        tournament?.sportName ||
+        "",
+      tournamentType:
+        fixtures?.tournament?.tournamentType ||
+        fixtures?.tournamentType ||
+        tournament?.tournamentType ||
+        "",
+      advancedSettings:
+        fixtures?.tournament?.advancedSettings ||
+        fixtures?.advancedSettings ||
+        tournament?.advancedSettings ||
+        null,
+    },
+  };
+} catch (e) {
+  console.error(e);
+  titleEl.textContent = "Failed to load fixtures";
+  subEl.textContent = String(e?.message || e);
+  return;
+}
 
   try {
     if (categoryId) {
