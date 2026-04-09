@@ -98,6 +98,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const datesEl = document.getElementById("players-tournament-dates");
   const codeEl = document.getElementById("players-tournament-code");
 
+  const playersToolbar = document.querySelector(".players-toolbar");
+const playersListSection = document.getElementById("players-list-section");
+
   const playersTabs = document.getElementById("players-tabs");
   const playersListToggleBtn = document.getElementById("players-list-toggle-btn");
   const playersListContent = document.getElementById("players-list-content");
@@ -265,6 +268,48 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
         );
       });
     }
+
+    function applyUmpireViewMode() {
+  if (!isLoggedInUserUmpire()) return;
+
+  // Keep join mode visually active for umpire
+  playerBtn?.classList.add("is-active");
+  hostBtn?.classList.remove("is-active");
+
+  // Hide host toolbar actions except Back
+  if (playersToolbar) {
+    playersToolbar.querySelectorAll("button").forEach((btn) => {
+      if (btn.id !== "players-back-btn") {
+        btn.classList.add("hidden");
+        btn.style.display = "none";
+      }
+    });
+  }
+
+  // Hide non-fixture sections
+  playersListSection?.classList.add("hidden");
+  captainsSummarySection?.classList.add("hidden");
+  poolsSection?.classList.add("hidden");
+  leaderboardSection?.classList.add("hidden");
+
+  // Show fixtures only
+  fixturesEmbed?.classList.remove("hidden");
+  isFixturesCollapsed = false;
+  syncFixturesUi();
+
+  // Optional: hide host-only fixture actions too
+  fixturesGenerateBtn?.classList.add("hidden");
+  fixturesGenerateBtn && (fixturesGenerateBtn.style.display = "none");
+
+  fixturesGoKnockoutBtn?.classList.add("hidden");
+  fixturesGoKnockoutBtn && (fixturesGoKnockoutBtn.style.display = "none");
+
+  fixturesConfigureBtn?.classList.add("hidden");
+  fixturesConfigureBtn && (fixturesConfigureBtn.style.display = "none");
+
+  fixturesEditBtn?.classList.add("hidden");
+  fixturesEditBtn && (fixturesEditBtn.style.display = "none");
+}
 
     function openAddUmpireModal() {
       addUmpireModal?.classList.remove("hidden");
@@ -1080,6 +1125,7 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
     if (found && String(found.tournamentId ?? found.id) === String(tournamentId)) {
       tournamentMetaCache = found;
       hydrateTournamentMetaUi(found);
+      applyUmpireViewMode();
       return found;
     }
   }
