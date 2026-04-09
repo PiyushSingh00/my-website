@@ -60,6 +60,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
+  function getVisibleInviteForRequest(request) {
+    const invitedPlayers = Array.isArray(request?.invitedPlayers) ? request.invitedPlayers : [];
+    if (!invitedPlayers.length) return null;
+    return invitedPlayers.find((invite) => isSameUserByInviteFields(invite, user)) || invitedPlayers[0] || null;
+  }
+
   function isTeamEvent(tournament) {
     return String(tournament?.tournamentType || "").toLowerCase().includes("team");
   }
@@ -201,10 +207,13 @@ document.addEventListener("DOMContentLoaded", async () => {
               ? r.data.data
               : [];
 
-      myTeamInvites = rows.filter((req) => {
-        const invitedPlayers = Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [];
-        return invitedPlayers.some((invite) => isSameUserByInviteFields(invite, user));
-      });
+      myTeamInvites = rows
+        .map((req) => ({
+          ...req,
+          invitedPlayers: Array.isArray(req?.invitedPlayers) ? req.invitedPlayers : [],
+        }))
+        .filter((req) => req.invitedPlayers.length > 0);
+
       return;
     }
 
@@ -214,7 +223,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function loadNotifications() {
     myNotifications = [];
     myTeamInvites.forEach((invite) => {
-      const mine = (Array.isArray(invite?.invitedPlayers) ? invite.invitedPlayers : []).find((p) => isSameUserByInviteFields(p, user));
+      const mine = getVisibleInviteForRequest(invite);
       myNotifications.push({
         kind: "team_invite",
         title: `Team invite from ${invite?.captainName || "Captain"}`,
@@ -495,7 +504,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     teamInviteSection.classList.remove("hidden");
 
     myTeamInvites.forEach((request) => {
-      const invite = (Array.isArray(request?.invitedPlayers) ? request.invitedPlayers : []).find((p) => isSameUserByInviteFields(p, user));
+      const invite = getVisibleInviteForRequest(request);
       const currentStatus = String(invite?.inviteStatus || "pending").toLowerCase();
       const requestId = request?.requestId || request?.teamRequestId || request?.id;
       const tournamentId = request?.tournamentId || "";

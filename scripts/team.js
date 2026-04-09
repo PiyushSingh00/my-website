@@ -518,10 +518,54 @@ function normalizeCanonicalTeamPlayer(player = {}) {
   };
 }
 
+function canonicalPlayersOverlap(a = {}, b = {}) {
+  const aId = String(a?.playerId || "").trim();
+  const bId = String(b?.playerId || "").trim();
+  const aUsername = normalizeIdentity(a?.username || "");
+  const bUsername = normalizeIdentity(b?.username || "");
+  const aPhone = String(a?.phone || "").trim();
+  const bPhone = String(b?.phone || "").trim();
+  const aName = normalizeIdentity(a?.playerName || "");
+  const bName = normalizeIdentity(b?.playerName || "");
+
+  if (aId && bId && aId === bId) return true;
+  if (aUsername && bUsername && aUsername === bUsername) return true;
+  if (aPhone && bPhone && aPhone === bPhone) return true;
+  if (aName && bName && aName === bName) return true;
+
+  return false;
+}
+
 function getCanonicalTeamPlayers(team) {
-  return Array.isArray(team?.players)
-    ? team.players.map(normalizeCanonicalTeamPlayer).filter((p) => p.playerName || p.playerId || p.username)
-    : [];
+  const rawPlayers = Array.isArray(team?.players) ? team.players : [];
+  const out = [];
+
+  rawPlayers
+    .map(normalizeCanonicalTeamPlayer)
+    .filter((p) => p.playerName || p.playerId || p.username)
+    .forEach((player) => {
+      const existing = out.find((candidate) => canonicalPlayersOverlap(candidate, player));
+      if (!existing) {
+        out.push(player);
+        return;
+      }
+
+      if (!existing.playerId && player.playerId) existing.playerId = player.playerId;
+      if (!existing.username && player.username) existing.username = player.username;
+      if (!existing.phone && player.phone) existing.phone = player.phone;
+      if ((!existing.playerName || existing.playerName === "Player") && player.playerName) {
+        existing.playerName = player.playerName;
+      }
+      existing.isCaptain = Boolean(existing.isCaptain || player.isCaptain);
+
+      const existingStatus = String(existing.inviteStatus || "pending").toLowerCase();
+      const incomingStatus = String(player.inviteStatus || "pending").toLowerCase();
+      if (incomingStatus === "accepted" || (incomingStatus === "pending" && existingStatus === "rejected")) {
+        existing.inviteStatus = incomingStatus;
+      }
+    });
+
+  return out;
 }
 
 function teamMatchesCurrentCaptain(team) {
@@ -859,7 +903,10 @@ function getActiveDisplayTeam() {
     </div>
   `);
 
-  const nonCaptainPlayers = canonicalPlayers.filter((player) => !player.isCaptain);
+  const nonCaptainPlayers = canonicalPlayers.filter((player) => {
+    if (player.isCaptain) return false;
+    return !canonicalPlayersOverlap(player, captainCard);
+  });
 
   if (nonCaptainPlayers.length) {
     nonCaptainPlayers.forEach((player) => {
@@ -885,7 +932,14 @@ function getActiveDisplayTeam() {
     return cards.join("");
   }
 
-  const invitedPlayers = Array.isArray(activeTeam?.invitedPlayers) ? activeTeam.invitedPlayers : [];
+  const invitedPlayers = (Array.isArray(activeTeam?.invitedPlayers) ? activeTeam.invitedPlayers : []).filter((player) => {
+    const playerName = player?.playerName || player?.inviteeName || player?.name || player?.username || "";
+    const playerUsername = player?.username || player?.inviteeUsername || "";
+    return !(
+      identitiesMatch(playerName, activeTeam?.captainName) ||
+      identitiesMatch(playerUsername, activeTeam?.captainUsername)
+    );
+  });
   invitedPlayers.forEach((player) => {
     const status = String(player?.inviteStatus || "pending").toLowerCase();
     const statusClass =
