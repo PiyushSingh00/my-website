@@ -140,8 +140,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function apiGet(url) {
-    const res = await fetch(url, {
-      headers: { Authorization: "Bearer " + getToken() },
+    const hasQuery = url.includes("?");
+    const freshUrl = `${url}${hasQuery ? "&" : "?"}_ts=${Date.now()}`;
+    const res = await fetch(freshUrl, {
+      headers: {
+        Authorization: "Bearer " + getToken(),
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+      cache: "no-store",
     });
 
     const raw = await res.text();
@@ -2350,8 +2357,8 @@ try {
   let tournamentResp = null;
 
   const fixtureUrls = [
-    `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
     `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+    `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
   ];
 
   for (const url of fixtureUrls) {
@@ -3020,6 +3027,18 @@ try {
     const B = state.state.B;
     const cfg = state.config;
 
+    const hasProgress = (() => {
+      const directA = Object.values(A || {}).some((value) => Number(value) > 0);
+      const directB = Object.values(B || {}).some((value) => Number(value) > 0);
+      const playerA = Object.values(A?.players || {}).some((player) =>
+        Object.values(player || {}).some((value) => Number(value) > 0)
+      );
+      const playerB = Object.values(B?.players || {}).some((player) =>
+        Object.values(player || {}).some((value) => Number(value) > 0)
+      );
+      return directA || directB || playerA || playerB || Number(state.timer.elapsedMs || 0) > 0;
+    })();
+
     if (logic.type === "higherScoreWins") {
       const field = logic.field || "score";
       const a = Number(A[field] ?? 0);
@@ -3027,7 +3046,7 @@ try {
 
       if (a > b) return { status: "completed", winnerName: homeLabel, reason: `${a} > ${b}` };
       if (b > a) return { status: "completed", winnerName: awayLabel, reason: `${b} > ${a}` };
-      return { status: "pending", winnerName: null, reason: "Equal scores" };
+      return { status: hasProgress ? "live" : "pending", winnerName: null, reason: "Equal scores" };
     }
 
     if (logic.type === "firstToTarget") {
@@ -3044,10 +3063,10 @@ try {
       if (b >= target && (!win2 || b - a >= 2)) {
         return { status: "completed", winnerName: awayLabel, reason: `Reached ${b}/${target}` };
       }
-      return { status: "pending", winnerName: null, reason: "Ongoing" };
+      return { status: hasProgress ? "live" : "pending", winnerName: null, reason: "Ongoing" };
     }
 
-    return { status: "pending", winnerName: null, reason: "Unknown logic" };
+    return { status: hasProgress ? "live" : "pending", winnerName: null, reason: "Unknown logic" };
   }
 
   function renderPills() {

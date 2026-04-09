@@ -110,10 +110,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   async function apiGet(url) {
-    const res = await fetch(url, {
+    const hasQuery = url.includes("?");
+    const freshUrl = `${url}${hasQuery ? "&" : "?"}_ts=${Date.now()}`;
+    const res = await fetch(freshUrl, {
       headers: {
         Authorization: "Bearer " + (localStorage.getItem("token") || ""),
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
       },
+      cache: "no-store",
     });
 
     const raw = await res.text();
@@ -1160,9 +1165,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function refreshFixturesOnly() {
-    const response = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-    if (response.ok) {
-      state.fixtures = migrateFixtures(response.data?.data || response.data || null);
+    const urls = [
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+    ];
+
+    for (const url of urls) {
+      const response = await apiGet(url);
+      if (!response.ok) continue;
+      const parsed = response.data?.data || response.data || null;
+      if (parsed?.categories) {
+        state.fixtures = migrateFixtures(parsed);
+        return;
+      }
     }
   }
 
@@ -1210,9 +1225,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function loadFixtures() {
-    const response = await apiGet(`/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`);
-    if (!response.ok) return null;
-    return migrateFixtures(response.data?.data || response.data || null);
+    const urls = [
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+    ];
+
+    for (const url of urls) {
+      const response = await apiGet(url);
+      if (!response.ok) continue;
+      const parsed = response.data?.data || response.data || null;
+      if (parsed?.categories) return migrateFixtures(parsed);
+    }
+
+    return null;
   }
 
   async function init() {
