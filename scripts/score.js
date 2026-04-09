@@ -1559,25 +1559,7 @@ function buildTeamRosterLookupFromCaptains(raw) {
     }));
   }
 
-    const teamLabel = side === "A" ? matchObj?.home : matchObj?.away;
-    const normalizedTeamLabel = safeText(teamLabel);
-
-    const rosterFromCaptains = normalizedTeamLabel
-      ? resolveRosterList(teamRosterLookup.get(normalizedTeamLabel), [], normalizedTeamLabel)
-      : [];
-
-    if (rosterFromCaptains.length) return rosterFromCaptains;
-
-    const rosterFromMatch = side === "A" ? matchObj?.homePlayers : matchObj?.awayPlayers;
-    const fromMatchList = toArray(rosterFromMatch).map((p) => safeText(p)).filter(Boolean);
-    if (fromMatchList.length && !isRosterJustTeamLabel(fromMatchList, normalizedTeamLabel)) {
-      return fromMatchList;
-    }
-
-    const split = splitTeamLabel(teamLabel);
-    if (split.length) return split;
-
-    return Array.from({ length: 8 }, (_, index) => `${side === "A" ? "Home" : "Away"} Player ${index + 1}`);
+    
   function inferTeamRoster(matchObj, side) {
   const teamLabel = side === "A" ? matchObj?.home : matchObj?.away;
   const normalizedTeamLabel = safeText(teamLabel);
