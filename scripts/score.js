@@ -1998,7 +1998,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const homePoints = Number(set.homePoints || 0);
     const awayPoints = Number(set.awayPoints || 0);
 
-    if ((homePoints >= target || awayPoints >= target) && Math.abs(homePoints - awayPoints) >= 2) {
+    if (homePoints >= target || awayPoints >= target) {
       set.completed = true;
       set.winnerSide = homePoints > awayPoints ? "A" : "B";
       pb.currentSetIndex = null;
