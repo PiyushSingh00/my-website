@@ -379,30 +379,45 @@ document.addEventListener("DOMContentLoaded", async () => {
         .filter(Boolean);
     }
 
-    function buildTeamRosterLookupFromCaptains(raw) {
-      const payload = unwrapCaptainsPayload(raw);
-      const confirmedCaptains = Array.isArray(payload?.confirmedCaptains) ? payload.confirmedCaptains : [];
-      const lookup = new Map();
+function buildTeamRosterLookupFromCaptains(raw) {
+  const payload = unwrapCaptainsPayload(raw);
+  const confirmedCaptains = Array.isArray(payload?.confirmedCaptains)
+    ? payload.confirmedCaptains
+    : [];
 
-      confirmedCaptains.forEach((captain) => {
-        const teamName = safeText(captain?.teamName || captain?.playerName);
-        if (!teamName) return;
+  const lookup = new Map();
 
-        const roster = normalizeTeamRosterNames(
-          captain?.teamPlayers ||
-          captain?.players ||
-          captain?.members ||
-          captain?.submittedPlayers ||
-          captain?.roster
-        );
+  confirmedCaptains.forEach((captain) => {
+    const teamName = safeText(captain?.teamName || captain?.playerName);
+    if (!teamName) return;
 
-        if (roster.length) {
-          lookup.set(teamName, roster);
-        }
-      });
+    const captainName = safeText(
+      captain?.playerName ||
+      captain?.captainName ||
+      captain?.username ||
+      captain?.captainUsername
+    );
 
-      teamRosterLookup = lookup;
+    const roster = normalizeTeamRosterNames(
+      captain?.teamRoster ||
+      captain?.roster ||
+      captain?.teamPlayers ||
+      captain?.players ||
+      captain?.members ||
+      captain?.submittedPlayers
+    );
+
+    const mergedRoster = Array.from(
+      new Set([captainName, ...roster].filter(Boolean))
+    );
+
+    if (mergedRoster.length) {
+      lookup.set(teamName, mergedRoster);
     }
+  });
+
+  teamRosterLookup = lookup;
+}
 
     async function loadTeamRosterLookup() {
       try {
@@ -1544,7 +1559,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }));
   }
 
-  function inferTeamRoster(matchObj, side) {
     const teamLabel = side === "A" ? matchObj?.home : matchObj?.away;
     const normalizedTeamLabel = safeText(teamLabel);
 
@@ -1564,7 +1578,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (split.length) return split;
 
     return Array.from({ length: 8 }, (_, index) => `${side === "A" ? "Home" : "Away"} Player ${index + 1}`);
+  function inferTeamRoster(matchObj, side) {
+  const teamLabel = side === "A" ? matchObj?.home : matchObj?.away;
+  const normalizedTeamLabel = safeText(teamLabel);
+
+  const rosterFromCaptains = normalizedTeamLabel
+    ? resolveRosterList(teamRosterLookup.get(normalizedTeamLabel), [], normalizedTeamLabel)
+    : [];
+
+  const rosterFromMatch = side === "A" ? matchObj?.homePlayers : matchObj?.awayPlayers;
+  const fromMatchList = toArray(rosterFromMatch).map((p) => safeText(p)).filter(Boolean);
+
+  const split = splitTeamLabel(teamLabel);
+
+  const merged = Array.from(
+    new Set(
+      [...rosterFromCaptains, ...fromMatchList, ...split]
+        .map((p) => safeText(p))
+        .filter(Boolean)
+    )
+  );
+
+  if (merged.length && !isRosterJustTeamLabel(merged, normalizedTeamLabel)) {
+    return merged;
   }
+
+  return Array.from(
+    { length: 8 },
+    (_, index) => `${side === "A" ? "Home" : "Away"} Player ${index + 1}`
+  );
+}
 
   function buildInitialTeamState(matchObj, rawFixtures) {
     const categories = inferCategoryDefinitions(rawFixtures);
