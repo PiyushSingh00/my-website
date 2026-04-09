@@ -1032,7 +1032,18 @@ function renderMyTeamPanel() {
     tournamentDatesEl.textContent = tournamentMeta?.tournamentDates || "-";
 
     const draft = loadDraft();
-    if (draft?.teamName) teamNameInput.value = draft.teamName;
+
+      const preferredTeamName =
+        draft?.teamName ||
+        currentCanonicalTeam?.teamName ||
+        currentCaptainSubmission?.teamName ||
+        currentAcceptedInvite?.teamName ||
+        "";
+
+      if (teamNameInput) {
+        teamNameInput.value = preferredTeamName;
+      }
+
 
     if (tournamentMeta?.tournamentType === "team") {
       categoryWrap?.classList.add("hidden");
@@ -1183,7 +1194,12 @@ function renderMyTeamPanel() {
 
     const payload = {
       tournamentId,
-      teamName: teamNameInput.value.trim() || "My Team",
+      teamName:
+  teamNameInput.value.trim() ||
+  currentCanonicalTeam?.teamName ||
+  currentCaptainSubmission?.teamName ||
+  currentAcceptedInvite?.teamName ||
+  "My Team",
       categoryId,
       categoryLabel:
         tournamentMeta?.tournamentType === "team"
