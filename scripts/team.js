@@ -799,18 +799,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     ctx.font = '700 70px "Space Grotesk", sans-serif';
     cursorY = drawWrappedText(ctx, tournamentMeta?.tournamentName || "ScheduleIt", 84, cursorY + 34, 912, 82, 3);
 
-    ctx.fillStyle = "rgba(230, 238, 248, 0.82)";
-    ctx.font = '500 30px "Inter", sans-serif';
-    const metaLine = [match?.categoryLabel, match?.roundLabel, match?.court].filter(Boolean).join(" • ");
-    cursorY = drawWrappedText(ctx, metaLine, 84, cursorY + 10, 912, 40, 2);
-
-    drawRoundedRect(ctx, 64, 360, 952, match?.isTeamSchedule ? 960 : 760, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
+    drawRoundedRect(ctx, 64, 330, 952, match?.isTeamSchedule ? 990 : 790, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
 
     ctx.fillStyle = "#f8fafc";
     ctx.font = '700 54px "Space Grotesk", sans-serif';
-    drawWrappedText(ctx, match?.home || "Home", 116, 470, 300, 60, 2);
+    drawWrappedText(ctx, match?.home || "Home", 116, 440, 300, 60, 2);
     ctx.textAlign = "right";
-    drawWrappedText(ctx, match?.away || "Away", 964, 470, 300, 60, 2);
+    drawWrappedText(ctx, match?.away || "Away", 964, 440, 300, 60, 2);
     ctx.textAlign = "left";
 
     if (match?.isTeamSchedule) {
@@ -830,14 +825,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? `${mainHomeScore} - ${mainAwayScore}`
           : `${totals.homeWins} - ${totals.awayWins}`,
         width / 2,
-        590
+        560
       );
       ctx.fillStyle = "rgba(230, 238, 248, 0.8)";
       ctx.font = '600 24px "Inter", sans-serif';
-      ctx.fillText(hasMainScore ? "Match score" : "Tie score", width / 2, 640);
+      ctx.fillText(hasMainScore ? "Match score" : "Tie score", width / 2, 610);
       ctx.textAlign = "left";
 
-      let y = 760;
+      let y = 700;
       const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
       submatches.slice(0, 6).forEach((submatch, index) => {
         const highlight = Boolean(submatch?.isMine);
@@ -881,7 +876,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ctx.fillStyle = "rgba(230, 238, 248, 0.72)";
         ctx.font = '600 24px "Inter", sans-serif';
         ctx.textAlign = "center";
-        ctx.fillText("No player-level submatch score is available yet.", width / 2, 820);
+        ctx.fillText("Lineups are shown below. Player-level scores were not saved for this tie.", width / 2, 760);
         ctx.textAlign = "left";
       }
     } else {
@@ -890,13 +885,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       ctx.fillStyle = "rgba(230, 238, 248, 0.92)";
       ctx.font = '600 30px "Inter", sans-serif';
-      let leftY = 580;
+      let leftY = 540;
       homePlayers.forEach((player) => {
         leftY = drawWrappedText(ctx, player, 116, leftY, 280, 38, 2);
       });
 
       ctx.textAlign = "right";
-      let rightY = 580;
+      let rightY = 540;
       awayPlayers.forEach((player) => {
         rightY = drawWrappedText(ctx, player, 964, rightY, 280, 38, 2);
       });
@@ -905,7 +900,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ctx.fillStyle = "#4dd0e1";
       ctx.font = '700 130px "Space Grotesk", sans-serif';
       ctx.textAlign = "center";
-      ctx.fillText(`${getDisplayedMatchScore(match, "home")} - ${getDisplayedMatchScore(match, "away")}`, width / 2, 760);
+      ctx.fillText(`${getDisplayedMatchScore(match, "home")} - ${getDisplayedMatchScore(match, "away")}`, width / 2, 700);
       ctx.textAlign = "left";
     }
 
