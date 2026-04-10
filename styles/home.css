@@ -397,6 +397,16 @@ h1 {
   font: inherit;
 }
 
+.phone-field {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.phone-code-select {
+  min-width: 0;
+}
+
 .field-group input::placeholder {
   color: rgba(169, 182, 204, 0.7);
 }
@@ -587,4 +597,10 @@ h1 {
 /* Optional: tighter spacing so form feels shorter */
 #signup-modal #signup-form .field-group {
   margin-bottom: 10px;
+}
+
+@media (max-width: 520px) {
+  .phone-field {
+    grid-template-columns: 1fr;
+  }
 }

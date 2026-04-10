@@ -94,13 +94,17 @@
           <label for="signup-phone">
             Phone Number <span class="required-asterisk">*</span>
           </label>
-          <input
-            type="tel"
-            id="signup-phone"
-            name="phone"
-            placeholder="e.g. +91 98765 43210"
-            required
-          />
+          <div class="phone-field">
+            <select id="signup-phone-code" class="phone-code-select" aria-label="Select country code"></select>
+            <input
+              type="tel"
+              id="signup-phone"
+              name="phone"
+              placeholder="98765 43210"
+              inputmode="numeric"
+              required
+            />
+          </div>
         </div>
 
         <div class="field-group">
@@ -304,13 +308,17 @@
           <label for="forgot-phone">
             Phone Number <span class="required-asterisk">*</span>
           </label>
-          <input
-            type="tel"
-            id="forgot-phone"
-            name="phone"
-            placeholder="Registered phone number"
-            required
-          />
+          <div class="phone-field">
+            <select id="forgot-phone-code" class="phone-code-select" aria-label="Select country code"></select>
+            <input
+              type="tel"
+              id="forgot-phone"
+              name="phone"
+              placeholder="Registered phone number"
+              inputmode="numeric"
+              required
+            />
+          </div>
         </div>
 
         <button type="button" class="btn ghost full-width" id="verify-reset-btn">

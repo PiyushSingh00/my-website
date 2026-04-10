@@ -4,6 +4,49 @@ console.log("🚨 HOME.JS VERSION = PROD_NO_8080");
 
 
 document.addEventListener("DOMContentLoaded", () => {
+  const COUNTRY_CODES = [
+    { code: "91", label: "India (+91)" },
+    { code: "1", label: "United States (+1)" },
+    { code: "1", label: "Canada (+1)" },
+    { code: "44", label: "United Kingdom (+44)" },
+    { code: "61", label: "Australia (+61)" },
+    { code: "64", label: "New Zealand (+64)" },
+    { code: "971", label: "UAE (+971)" },
+    { code: "966", label: "Saudi Arabia (+966)" },
+    { code: "974", label: "Qatar (+974)" },
+    { code: "65", label: "Singapore (+65)" },
+    { code: "60", label: "Malaysia (+60)" },
+    { code: "66", label: "Thailand (+66)" },
+    { code: "81", label: "Japan (+81)" },
+    { code: "82", label: "South Korea (+82)" },
+    { code: "86", label: "China (+86)" },
+    { code: "49", label: "Germany (+49)" },
+    { code: "33", label: "France (+33)" },
+    { code: "39", label: "Italy (+39)" },
+    { code: "34", label: "Spain (+34)" },
+    { code: "31", label: "Netherlands (+31)" },
+    { code: "41", label: "Switzerland (+41)" },
+    { code: "46", label: "Sweden (+46)" },
+    { code: "47", label: "Norway (+47)" },
+    { code: "45", label: "Denmark (+45)" },
+    { code: "7", label: "Russia (+7)" },
+    { code: "27", label: "South Africa (+27)" },
+    { code: "254", label: "Kenya (+254)" },
+    { code: "234", label: "Nigeria (+234)" },
+    { code: "20", label: "Egypt (+20)" },
+    { code: "55", label: "Brazil (+55)" },
+    { code: "52", label: "Mexico (+52)" },
+    { code: "54", label: "Argentina (+54)" },
+    { code: "56", label: "Chile (+56)" },
+    { code: "57", label: "Colombia (+57)" },
+    { code: "62", label: "Indonesia (+62)" },
+    { code: "63", label: "Philippines (+63)" },
+    { code: "92", label: "Pakistan (+92)" },
+    { code: "880", label: "Bangladesh (+880)" },
+    { code: "94", label: "Sri Lanka (+94)" },
+    { code: "977", label: "Nepal (+977)" },
+  ];
+
   /* ===============================
      ELEMENTS
   =============================== */
@@ -37,10 +80,36 @@ document.addEventListener("DOMContentLoaded", () => {
   const forgotPasswordSubmit = document.getElementById("forgot-password-submit");
   const forgotUsernameInput = document.getElementById("forgot-username");
   const forgotPhoneInput = document.getElementById("forgot-phone");
+  const forgotPhoneCodeSelect = document.getElementById("forgot-phone-code");
   const forgotSecurityAnswerInput = document.getElementById("forgot-security-answer");
   const forgotNewPasswordInput = document.getElementById("forgot-new-password");
+  const signupPhoneInput = document.getElementById("signup-phone");
+  const signupPhoneCodeSelect = document.getElementById("signup-phone-code");
 
   let verifiedResetIdentity = null;
+
+  function fillCountryCodes(selectEl, defaultCode = "91") {
+    if (!selectEl) return;
+    selectEl.innerHTML = COUNTRY_CODES.map((entry) => {
+      const selected = String(entry.code) === String(defaultCode) ? "selected" : "";
+      return `<option value="${entry.code}" ${selected}>${entry.label}</option>`;
+    }).join("");
+  }
+
+  function normalizeLocalPhoneInput(value = "") {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  function buildPhoneWithCountryCode(selectEl, inputEl) {
+    const countryCode = String(selectEl?.value || "91").replace(/\D/g, "");
+    const localDigits = normalizeLocalPhoneInput(inputEl?.value || "");
+    if (!localDigits) return "";
+    if (localDigits.startsWith(countryCode) && localDigits.length > 10) return localDigits;
+    return `${countryCode}${localDigits}`;
+  }
+
+  fillCountryCodes(signupPhoneCodeSelect, "91");
+  fillCountryCodes(forgotPhoneCodeSelect, "91");
 
   /* ===============================
      MODAL HELPERS
@@ -67,6 +136,7 @@ function resetForgotPasswordState(options = {}) {
   if (preserveIdentityInputs) {
     if (forgotUsernameInput) forgotUsernameInput.value = usernameValue;
     if (forgotPhoneInput) forgotPhoneInput.value = phoneValue;
+    if (forgotPhoneCodeSelect) forgotPhoneCodeSelect.value = forgotPhoneCodeSelect.value || "91";
   }
   if (forgotPasswordStatus) {
     forgotPasswordStatus.textContent = "";
@@ -183,7 +253,7 @@ function setForgotPasswordStatus(message = "", type = "") {
 
   verifyResetBtn?.addEventListener("click", async () => {
     const username = String(forgotUsernameInput?.value || "").trim();
-    const phone = String(forgotPhoneInput?.value || "").trim();
+    const phone = buildPhoneWithCountryCode(forgotPhoneCodeSelect, forgotPhoneInput);
 
     if (!username || !phone) {
       setForgotPasswordStatus("Enter username and phone number first.", "error");
@@ -289,6 +359,7 @@ function setForgotPasswordStatus(message = "", type = "") {
       console.log("📝 SIGNUP SUBMIT FIRED");
 
       const data = Object.fromEntries(new FormData(signupForm));
+      data.phone = buildPhoneWithCountryCode(signupPhoneCodeSelect, signupPhoneInput);
 
       try {
         const res = await fetch("/api/register", {
