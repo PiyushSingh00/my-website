@@ -815,13 +815,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (match?.isTeamSchedule) {
       const totals = getTeamTotals(match);
+      const mainHomeScore = getDisplayedMatchScore(match, "home");
+      const mainAwayScore = getDisplayedMatchScore(match, "away");
+      const hasMainScore =
+        mainHomeScore !== "-" &&
+        mainAwayScore !== "-" &&
+        mainHomeScore != null &&
+        mainAwayScore != null;
       ctx.fillStyle = "#4dd0e1";
       ctx.font = '700 110px "Space Grotesk", sans-serif';
       ctx.textAlign = "center";
-      ctx.fillText(`${totals.homeWins} - ${totals.awayWins}`, width / 2, 590);
+      ctx.fillText(
+        hasMainScore
+          ? `${mainHomeScore} - ${mainAwayScore}`
+          : `${totals.homeWins} - ${totals.awayWins}`,
+        width / 2,
+        590
+      );
       ctx.fillStyle = "rgba(230, 238, 248, 0.8)";
       ctx.font = '600 24px "Inter", sans-serif';
-      ctx.fillText("Tie score", width / 2, 640);
+      ctx.fillText(hasMainScore ? "Match score" : "Tie score", width / 2, 640);
       ctx.textAlign = "left";
 
       let y = 760;
@@ -863,6 +876,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         y += 130;
       });
+
+      if (!submatches.length) {
+        ctx.fillStyle = "rgba(230, 238, 248, 0.72)";
+        ctx.font = '600 24px "Inter", sans-serif';
+        ctx.textAlign = "center";
+        ctx.fillText("No player-level submatch score is available yet.", width / 2, 820);
+        ctx.textAlign = "left";
+      }
     } else {
       const homePlayers = Array.isArray(match?.homePlayers) && match.homePlayers.length ? match.homePlayers : splitTeamName(match?.home);
       const awayPlayers = Array.isArray(match?.awayPlayers) && match.awayPlayers.length ? match.awayPlayers : splitTeamName(match?.away);
