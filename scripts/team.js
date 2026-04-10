@@ -1071,10 +1071,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (url.includes("/teams")) {
         if (Array.isArray(resp.data?.teams)) {
-          return resp.data.teams.filter((team) => teamContainsCurrentUser(team));
+          return resp.data.teams;
         }
         if (Array.isArray(resp.data)) {
-          return resp.data.filter((team) => teamContainsCurrentUser(team));
+          return resp.data;
         }
       }
 
