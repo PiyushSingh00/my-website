@@ -418,6 +418,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function getDisplayedMatchScore(match, side) {
     const sideKey = String(side || "").toLowerCase() === "away" ? "away" : "home";
+    const explicitDisplayScore =
+      sideKey === "home" ? match?.displayScore?.home : match?.displayScore?.away;
+    if (typeof explicitDisplayScore === "number") return explicitDisplayScore;
+    if (typeof explicitDisplayScore === "string" && explicitDisplayScore.trim()) return explicitDisplayScore.trim();
+
     const bucketKey = sideKey === "home" ? "A" : "B";
     const directBucket = getBucketScore(match?.score?.state?.[bucketKey]);
     if (directBucket !== "-" && directBucket !== "" && directBucket != null) return directBucket;
@@ -455,6 +460,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getTeamTotals(match) {
+    if (match?.displayTotals && typeof match.displayTotals === "object") {
+      return {
+        homeWins: Number(match.displayTotals.homeWins || 0) || 0,
+        awayWins: Number(match.displayTotals.awayWins || 0) || 0,
+        homePoints: Number(match.displayTotals.homePoints || 0) || 0,
+        awayPoints: Number(match.displayTotals.awayPoints || 0) || 0,
+      };
+    }
+
     const totals = {
       homeWins: 0,
       awayWins: 0,
