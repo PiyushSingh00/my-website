@@ -524,6 +524,51 @@ h1 {
   text-decoration: underline;
 }
 
+.text-button {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 10px;
+  border: none;
+  background: transparent;
+  color: var(--accent-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  color: #c2f5ff;
+  text-decoration: underline;
+}
+
+.security-question-panel {
+  margin: 14px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(77, 208, 225, 0.24);
+  background: rgba(77, 208, 225, 0.08);
+}
+
+.security-question-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.security-question-text {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.hidden {
+  display: none !important;
+}
+
 /* --- Signup modal: shorter + scrollable form --- */
 #signup-modal .modal {
   max-height: 80vh;          /* keeps modal short */
@@ -543,4 +588,3 @@ h1 {
 #signup-modal #signup-form .field-group {
   margin-bottom: 10px;
 }
-
