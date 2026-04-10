@@ -461,11 +461,29 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function getTeamTotals(match) {
     if (match?.displayTotals && typeof match.displayTotals === "object") {
+      const explicitHomeScore = getDisplayedMatchScore(match, "home");
+      const explicitAwayScore = getDisplayedMatchScore(match, "away");
+      const hasExplicitMainScore =
+        explicitHomeScore !== "-" &&
+        explicitAwayScore !== "-" &&
+        explicitHomeScore != null &&
+        explicitAwayScore != null;
+
+      const displayHomePoints = Number(match.displayTotals.homePoints || 0) || 0;
+      const displayAwayPoints = Number(match.displayTotals.awayPoints || 0) || 0;
+      const hasSubmatches = Array.isArray(match?.submatches) && match.submatches.length > 0;
+
       return {
         homeWins: Number(match.displayTotals.homeWins || 0) || 0,
         awayWins: Number(match.displayTotals.awayWins || 0) || 0,
-        homePoints: Number(match.displayTotals.homePoints || 0) || 0,
-        awayPoints: Number(match.displayTotals.awayPoints || 0) || 0,
+        homePoints:
+          !hasSubmatches && displayHomePoints === 0 && hasExplicitMainScore
+            ? Number(explicitHomeScore || 0) || 0
+            : displayHomePoints,
+        awayPoints:
+          !hasSubmatches && displayAwayPoints === 0 && hasExplicitMainScore
+            ? Number(explicitAwayScore || 0) || 0
+            : displayAwayPoints,
       };
     }
 
@@ -532,6 +550,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   function buildTeamScheduleLiveCard(match) {
     const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
     const totals = getTeamTotals(match);
+    const mainHomeScore = getDisplayedMatchScore(match, "home");
+    const mainAwayScore = getDisplayedMatchScore(match, "away");
+    const hasMainScore =
+      mainHomeScore !== "-" &&
+      mainAwayScore !== "-" &&
+      mainHomeScore != null &&
+      mainAwayScore != null;
 
     const submatchRows = submatches.length
       ? submatches.map((submatch, index) => {
@@ -574,8 +599,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             <div class="live-tv-team-total">Total match points ${escapeHtml(String(totals.homePoints || 0))}</div>
           </div>
           <div class="live-tv-tie-score-wrap">
-            <div class="live-tv-tie-score-label">Tie score</div>
-            <div class="live-tv-tie-score">${escapeHtml(String(totals.homeWins || 0))} - ${escapeHtml(String(totals.awayWins || 0))}</div>
+            <div class="live-tv-tie-score-label">${hasMainScore ? "Match score" : "Tie score"}</div>
+            <div class="live-tv-tie-score">
+              ${
+                hasMainScore
+                  ? `${escapeHtml(String(mainHomeScore))} - ${escapeHtml(String(mainAwayScore))}`
+                  : `${escapeHtml(String(totals.homeWins || 0))} - ${escapeHtml(String(totals.awayWins || 0))}`
+              }
+            </div>
           </div>
           <div class="live-tv-team live-tv-team--right">
             <div class="live-tv-team-name">${escapeHtml(match?.away || "Away")}</div>
