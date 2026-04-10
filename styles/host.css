@@ -922,9 +922,202 @@ body {
   color: #fecaca;
 }
 
+.poster-btn {
+  padding: 10px 18px;
+}
+
 .wizard-actions {
   margin-top: 24px;
   justify-content: flex-end;
+}
+
+.modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.7);
+  backdrop-filter: blur(10px);
+}
+
+.modal-card {
+  position: relative;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.12), transparent 45%),
+    rgba(10, 16, 30, 0.96);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.modal-head h2 {
+  margin: 0 0 6px;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 28px;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(5, 10, 22, 0.98);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.poster-settings-form {
+  display: grid;
+  gap: 18px;
+}
+
+.poster-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px 16px;
+  align-items: end;
+}
+
+.poster-settings-grid-full {
+  grid-column: 1;
+}
+
+.poster-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(8, 14, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.poster-toggle input {
+  accent-color: var(--accent-2);
+}
+
+.poster-preview-note {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(8, 14, 30, 0.72);
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.poster-preview-note strong {
+  color: var(--text);
+}
+
+.poster-custom-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.poster-add-field-btn {
+  padding: 8px 14px;
+}
+
+.poster-custom-fields-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.poster-custom-field-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(8, 14, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.poster-custom-field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.poster-custom-field-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.poster-inline-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.poster-host-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.poster-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.poster-preview-head h3 {
+  margin: 0 0 4px;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 22px;
+}
+
+.poster-preview-frame {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  border-radius: 20px;
+  background: rgba(5, 11, 24, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.poster-preview-image {
+  display: block;
+  width: min(100%, 320px);
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* advanced/rules cards */
@@ -1087,6 +1280,26 @@ body {
 
   .host-mode-card {
     flex: 1 1 220px;
+  }
+}
+
+@media (max-width: 760px) {
+  .poster-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .poster-settings-grid-full {
+    grid-column: auto;
+  }
+
+  .modal-card {
+    padding: 20px;
+  }
+
+  .poster-custom-field-grid,
+  .poster-preview-head {
+    grid-template-columns: 1fr;
+    display: grid;
   }
 }
 

@@ -665,6 +665,109 @@
       </main>
     </div>
 
+    <div class="modal-shell hidden" id="poster-settings-modal" aria-hidden="true">
+      <div class="modal-backdrop" data-poster-close></div>
+      <div class="modal-card poster-modal-card" role="dialog" aria-modal="true" aria-labelledby="poster-modal-title">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Share poster</p>
+            <h2 id="poster-modal-title">Poster settings</h2>
+            <p class="helper-text">These details will appear on the player share card for this tournament.</p>
+          </div>
+          <button type="button" class="icon-btn" id="poster-settings-close-btn" aria-label="Close poster settings">✕</button>
+        </div>
+
+        <form id="poster-settings-form" class="poster-settings-form">
+          <div class="poster-settings-grid">
+            <div class="field-group">
+              <label for="poster-organizer-name">Organizer / hosted by</label>
+              <input type="text" id="poster-organizer-name" placeholder="e.g. Shakti Sports Club" />
+            </div>
+            <label class="poster-toggle">
+              <input type="checkbox" id="poster-show-organizer-name" />
+              <span>Show on poster</span>
+            </label>
+
+            <div class="field-group poster-settings-grid-full">
+              <label for="poster-sponsor-names">Sponsors</label>
+              <textarea id="poster-sponsor-names" rows="3" placeholder="One sponsor per line or comma separated"></textarea>
+            </div>
+            <label class="poster-toggle">
+              <input type="checkbox" id="poster-show-sponsor-names" />
+              <span>Show on poster</span>
+            </label>
+
+            <div class="field-group">
+              <label for="poster-venue-label">Venue label</label>
+              <input type="text" id="poster-venue-label" placeholder="e.g. Center Court Arena" />
+            </div>
+            <label class="poster-toggle">
+              <input type="checkbox" id="poster-show-venue-label" />
+              <span>Show on poster</span>
+            </label>
+
+            <div class="field-group">
+              <label for="poster-city-name">City</label>
+              <input type="text" id="poster-city-name" placeholder="e.g. Lucknow" />
+            </div>
+            <label class="poster-toggle">
+              <input type="checkbox" id="poster-show-city-name" />
+              <span>Show on poster</span>
+            </label>
+
+            <div class="field-group poster-settings-grid-full">
+              <label for="poster-tagline">Tagline</label>
+              <input type="text" id="poster-tagline" placeholder="e.g. The city showdown series" />
+            </div>
+            <label class="poster-toggle">
+              <input type="checkbox" id="poster-show-tagline" />
+              <span>Show on poster</span>
+            </label>
+
+            <div class="field-group">
+              <label for="poster-social-handle">Instagram / website</label>
+              <input type="text" id="poster-social-handle" placeholder="e.g. @scheduleit.sports" />
+            </div>
+            <label class="poster-toggle">
+              <input type="checkbox" id="poster-show-social-handle" />
+              <span>Show on poster</span>
+            </label>
+
+            <div class="field-group poster-settings-grid-full">
+              <div class="poster-custom-head">
+                <label>Custom fields</label>
+                <button type="button" class="btn-dark poster-add-field-btn" id="poster-add-custom-field-btn">+ Add field</button>
+              </div>
+              <p class="helper-text">Add up to 4 extra lines like “Presented by”, “Powered by”, or any custom label.</p>
+              <div id="poster-custom-fields-list" class="poster-custom-fields-list"></div>
+            </div>
+          </div>
+
+          <div class="poster-preview-note">
+            <strong>Placement:</strong> organizer and tagline appear above the scorecard, while sponsors and footer metadata appear below it in the share image.
+          </div>
+
+          <div class="poster-host-preview">
+            <div class="poster-preview-head">
+              <div>
+                <h3>Preview</h3>
+                <p class="helper-text">This is how the story card will look to players when they share.</p>
+              </div>
+              <button type="button" class="btn-dark" id="poster-preview-download-btn">Download preview</button>
+            </div>
+            <div class="poster-preview-frame">
+              <img id="poster-preview-image" class="poster-preview-image" alt="Poster preview image" />
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-dark" id="poster-settings-cancel-btn">Cancel</button>
+            <button type="submit" class="btn-primary">Save settings</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script type="module" src="scripts/host.js"></script>
   </body>
 </html>

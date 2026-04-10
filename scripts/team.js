@@ -32,6 +32,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   let teamRequestsCache = [];
   let canonicalTeams = [];
   let currentCanonicalTeam = null;
+  let myMatchesPayload = { matches: [], posterSettings: null };
+  let activeSharePoster = null;
 
   const draftKey = `scheduleit_team_draft_${tournamentId}_${user.username || user.name || "user"}`;
 
@@ -43,6 +45,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const teamTabs = document.querySelectorAll(".team-tab");
   const teamPanels = document.querySelectorAll(".team-tab-panel");
+  const myMatchesTabBtn = document.getElementById("my-matches-tab-btn");
   const createTeamTabBtn = document.getElementById("create-team-tab-btn");
   const lineupTabBtn = document.getElementById("lineup-tab-btn");
 
@@ -71,12 +74,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   const myTeamPlayerListEl = document.getElementById("my-team-player-list");
   const myTeamEmptyStateEl = document.getElementById("my-team-empty-state");
   const myTeamEmptyTextEl = document.getElementById("my-team-empty-text");
+  const myMatchesListEl = document.getElementById("my-matches-list");
+  const myMatchesEmptyStateEl = document.getElementById("my-matches-empty-state");
+  const myMatchesEmptyTextEl = document.getElementById("my-matches-empty-text");
 
   const lineupStatusEl = document.getElementById("team-lineup-status");
   const lineupHelpTextEl = document.getElementById("lineup-help-text");
   const lineupEmptyStateEl = document.getElementById("lineup-empty-state");
   const lineupParticipationSummaryEl = document.getElementById("lineup-participation-summary");
   const lineupMatchesListEl = document.getElementById("lineup-matches-list");
+  const matchShareModal = document.getElementById("match-share-modal");
+  const matchSharePreviewEl = document.getElementById("match-share-preview");
+  const matchShareCloseBtn = document.getElementById("match-share-close-btn");
+  const matchShareDownloadBtn = document.getElementById("match-share-download-btn");
+  const matchShareNativeBtn = document.getElementById("match-share-native-btn");
 
   function normalizeIdentity(value) {
     return String(value || "").trim().toLowerCase();
@@ -381,6 +392,500 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function getStatusClass(status) {
+    const normalized = normalizeIdentity(status);
+    if (normalized === "live") return "live-status--live";
+    if (normalized === "completed") return "live-status--completed";
+    return "live-status--pending";
+  }
+
+  function splitTeamName(value) {
+    const text = String(value || "").trim();
+    const upper = text.toUpperCase();
+    if (!text || upper === "BYE" || upper === "TBD") return [];
+    return text.split(" + ").map((item) => item.trim()).filter(Boolean);
+  }
+
+  function getBucketScore(bucket) {
+    if (bucket == null) return "-";
+    if (typeof bucket === "number") return bucket;
+    if (typeof bucket === "string" && bucket.trim()) return bucket.trim();
+    if (typeof bucket?.value === "number") return bucket.value;
+    if (typeof bucket?.score === "number") return bucket.score;
+    if (typeof bucket?.points === "number") return bucket.points;
+    return 0;
+  }
+
+  function getSubmatchLabel(submatch, index) {
+    return String(
+      submatch?.label ||
+      submatch?.title ||
+      submatch?.categoryName ||
+      submatch?.eventName ||
+      `Submatch ${index + 1}`
+    ).trim();
+  }
+
+  function getSubmatchPlayerLabel(submatch, side, fallback) {
+    const key = side === "A" ? "homePlayers" : "awayPlayers";
+    const values = Array.isArray(submatch?.[key]) ? submatch[key] : [];
+    return values.length ? values.join(" + ") : fallback;
+  }
+
+  function getTeamTotals(match) {
+    const totals = {
+      homeWins: 0,
+      awayWins: 0,
+      homePoints: Number(match?.matchPointsHome || 0) || 0,
+      awayPoints: Number(match?.matchPointsAway || 0) || 0,
+    };
+
+    const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
+    submatches.forEach((submatch) => {
+      const winnerSide = normalizeIdentity(submatch?.winnerSide || submatch?.score?.computed?.winnerSide || "");
+      if (winnerSide === "a" || winnerSide === "home") totals.homeWins += 1;
+      if (winnerSide === "b" || winnerSide === "away") totals.awayWins += 1;
+    });
+
+    return totals;
+  }
+
+  function buildSimpleLiveCard(match) {
+    const homeScore = getBucketScore(match?.score?.state?.A);
+    const awayScore = getBucketScore(match?.score?.state?.B);
+    const homePlayers = Array.isArray(match?.homePlayers) && match.homePlayers.length
+      ? match.homePlayers
+      : splitTeamName(match?.home);
+    const awayPlayers = Array.isArray(match?.awayPlayers) && match.awayPlayers.length
+      ? match.awayPlayers
+      : splitTeamName(match?.away);
+
+    return `
+      <section class="live-score-card live-tv-card">
+        <div class="live-tv-card-head">
+          <div class="live-tv-badges">
+            <span class="live-badge">${escapeHtml(match?.categoryLabel || "Match")}</span>
+            <span class="live-badge">${escapeHtml(match?.roundLabel || `Round ${Number(match?.roundIndex || 0) + 1}`)}</span>
+            ${match?.court ? `<span class="live-badge">${escapeHtml(match.court)}</span>` : ""}
+            ${match?.time ? `<span class="live-badge">${escapeHtml(match.time)}</span>` : ""}
+          </div>
+          <span class="live-badge ${getStatusClass(match?.status)}">${escapeHtml(match?.status || "pending")}</span>
+        </div>
+
+        <div class="live-tv-simple-main">
+          <div class="live-tv-team-block">
+            <div class="live-tv-team-name">${escapeHtml(match?.home || "Home")}</div>
+            <div class="live-tv-player-stack" role="list">
+              ${(homePlayers.length ? homePlayers : ["-"]).map((name) => `<span class="live-tv-player-row" role="listitem">${escapeHtml(name)}</span>`).join("")}
+            </div>
+          </div>
+
+          <div class="live-tv-simple-score">${escapeHtml(String(homeScore))} - ${escapeHtml(String(awayScore))}</div>
+
+          <div class="live-tv-team-block live-tv-team-block--right">
+            <div class="live-tv-team-name">${escapeHtml(match?.away || "Away")}</div>
+            <div class="live-tv-player-stack live-tv-player-stack--right" role="list">
+              ${(awayPlayers.length ? awayPlayers : ["-"]).map((name) => `<span class="live-tv-player-row live-tv-player-row--right" role="listitem">${escapeHtml(name)}</span>`).join("")}
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function buildTeamScheduleLiveCard(match) {
+    const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
+    const totals = getTeamTotals(match);
+
+    const submatchRows = submatches.length
+      ? submatches.map((submatch, index) => {
+          const homeScore = getBucketScore(submatch?.score?.state?.A);
+          const awayScore = getBucketScore(submatch?.score?.state?.B);
+          return `
+            <div class="live-tv-submatch-row${submatch?.isMine ? " live-tv-submatch-row--mine" : ""}">
+              <div class="live-tv-submatch-side live-tv-submatch-side--left">
+                <span class="live-tv-submatch-player">${escapeHtml(getSubmatchPlayerLabel(submatch, "A", match?.home || "Home"))}</span>
+                ${submatch?.mySide === "home" ? '<span class="live-tv-submatch-tag">You played</span>' : ""}
+              </div>
+              <div class="live-tv-submatch-center">
+                <span class="live-tv-submatch-title">${escapeHtml(getSubmatchLabel(submatch, index))}</span>
+                <span class="live-tv-submatch-score">${escapeHtml(String(homeScore))} - ${escapeHtml(String(awayScore))}</span>
+              </div>
+              <div class="live-tv-submatch-side live-tv-submatch-side--right">
+                <span class="live-tv-submatch-player">${escapeHtml(getSubmatchPlayerLabel(submatch, "B", match?.away || "Away"))}</span>
+                ${submatch?.mySide === "away" ? '<span class="live-tv-submatch-tag">You played</span>' : ""}
+              </div>
+            </div>
+          `;
+        }).join("")
+      : '<div class="live-tv-empty-note">No player-level submatch score is available yet.</div>';
+
+    return `
+      <section class="live-score-card live-tv-card">
+        <div class="live-tv-card-head">
+          <div class="live-tv-badges">
+            <span class="live-badge">${escapeHtml(match?.categoryLabel || "Team match")}</span>
+            <span class="live-badge">${escapeHtml(match?.roundLabel || `Match ${Number(match?.matchIndex || 0) + 1}`)}</span>
+            ${match?.court ? `<span class="live-badge">${escapeHtml(match.court)}</span>` : ""}
+            ${match?.time ? `<span class="live-badge">${escapeHtml(match.time)}</span>` : ""}
+          </div>
+          <span class="live-badge ${getStatusClass(match?.status)}">${escapeHtml(match?.status || "pending")}</span>
+        </div>
+
+        <div class="live-tv-teams">
+          <div class="live-tv-team">
+            <div class="live-tv-team-name">${escapeHtml(match?.home || "Home")}</div>
+            <div class="live-tv-team-total">Total match points ${escapeHtml(String(totals.homePoints || 0))}</div>
+          </div>
+          <div class="live-tv-tie-score-wrap">
+            <div class="live-tv-tie-score-label">Tie score</div>
+            <div class="live-tv-tie-score">${escapeHtml(String(totals.homeWins || 0))} - ${escapeHtml(String(totals.awayWins || 0))}</div>
+          </div>
+          <div class="live-tv-team live-tv-team--right">
+            <div class="live-tv-team-name">${escapeHtml(match?.away || "Away")}</div>
+            <div class="live-tv-team-total">Total match points ${escapeHtml(String(totals.awayPoints || 0))}</div>
+          </div>
+        </div>
+
+        <div class="live-tv-submatches">${submatchRows}</div>
+      </section>
+    `;
+  }
+
+  function buildMyMatchCard(match, index) {
+    const cardHtml = match?.isTeamSchedule ? buildTeamScheduleLiveCard(match) : buildSimpleLiveCard(match);
+    return `
+      <div class="my-match-card-shell" data-match-card="${escapeHtml(String(index))}">
+        ${cardHtml}
+        <div class="my-match-actions">
+          <button type="button" class="btn-primary" data-share-match="${escapeHtml(String(index))}">Share story card</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMyMatchesTab() {
+    if (!myMatchesListEl || !myMatchesEmptyStateEl || !myMatchesEmptyTextEl) return;
+
+    const matches = Array.isArray(myMatchesPayload?.matches) ? myMatchesPayload.matches : [];
+    myMatchesListEl.innerHTML = "";
+
+    if (!matches.length) {
+      myMatchesEmptyStateEl.classList.remove("hidden");
+      myMatchesEmptyTextEl.textContent = "As soon as you appear in a match lineup or player list, your scorecard will show up here.";
+      return;
+    }
+
+    myMatchesEmptyStateEl.classList.add("hidden");
+    myMatchesListEl.innerHTML = matches.map((match, index) => buildMyMatchCard(match, index)).join("");
+
+    myMatchesListEl.querySelectorAll("[data-share-match]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const index = Number(button.getAttribute("data-share-match"));
+        const match = matches[index];
+        if (match) await openMatchShareModal(match);
+      });
+    });
+  }
+
+  async function loadMyMatches() {
+    const resp = await apiGet(`/api/player/tournaments/${encodeURIComponent(tournamentId)}/my-matches`);
+    if (!resp.ok) {
+      myMatchesPayload = { matches: [], posterSettings: null };
+      renderMyMatchesTab();
+      return;
+    }
+
+    myMatchesPayload = {
+      matches: Array.isArray(resp.data?.matches) ? resp.data.matches : [],
+      posterSettings: resp.data?.posterSettings || null,
+    };
+    renderMyMatchesTab();
+  }
+
+  function closeMatchShareModal() {
+    matchShareModal?.classList.add("hidden");
+    matchShareModal?.setAttribute("aria-hidden", "true");
+    activeSharePoster = null;
+    if (matchSharePreviewEl) matchSharePreviewEl.src = "";
+  }
+
+  function getPosterMetaLines(settings) {
+    if (!settings || typeof settings !== "object") return { top: [], bottom: [] };
+    const linesTop = [];
+    const linesBottom = [];
+    const visibility = settings.visibility || {};
+
+    if (visibility.organizerName && settings.organizerName) linesTop.push(`Hosted by ${settings.organizerName}`);
+    if (visibility.tagline && settings.tagline) linesTop.push(settings.tagline);
+
+    (Array.isArray(settings.customFields) ? settings.customFields : [])
+      .filter((field) => field?.enabled !== false && field?.label && field?.value)
+      .forEach((field) => {
+        const line = `${field.label}: ${field.value}`;
+        if (String(field.position || "bottom").toLowerCase() === "top") linesTop.push(line);
+        else linesBottom.push(line);
+      });
+
+    if (visibility.sponsorNames && Array.isArray(settings.sponsorNames) && settings.sponsorNames.length) {
+      linesBottom.push(`Sponsors: ${settings.sponsorNames.join(" • ")}`);
+    }
+
+    const footerBits = [];
+    if (visibility.venueLabel && settings.venueLabel) footerBits.push(settings.venueLabel);
+    if (visibility.cityName && settings.cityName) footerBits.push(settings.cityName);
+    if (visibility.socialHandle && settings.socialHandle) footerBits.push(settings.socialHandle);
+    if (footerBits.length) linesBottom.push(footerBits.join(" • "));
+
+    return { top: linesTop, bottom: linesBottom };
+  }
+
+  function drawRoundedRect(ctx, x, y, width, height, radius, fillStyle, strokeStyle = null) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + width, y, x + width, y + height, radius);
+    ctx.arcTo(x + width, y + height, x, y + height, radius);
+    ctx.arcTo(x, y + height, x, y, radius);
+    ctx.arcTo(x, y, x + width, y, radius);
+    ctx.closePath();
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+    if (strokeStyle) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.stroke();
+    }
+  }
+
+  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3) {
+    const words = String(text || "").split(/\s+/).filter(Boolean);
+    if (!words.length) return y;
+
+    let line = "";
+    let linesDrawn = 0;
+    for (let index = 0; index < words.length; index += 1) {
+      const testLine = line ? `${line} ${words[index]}` : words[index];
+      if (ctx.measureText(testLine).width <= maxWidth || !line) {
+        line = testLine;
+        continue;
+      }
+
+      ctx.fillText(line, x, y);
+      y += lineHeight;
+      linesDrawn += 1;
+      line = words[index];
+      if (linesDrawn >= maxLines - 1) break;
+    }
+
+    if (line && linesDrawn < maxLines) {
+      let finalLine = line;
+      while (ctx.measureText(finalLine).width > maxWidth && finalLine.length > 1) {
+        finalLine = `${finalLine.slice(0, -2)}…`;
+      }
+      ctx.fillText(finalLine, x, y);
+      y += lineHeight;
+    }
+
+    return y;
+  }
+
+  async function buildMatchSharePoster(match) {
+    const width = 1080;
+    const height = 1920;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not create poster canvas");
+
+    if (document.fonts?.ready) {
+      try {
+        await document.fonts.ready;
+      } catch {}
+    }
+
+    const background = ctx.createLinearGradient(0, 0, width, height);
+    background.addColorStop(0, "#08111f");
+    background.addColorStop(0.5, "#0b1730");
+    background.addColorStop(1, "#050b18");
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "rgba(77, 208, 225, 0.16)";
+    ctx.beginPath();
+    ctx.arc(220, 260, 260, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(242, 95, 76, 0.12)";
+    ctx.beginPath();
+    ctx.arc(880, 1540, 300, 0, Math.PI * 2);
+    ctx.fill();
+
+    const posterMeta = getPosterMetaLines(myMatchesPayload?.posterSettings || null);
+
+    ctx.fillStyle = "#7dd3fc";
+    ctx.font = '700 34px "Space Grotesk", sans-serif';
+    let cursorY = 120;
+    posterMeta.top.forEach((line) => {
+      cursorY = drawWrappedText(ctx, line, 84, cursorY, 912, 42, 2);
+    });
+
+    ctx.fillStyle = "#e6eef8";
+    ctx.font = '700 70px "Space Grotesk", sans-serif';
+    cursorY = drawWrappedText(ctx, tournamentMeta?.tournamentName || "ScheduleIt", 84, cursorY + 34, 912, 82, 3);
+
+    ctx.fillStyle = "rgba(230, 238, 248, 0.82)";
+    ctx.font = '500 30px "Inter", sans-serif';
+    const metaLine = [match?.categoryLabel, match?.roundLabel, match?.court].filter(Boolean).join(" • ");
+    cursorY = drawWrappedText(ctx, metaLine, 84, cursorY + 10, 912, 40, 2);
+
+    drawRoundedRect(ctx, 64, 360, 952, match?.isTeamSchedule ? 960 : 760, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
+
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = '700 54px "Space Grotesk", sans-serif';
+    drawWrappedText(ctx, match?.home || "Home", 116, 470, 300, 60, 2);
+    ctx.textAlign = "right";
+    drawWrappedText(ctx, match?.away || "Away", 964, 470, 300, 60, 2);
+    ctx.textAlign = "left";
+
+    if (match?.isTeamSchedule) {
+      const totals = getTeamTotals(match);
+      ctx.fillStyle = "#4dd0e1";
+      ctx.font = '700 110px "Space Grotesk", sans-serif';
+      ctx.textAlign = "center";
+      ctx.fillText(`${totals.homeWins} - ${totals.awayWins}`, width / 2, 590);
+      ctx.fillStyle = "rgba(230, 238, 248, 0.8)";
+      ctx.font = '600 24px "Inter", sans-serif';
+      ctx.fillText("Tie score", width / 2, 640);
+      ctx.textAlign = "left";
+
+      let y = 760;
+      const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
+      submatches.slice(0, 6).forEach((submatch, index) => {
+        const highlight = Boolean(submatch?.isMine);
+        drawRoundedRect(
+          ctx,
+          108,
+          y - 48,
+          864,
+          112,
+          26,
+          highlight ? "rgba(77, 208, 225, 0.12)" : "rgba(255,255,255,0.03)",
+          highlight ? "rgba(77, 208, 225, 0.36)" : "rgba(255,255,255,0.06)"
+        );
+
+        ctx.fillStyle = "#e6eef8";
+        ctx.font = '700 26px "Inter", sans-serif';
+        drawWrappedText(ctx, getSubmatchPlayerLabel(submatch, "A", match?.home || "Home"), 136, y, 280, 30, 2);
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(230,238,248,0.78)";
+        ctx.font = '700 18px "Inter", sans-serif';
+        ctx.fillText(getSubmatchLabel(submatch, index), width / 2, y - 6);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = '700 34px "Space Grotesk", sans-serif';
+        ctx.fillText(`${getBucketScore(submatch?.score?.state?.A)} - ${getBucketScore(submatch?.score?.state?.B)}`, width / 2, y + 32);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#e6eef8";
+        ctx.font = '700 26px "Inter", sans-serif';
+        drawWrappedText(ctx, getSubmatchPlayerLabel(submatch, "B", match?.away || "Away"), 944, y, 280, 30, 2);
+        ctx.textAlign = "left";
+
+        if (highlight) {
+          ctx.fillStyle = "#4dd0e1";
+          ctx.font = '700 18px "Inter", sans-serif';
+          ctx.fillText("YOU PLAYED", 136, y + 52);
+        }
+
+        y += 130;
+      });
+    } else {
+      const homePlayers = Array.isArray(match?.homePlayers) && match.homePlayers.length ? match.homePlayers : splitTeamName(match?.home);
+      const awayPlayers = Array.isArray(match?.awayPlayers) && match.awayPlayers.length ? match.awayPlayers : splitTeamName(match?.away);
+
+      ctx.fillStyle = "rgba(230, 238, 248, 0.92)";
+      ctx.font = '600 30px "Inter", sans-serif';
+      let leftY = 580;
+      homePlayers.forEach((player) => {
+        leftY = drawWrappedText(ctx, player, 116, leftY, 280, 38, 2);
+      });
+
+      ctx.textAlign = "right";
+      let rightY = 580;
+      awayPlayers.forEach((player) => {
+        rightY = drawWrappedText(ctx, player, 964, rightY, 280, 38, 2);
+      });
+      ctx.textAlign = "left";
+
+      ctx.fillStyle = "#4dd0e1";
+      ctx.font = '700 130px "Space Grotesk", sans-serif';
+      ctx.textAlign = "center";
+      ctx.fillText(`${getBucketScore(match?.score?.state?.A)} - ${getBucketScore(match?.score?.state?.B)}`, width / 2, 760);
+      ctx.textAlign = "left";
+    }
+
+    ctx.fillStyle = "rgba(230,238,248,0.86)";
+    ctx.font = '600 24px "Inter", sans-serif';
+    const footerYStart = height - 240;
+    let footerY = footerYStart;
+    posterMeta.bottom.forEach((line) => {
+      footerY = drawWrappedText(ctx, line, 84, footerY, 912, 34, 3);
+    });
+
+    ctx.fillStyle = "#7dd3fc";
+    ctx.font = '700 24px "Inter", sans-serif';
+    ctx.fillText("Built on ScheduleIt", 84, height - 88);
+
+    return canvas.toDataURL("image/png");
+  }
+
+  async function openMatchShareModal(match) {
+    if (!matchShareModal || !matchSharePreviewEl) return;
+    const dataUrl = await buildMatchSharePoster(match);
+    activeSharePoster = {
+      dataUrl,
+      fileName: `scheduleit-match-${String(match?.matchId || "card").replace(/[^a-z0-9_-]+/gi, "-").toLowerCase()}.png`,
+      match,
+    };
+    matchSharePreviewEl.src = dataUrl;
+    matchShareModal.classList.remove("hidden");
+    matchShareModal.setAttribute("aria-hidden", "false");
+  }
+
+  async function dataUrlToFile(dataUrl, fileName) {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    return new File([blob], fileName, { type: blob.type || "image/png" });
+  }
+
+  async function downloadActiveSharePoster() {
+    if (!activeSharePoster?.dataUrl) return;
+    const link = document.createElement("a");
+    link.href = activeSharePoster.dataUrl;
+    link.download = activeSharePoster.fileName || "scheduleit-match.png";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  async function shareActivePoster() {
+    if (!activeSharePoster?.dataUrl) return;
+
+    const file = await dataUrlToFile(
+      activeSharePoster.dataUrl,
+      activeSharePoster.fileName || "scheduleit-match.png"
+    );
+
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: `${tournamentMeta?.tournamentName || "Tournament"} match card`,
+        text: "Generated from ScheduleIt",
+      });
+      return;
+    }
+
+    await downloadActiveSharePoster();
+    alert("Image downloaded. Open Instagram and add it to your story.");
+  }
+
   if (trigger) {
     const label = String(user?.username || user?.name || user?.email || "U").trim();
     trigger.textContent = (label[0] || "U").toUpperCase();
@@ -436,6 +941,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   backBtn?.addEventListener("click", () => {
     window.location.href = "join.html";
+  });
+
+  matchShareCloseBtn?.addEventListener("click", closeMatchShareModal);
+  matchShareDownloadBtn?.addEventListener("click", downloadActiveSharePoster);
+  matchShareNativeBtn?.addEventListener("click", async () => {
+    try {
+      await shareActivePoster();
+    } catch (err) {
+      alert(err?.message || "Could not share this image.");
+    }
+  });
+  matchShareModal?.querySelectorAll("[data-share-close]")?.forEach((element) => {
+    element.addEventListener("click", closeMatchShareModal);
   });
 
   function wireTeamTabs() {
@@ -1142,6 +1660,7 @@ if (teamNameInput) {
 }
 
     renderMyTeamPanel();
+    renderMyMatchesTab();
   }
 
   categorySelect?.addEventListener("change", () => {
@@ -1281,6 +1800,7 @@ if (teamNameInput) {
         localStorage.removeItem(draftKey);
         alert("Team request created successfully.");
         await hydrateSubmissionState();
+        await loadMyMatches();
         hydratePage();
         await renderLineupTab();
         return;
@@ -1755,6 +2275,7 @@ if (teamNameInput) {
 
   allPlayers = await loadPlayers();
   await hydrateSubmissionState();
+  await loadMyMatches();
   hydratePage();
   await renderLineupTab();
 });
