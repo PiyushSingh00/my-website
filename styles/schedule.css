@@ -456,9 +456,9 @@
   font-size: 15px;
   font-weight: 700;
   color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .live-tv-submatch-center {
@@ -509,26 +509,35 @@
   white-space: nowrap;
 }
 
-.live-tv-player-list {
-  display: flex;
-  flex-wrap: wrap;
+.live-tv-player-stack {
+  display: grid;
   gap: 8px;
+  min-height: 76px;
+  align-content: start;
 }
 
-.live-tv-player-list--right {
-  justify-content: flex-end;
+.live-tv-player-stack--right {
+  justify-items: end;
 }
 
-.live-tv-player-pill {
-  display: inline-flex;
+.live-tv-player-row {
+  display: grid;
   align-items: center;
+  min-height: 34px;
   padding: 8px 12px;
-  border-radius: 999px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--text);
   font-size: 14px;
   font-weight: 700;
+  line-height: 1.3;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.live-tv-player-row--right {
+  text-align: right;
 }
 
 @media (max-width: 980px) {
@@ -551,8 +560,16 @@
     text-align: left;
   }
 
-  .live-tv-player-list--right {
-    justify-content: flex-start;
+  .live-tv-player-stack {
+    min-height: 0;
+  }
+
+  .live-tv-player-stack--right {
+    justify-items: start;
+  }
+
+  .live-tv-player-row--right {
+    text-align: left;
   }
 
   .live-tv-simple-score,
