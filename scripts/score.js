@@ -531,6 +531,41 @@ async function loadTeamRosterLookup() {
   teamRosterLookup = merged;
 }
 
+async function refreshLatestTeamRostersIntoState(matchObj, teamTieState) {
+  if (!matchObj || !teamTieState) return;
+
+  await loadTeamRosterLookup();
+
+  const latestHomeRoster = inferTeamRoster(matchObj, "A");
+  const latestAwayRoster = inferTeamRoster(matchObj, "B");
+
+  const selectedHome = toArray(teamTieState.categories)
+    .flatMap((category) => getSelectedPlayers(category, "A"))
+    .map((name) => safeText(name))
+    .filter(Boolean);
+
+  const selectedAway = toArray(teamTieState.categories)
+    .flatMap((category) => getSelectedPlayers(category, "B"))
+    .map((name) => safeText(name))
+    .filter(Boolean);
+
+  const aggregateTie = matchObj?.score?.state?.meta?.teamTieState;
+
+  teamTieState.homeRoster = mergeUniqueRoster(
+    latestHomeRoster,
+    resolveRosterList(teamTieState.homeRoster, [], matchObj?.home),
+    resolveRosterList(aggregateTie?.homeRoster, [], matchObj?.home),
+    selectedHome
+  );
+
+  teamTieState.awayRoster = mergeUniqueRoster(
+    latestAwayRoster,
+    resolveRosterList(teamTieState.awayRoster, [], matchObj?.away),
+    resolveRosterList(aggregateTie?.awayRoster, [], matchObj?.away),
+    selectedAway
+  );
+}
+
     function isRosterJustTeamLabel(roster, teamLabel) {
       const list = toArray(roster).map((name) => safeText(name)).filter(Boolean);
       const label = safeText(teamLabel);
@@ -2504,6 +2539,7 @@ try {
 
     const teamTieState = loadTeamTieState(match, fixtures);
     hydrateTeamTieStateFromMatch(match, teamTieState, fixtures);
+    await refreshLatestTeamRostersIntoState(match, teamTieState);
 
     let savingTeam = false;
     const scheduleTeamAutoSave = debounce(() => {
@@ -2616,9 +2652,16 @@ try {
           </div>
         `;
 
-        row.querySelector('[data-action="edit-lineup"]')?.addEventListener("click", () => {
-          row.scrollIntoView({ behavior: "smooth", block: "nearest" });
-          row.querySelector('select')?.focus();
+        row.querySelector('[data-action="edit-lineup"]')?.addEventListener("click", async () => {
+          await refreshLatestTeamRostersIntoState(match, teamTieState);
+          renderLineupReview();
+          renderTeamCategoryBars();
+
+          requestAnimationFrame(() => {
+            const freshRow = lineupReviewList?.children?.[index];
+            freshRow?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            freshRow?.querySelector("select")?.focus();
+          });
         });
 
         const notesInput = row.querySelector('[data-role="notes"]');
