@@ -203,14 +203,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       "/api/tournaments/mine",
     ];
 
+    const merged = new Map();
+
     for (const url of candidates) {
       const r = await apiGet(url);
       if (!r.ok) continue;
-      myJoinedTournaments = normalizeTournamentList(r.data);
-      return;
+
+      normalizeTournamentList(r.data).forEach((tournament) => {
+        const tournamentId = String(tournament?.tournamentId || tournament?.id || "").trim();
+        if (!tournamentId) return;
+        const existing = merged.get(tournamentId) || {};
+        merged.set(tournamentId, {
+          ...existing,
+          ...tournament,
+          tournamentId,
+        });
+      });
     }
 
-    myJoinedTournaments = [];
+    myJoinedTournaments = [...merged.values()].sort((a, b) =>
+      String(b?.createdAt || "").localeCompare(String(a?.createdAt || ""))
+    );
   }
 
   async function loadTeamInvites() {
