@@ -687,8 +687,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function loadFixtures() {
     const urls = [
-      `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
       `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+      `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
     ];
 
     for (const url of urls) {

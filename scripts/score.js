@@ -140,8 +140,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function apiGet(url) {
-    const res = await fetch(url, {
-      headers: { Authorization: "Bearer " + getToken() },
+    const hasQuery = url.includes("?");
+    const freshUrl = `${url}${hasQuery ? "&" : "?"}_ts=${Date.now()}`;
+    const res = await fetch(freshUrl, {
+      headers: {
+        Authorization: "Bearer " + getToken(),
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+      cache: "no-store",
     });
 
     const raw = await res.text();
@@ -278,9 +285,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     explicitCategoryId,
     roundIndex,
     matchIndex,
+    scoreIndex = null,
     status,
     winnerName = null,
     computed = null,
+    scorePayload = null,
   }) {
     try {
       const rawFixtures = await apiGet(
@@ -295,37 +304,76 @@ document.addEventListener("DOMContentLoaded", async () => {
       const targetCategoryId = found.categoryId;
       const targetMatch = found.match;
 
+      function cloneScorePayload(payload) {
+        if (!payload || typeof payload !== "object") return null;
+        try {
+          return JSON.parse(JSON.stringify(payload));
+        } catch {
+          return { ...payload };
+        }
+      }
+
+      function applyComputed(targetScore) {
+        targetScore.computed = {
+          ...(targetScore.computed || {}),
+          ...(computed || {}),
+          status: status || "pending",
+          winnerName: winnerName || null,
+        };
+      }
+
+      function applyScore(target, payload) {
+        if (!target || typeof target !== "object") return;
+
+        target.score =
+          target.score && typeof target.score === "object" ? target.score : {};
+
+        const clonedPayload = cloneScorePayload(payload);
+        if (clonedPayload && typeof clonedPayload === "object") {
+          Object.keys(target.score).forEach((key) => delete target.score[key]);
+          Object.assign(target.score, clonedPayload);
+        }
+
+        applyComputed(target.score);
+      }
+
       targetMatch.status = status || "pending";
       if (winnerName) targetMatch.winner = winnerName;
       else delete targetMatch.winner;
+      applyScore(targetMatch, scorePayload);
 
-      targetMatch.score =
-        targetMatch.score && typeof targetMatch.score === "object" ? targetMatch.score : {};
-      targetMatch.score.computed = {
-        ...(targetMatch.score.computed || {}),
-        ...(computed || {}),
-        status: status || "pending",
-        winnerName: winnerName || null,
-      };
+      if (
+        Number.isInteger(scoreIndex) &&
+        scoreIndex >= 0 &&
+        Array.isArray(targetMatch.submatches) &&
+        targetMatch.submatches[scoreIndex]
+      ) {
+        const targetSubmatch = targetMatch.submatches[scoreIndex];
+        targetSubmatch.status = status || "pending";
+        if (winnerName) targetSubmatch.winner = winnerName;
+        else delete targetSubmatch.winner;
+        applyScore(targetSubmatch, scorePayload);
+      }
 
       const categoryBucket = fixturesDoc.categories?.[targetCategoryId];
       if (Array.isArray(categoryBucket?.matches) && categoryBucket.matches[matchIndex]) {
         categoryBucket.matches[matchIndex].status = targetMatch.status;
         if (winnerName) categoryBucket.matches[matchIndex].winner = winnerName;
         else delete categoryBucket.matches[matchIndex].winner;
+        applyScore(categoryBucket.matches[matchIndex], scorePayload);
 
-        categoryBucket.matches[matchIndex].score =
-          categoryBucket.matches[matchIndex].score &&
-          typeof categoryBucket.matches[matchIndex].score === "object"
-            ? categoryBucket.matches[matchIndex].score
-            : {};
-
-        categoryBucket.matches[matchIndex].score.computed = {
-          ...(categoryBucket.matches[matchIndex].score.computed || {}),
-          ...(computed || {}),
-          status: status || "pending",
-          winnerName: winnerName || null,
-        };
+        if (
+          Number.isInteger(scoreIndex) &&
+          scoreIndex >= 0 &&
+          Array.isArray(categoryBucket.matches[matchIndex].submatches) &&
+          categoryBucket.matches[matchIndex].submatches[scoreIndex]
+        ) {
+          const categorySubmatch = categoryBucket.matches[matchIndex].submatches[scoreIndex];
+          categorySubmatch.status = status || "pending";
+          if (winnerName) categorySubmatch.winner = winnerName;
+          else delete categorySubmatch.winner;
+          applyScore(categorySubmatch, scorePayload);
+        }
       }
 
       await apiPost(
@@ -481,6 +529,41 @@ async function loadTeamRosterLookup() {
   }
 
   teamRosterLookup = merged;
+}
+
+async function refreshLatestTeamRostersIntoState(matchObj, teamTieState) {
+  if (!matchObj || !teamTieState) return;
+
+  await loadTeamRosterLookup();
+
+  const latestHomeRoster = inferTeamRoster(matchObj, "A");
+  const latestAwayRoster = inferTeamRoster(matchObj, "B");
+
+  const selectedHome = toArray(teamTieState.categories)
+    .flatMap((category) => getSelectedPlayers(category, "A"))
+    .map((name) => safeText(name))
+    .filter(Boolean);
+
+  const selectedAway = toArray(teamTieState.categories)
+    .flatMap((category) => getSelectedPlayers(category, "B"))
+    .map((name) => safeText(name))
+    .filter(Boolean);
+
+  const aggregateTie = matchObj?.score?.state?.meta?.teamTieState;
+
+  teamTieState.homeRoster = mergeUniqueRoster(
+    latestHomeRoster,
+    resolveRosterList(teamTieState.homeRoster, [], matchObj?.home),
+    resolveRosterList(aggregateTie?.homeRoster, [], matchObj?.home),
+    selectedHome
+  );
+
+  teamTieState.awayRoster = mergeUniqueRoster(
+    latestAwayRoster,
+    resolveRosterList(teamTieState.awayRoster, [], matchObj?.away),
+    resolveRosterList(aggregateTie?.awayRoster, [], matchObj?.away),
+    selectedAway
+  );
 }
 
     function isRosterJustTeamLabel(roster, teamLabel) {
@@ -2309,8 +2392,8 @@ try {
   let tournamentResp = null;
 
   const fixtureUrls = [
-    `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
     `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
+    `/api/tournaments/${encodeURIComponent(tournamentId)}/fixtures`,
   ];
 
   for (const url of fixtureUrls) {
@@ -2456,6 +2539,7 @@ try {
 
     const teamTieState = loadTeamTieState(match, fixtures);
     hydrateTeamTieStateFromMatch(match, teamTieState, fixtures);
+    await refreshLatestTeamRostersIntoState(match, teamTieState);
 
     let savingTeam = false;
     const scheduleTeamAutoSave = debounce(() => {
@@ -2568,9 +2652,16 @@ try {
           </div>
         `;
 
-        row.querySelector('[data-action="edit-lineup"]')?.addEventListener("click", () => {
-          row.scrollIntoView({ behavior: "smooth", block: "nearest" });
-          row.querySelector('select')?.focus();
+        row.querySelector('[data-action="edit-lineup"]')?.addEventListener("click", async () => {
+          await refreshLatestTeamRostersIntoState(match, teamTieState);
+          renderLineupReview();
+          renderTeamCategoryBars();
+
+          requestAnimationFrame(() => {
+            const freshRow = lineupReviewList?.children?.[index];
+            freshRow?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            freshRow?.querySelector("select")?.focus();
+          });
         });
 
         const notesInput = row.querySelector('[data-role="notes"]');
@@ -2790,46 +2881,44 @@ try {
               await apiPut(url, payload);
               break;
             }
+
+            await patchFixtureStatusInBackend({
+              explicitCategoryId: resolvedCategoryId,
+              roundIndex,
+              matchIndex,
+              scoreIndex: index,
+              status: category.winnerSide ? "completed" : (isCategoryLineupComplete(category) ? "live" : "pending"),
+              winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
+              computed: {
+                status: category.winnerSide ? "completed" : (isCategoryLineupComplete(category) ? "live" : "pending"),
+                winnerSide: category.winnerSide || null,
+                winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
+              },
+              scorePayload: payload.score,
+            });
           }
         }
 
-          if (!hasSubmatches) {
-            const aggregatePayload = {
-              tournamentId,
-              categoryId: resolvedCategoryId,
-              roundIndex,
-              matchIndex,
-              round: roundIndex,
-              match: matchIndex,
-              scoreIndex: 0,
-              score: {
-                config: { targetPoints: Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1)), winByTwo: false },
-                state: {
-                  A: { points: Number(summary.homeMatchPoints || 0) },
-                  B: { points: Number(summary.awayMatchPoints || 0) },
-                  meta: { teamTieState },
-                },
-                computed: {
-                  status: summary.allCompleted ? "completed" : (summary.readyLineups ? "live" : "pending"),
-                  winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
-                  winnerName: summary.homeWins > summary.awayWins ? homeLabel : summary.awayWins > summary.homeWins ? awayLabel : null,
-                },
-              },
-            };
-            await apiPut(candidateUrls[0], aggregatePayload);
-          }
-
-          const aggregateStatus = getTeamAggregateStatus(teamTieState);
-          const aggregateWinner = getTeamAggregateWinner(summary, aggregateStatus);
-
-          await patchFixtureStatusInBackend({
-            explicitCategoryId: resolvedCategoryId,
-            roundIndex,
-            matchIndex,
-            status: aggregateStatus,
-            winnerName: aggregateWinner,
+        const aggregateStatus = getTeamAggregateStatus(teamTieState);
+        const aggregateWinner = getTeamAggregateWinner(summary, aggregateStatus);
+        const aggregatePayload = {
+          tournamentId,
+          categoryId: resolvedCategoryId,
+          roundIndex,
+          matchIndex,
+          round: roundIndex,
+          match: matchIndex,
+          scoreIndex: 0,
+          score: {
+            config: { targetPoints: Math.max(1, Number(Math.max(summary.homeMatchPoints, summary.awayMatchPoints) || 1)), winByTwo: false },
+            state: {
+              A: { points: Number(summary.homeMatchPoints || 0) },
+              B: { points: Number(summary.awayMatchPoints || 0) },
+              meta: { teamTieState },
+            },
             computed: {
               status: aggregateStatus,
+              winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
               winnerName: aggregateWinner,
               homeCategoryWins: Number(summary?.homeCategoryWins ?? summary?.homeWins ?? 0),
               awayCategoryWins: Number(summary?.awayCategoryWins ?? summary?.awayWins ?? 0),
@@ -2837,8 +2926,23 @@ try {
               awayMatchPoints: Number(summary?.awayMatchPoints ?? summary?.awayPoints ?? 0),
               tieLocked: Boolean(teamTieState?.tieLocked),
             },
-          });
-        } catch (err) {
+          },
+        };
+
+        if (!hasSubmatches) {
+          await apiPut(candidateUrls[0], aggregatePayload);
+        }
+
+        await patchFixtureStatusInBackend({
+          explicitCategoryId: resolvedCategoryId,
+          roundIndex,
+          matchIndex,
+          status: aggregateStatus,
+          winnerName: aggregateWinner,
+          computed: aggregatePayload.score.computed,
+          scorePayload: aggregatePayload.score,
+        });
+      } catch (err) {
         console.error(err);
         if (!silent) alert(err?.message || "Could not auto-save tie data.");
       } finally {
@@ -2966,6 +3070,18 @@ try {
     const B = state.state.B;
     const cfg = state.config;
 
+    const hasProgress = (() => {
+      const directA = Object.values(A || {}).some((value) => Number(value) > 0);
+      const directB = Object.values(B || {}).some((value) => Number(value) > 0);
+      const playerA = Object.values(A?.players || {}).some((player) =>
+        Object.values(player || {}).some((value) => Number(value) > 0)
+      );
+      const playerB = Object.values(B?.players || {}).some((player) =>
+        Object.values(player || {}).some((value) => Number(value) > 0)
+      );
+      return directA || directB || playerA || playerB || Number(state.timer.elapsedMs || 0) > 0;
+    })();
+
     if (logic.type === "higherScoreWins") {
       const field = logic.field || "score";
       const a = Number(A[field] ?? 0);
@@ -2973,7 +3089,7 @@ try {
 
       if (a > b) return { status: "completed", winnerName: homeLabel, reason: `${a} > ${b}` };
       if (b > a) return { status: "completed", winnerName: awayLabel, reason: `${b} > ${a}` };
-      return { status: "pending", winnerName: null, reason: "Equal scores" };
+      return { status: hasProgress ? "live" : "pending", winnerName: null, reason: "Equal scores" };
     }
 
     if (logic.type === "firstToTarget") {
@@ -2990,10 +3106,10 @@ try {
       if (b >= target && (!win2 || b - a >= 2)) {
         return { status: "completed", winnerName: awayLabel, reason: `Reached ${b}/${target}` };
       }
-      return { status: "pending", winnerName: null, reason: "Ongoing" };
+      return { status: hasProgress ? "live" : "pending", winnerName: null, reason: "Ongoing" };
     }
 
-    return { status: "pending", winnerName: null, reason: "Unknown logic" };
+    return { status: hasProgress ? "live" : "pending", winnerName: null, reason: "Unknown logic" };
   }
 
   function renderPills() {
@@ -3394,9 +3510,11 @@ try {
       explicitCategoryId: resolvedCategoryId,
       roundIndex,
       matchIndex,
+      scoreIndex,
       status: computed?.status || "pending",
       winnerName: computed?.winnerName || null,
       computed,
+      scorePayload: payload.score,
     });
 
     if (saveMsg) saveMsg.textContent = "Saved";
