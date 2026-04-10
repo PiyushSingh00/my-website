@@ -416,6 +416,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     return 0;
   }
 
+  function getDisplayedMatchScore(match, side) {
+    const sideKey = String(side || "").toLowerCase() === "away" ? "away" : "home";
+    const bucketKey = sideKey === "home" ? "A" : "B";
+    const directBucket = getBucketScore(match?.score?.state?.[bucketKey]);
+    if (directBucket !== "-" && directBucket !== "" && directBucket != null) return directBucket;
+
+    const pointsValue =
+      sideKey === "home"
+        ? Number(match?.matchPointsHome ?? match?.summary?.homeMatchPoints ?? NaN)
+        : Number(match?.matchPointsAway ?? match?.summary?.awayMatchPoints ?? NaN);
+    if (Number.isFinite(pointsValue)) return pointsValue;
+
+    const altScore =
+      sideKey === "home"
+        ? match?.score?.computed?.homeScore
+        : match?.score?.computed?.awayScore;
+    if (typeof altScore === "number") return altScore;
+    if (typeof altScore === "string" && altScore.trim()) return altScore.trim();
+
+    return "-";
+  }
+
   function getSubmatchLabel(submatch, index) {
     return String(
       submatch?.label ||
@@ -451,8 +473,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function buildSimpleLiveCard(match) {
-    const homeScore = getBucketScore(match?.score?.state?.A);
-    const awayScore = getBucketScore(match?.score?.state?.B);
+    const homeScore = getDisplayedMatchScore(match, "home");
+    const awayScore = getDisplayedMatchScore(match, "away");
     const homePlayers = Array.isArray(match?.homePlayers) && match.homePlayers.length
       ? match.homePlayers
       : splitTeamName(match?.home);
@@ -499,8 +521,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const submatchRows = submatches.length
       ? submatches.map((submatch, index) => {
-          const homeScore = getBucketScore(submatch?.score?.state?.A);
-          const awayScore = getBucketScore(submatch?.score?.state?.B);
+          const homeScore = getDisplayedMatchScore(submatch, "home");
+          const awayScore = getDisplayedMatchScore(submatch, "away");
           return `
             <div class="live-tv-submatch-row${submatch?.isMine ? " live-tv-submatch-row--mine" : ""}">
               <div class="live-tv-submatch-side live-tv-submatch-side--left">
@@ -781,7 +803,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ctx.fillText(getSubmatchLabel(submatch, index), width / 2, y - 6);
         ctx.fillStyle = "#ffffff";
         ctx.font = '700 34px "Space Grotesk", sans-serif';
-        ctx.fillText(`${getBucketScore(submatch?.score?.state?.A)} - ${getBucketScore(submatch?.score?.state?.B)}`, width / 2, y + 32);
+        ctx.fillText(`${getDisplayedMatchScore(submatch, "home")} - ${getDisplayedMatchScore(submatch, "away")}`, width / 2, y + 32);
         ctx.textAlign = "right";
         ctx.fillStyle = "#e6eef8";
         ctx.font = '700 26px "Inter", sans-serif';
@@ -817,7 +839,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ctx.fillStyle = "#4dd0e1";
       ctx.font = '700 130px "Space Grotesk", sans-serif';
       ctx.textAlign = "center";
-      ctx.fillText(`${getBucketScore(match?.score?.state?.A)} - ${getBucketScore(match?.score?.state?.B)}`, width / 2, 760);
+      ctx.fillText(`${getDisplayedMatchScore(match, "home")} - ${getDisplayedMatchScore(match, "away")}`, width / 2, 760);
       ctx.textAlign = "left";
     }
 
