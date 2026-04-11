@@ -601,20 +601,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     drawRoundedRect(ctx, 64, 470, 952, 760, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
 
     ctx.fillStyle = "#f8fafc";
-    ctx.font = '700 54px "Space Grotesk", sans-serif';
-    drawWrappedText(ctx, match.home, 116, 580, 300, 60, 2);
+    ctx.font = '700 46px "Space Grotesk", sans-serif';
+    drawWrappedText(ctx, match.home, 116, 580, 250, 52, 2);
     ctx.textAlign = "right";
-    drawWrappedText(ctx, match.away, 964, 580, 300, 60, 2);
+    drawWrappedText(ctx, match.away, 964, 580, 250, 52, 2);
     ctx.textAlign = "left";
 
     ctx.fillStyle = "rgba(230, 238, 248, 0.92)";
     ctx.font = '600 30px "Inter", sans-serif';
-    let leftY = 690;
+    let leftY = 670;
     match.homePlayers.forEach((player) => {
       leftY = drawWrappedText(ctx, player, 116, leftY, 280, 38, 2);
     });
     ctx.textAlign = "right";
-    let rightY = 690;
+    let rightY = 670;
     match.awayPlayers.forEach((player) => {
       rightY = drawWrappedText(ctx, player, 964, rightY, 280, 38, 2);
     });
@@ -623,7 +623,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ctx.fillStyle = "#4dd0e1";
     ctx.font = '700 130px "Space Grotesk", sans-serif';
     ctx.textAlign = "center";
-    ctx.fillText("0 - 0", width / 2, 870);
+    ctx.fillText("0 - 0", width / 2, 900);
     ctx.textAlign = "left";
 
     ctx.fillStyle = "rgba(230,238,248,0.86)";

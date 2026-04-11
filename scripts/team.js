@@ -846,10 +846,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     drawRoundedRect(ctx, 64, 470, 952, match?.isTeamSchedule ? 990 : 790, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
 
     ctx.fillStyle = "#f8fafc";
-    ctx.font = '700 54px "Space Grotesk", sans-serif';
-    drawWrappedText(ctx, match?.home || "Home", 116, 580, 300, 60, 2);
+    ctx.font = '700 46px "Space Grotesk", sans-serif';
+    drawWrappedText(ctx, match?.home || "Home", 116, 580, 250, 52, 2);
     ctx.textAlign = "right";
-    drawWrappedText(ctx, match?.away || "Away", 964, 580, 300, 60, 2);
+    drawWrappedText(ctx, match?.away || "Away", 964, 580, 250, 52, 2);
     ctx.textAlign = "left";
 
     if (match?.isTeamSchedule) {
@@ -869,11 +869,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? `${mainHomeScore} - ${mainAwayScore}`
           : `${totals.homeWins} - ${totals.awayWins}`,
         width / 2,
-        700
+        730
       );
       ctx.fillStyle = "rgba(230, 238, 248, 0.8)";
       ctx.font = '600 24px "Inter", sans-serif';
-      ctx.fillText(hasMainScore ? "Match score" : "Tie score", width / 2, 750);
+      ctx.fillText(hasMainScore ? "Match score" : "Tie score", width / 2, 780);
       ctx.textAlign = "left";
 
       let y = 840;
@@ -907,12 +907,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         drawWrappedText(ctx, getSubmatchPlayerLabel(submatch, "B", match?.away || "Away"), 944, y, 280, 30, 2);
         ctx.textAlign = "left";
 
-        if (highlight) {
-          ctx.fillStyle = "#4dd0e1";
-          ctx.font = '700 18px "Inter", sans-serif';
-          ctx.fillText("YOU PLAYED", 136, y + 52);
-        }
-
         y += 130;
       });
 
@@ -929,13 +923,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       ctx.fillStyle = "rgba(230, 238, 248, 0.92)";
       ctx.font = '600 30px "Inter", sans-serif';
-      let leftY = 680;
+      let leftY = 670;
       homePlayers.forEach((player) => {
         leftY = drawWrappedText(ctx, player, 116, leftY, 280, 38, 2);
       });
 
       ctx.textAlign = "right";
-      let rightY = 680;
+      let rightY = 670;
       awayPlayers.forEach((player) => {
         rightY = drawWrappedText(ctx, player, 964, rightY, 280, 38, 2);
       });
@@ -944,7 +938,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ctx.fillStyle = "#4dd0e1";
       ctx.font = '700 130px "Space Grotesk", sans-serif';
       ctx.textAlign = "center";
-      ctx.fillText(`${getDisplayedMatchScore(match, "home")} - ${getDisplayedMatchScore(match, "away")}`, width / 2, 840);
+      ctx.fillText(`${getDisplayedMatchScore(match, "home")} - ${getDisplayedMatchScore(match, "away")}`, width / 2, 870);
       ctx.textAlign = "left";
     }
 
