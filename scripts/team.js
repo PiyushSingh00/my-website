@@ -896,11 +896,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         drawWrappedText(ctx, getSubmatchPlayerLabel(submatch, "A", match?.home || "Home"), 136, y, 280, 30, 2);
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(230,238,248,0.78)";
-        ctx.font = '700 18px "Inter", sans-serif';
-        ctx.fillText(getSubmatchLabel(submatch, index), width / 2, y - 6);
+        ctx.font = '700 16px "Inter", sans-serif';
+        drawWrappedText(ctx, getSubmatchLabel(submatch, index), width / 2, y - 18, 132, 18, 2);
         ctx.fillStyle = "#ffffff";
         ctx.font = '700 34px "Space Grotesk", sans-serif';
-        ctx.fillText(`${getDisplayedMatchScore(submatch, "home")} - ${getDisplayedMatchScore(submatch, "away")}`, width / 2, y + 32);
+        ctx.fillText(`${getDisplayedMatchScore(submatch, "home")} - ${getDisplayedMatchScore(submatch, "away")}`, width / 2, y + 38);
         ctx.textAlign = "right";
         ctx.fillStyle = "#e6eef8";
         ctx.font = '700 26px "Inter", sans-serif';
