@@ -266,6 +266,72 @@ h1 {
   margin-right: 8px;
 }
 
+.contact-strip {
+  padding: 0 clamp(20px, 5vw, 64px) 56px;
+  background: linear-gradient(180deg, rgba(5, 11, 24, 0) 0%, rgba(5, 11, 24, 0.65) 100%);
+}
+
+.contact-strip__inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.95fr) minmax(320px, 1.25fr);
+  gap: 18px;
+  align-items: start;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(10, 16, 30, 0.6);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px);
+}
+
+.contact-strip__eyebrow {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.contact-strip__copy h2 {
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.25;
+  font-family: "Space Grotesk", "Barlow", sans-serif;
+  color: var(--text);
+}
+
+.contact-strip__people {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.contact-card {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.contact-card__name {
+  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.contact-card__phone {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.contact-card__phone:hover {
+  color: var(--accent-2);
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -316,6 +382,15 @@ h1 {
 
   .hero {
     padding-top: 24px;
+  }
+
+  .contact-strip {
+    padding: 0 16px 44px;
+  }
+
+  .contact-strip__inner {
+    grid-template-columns: 1fr;
+    padding: 16px;
   }
 }
 
