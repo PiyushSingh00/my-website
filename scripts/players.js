@@ -966,8 +966,26 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
       }));
     }
 
+  function getSemifinalPairingRule() {
+    return String(getAdvancedSettings()?.semifinalPairing || "1v4_2v3").trim().toLowerCase() || "1v4_2v3";
+  }
+
+  function buildQualifiedKnockoutEntrants(teamNames) {
+    const seeded = [...teamNames].map((name) => String(name || "").trim()).filter(Boolean);
+    if (seeded.length < 2) return [];
+    if (seeded.length > 4) return seeded;
+    if (seeded.length >= 4) {
+      const top4 = seeded.slice(0, 4);
+      if (getSemifinalPairingRule() === "1v3_2v4") {
+        return [top4[0], top4[2], top4[1], top4[3]].filter(Boolean);
+      }
+      return [top4[0], top4[3], top4[1], top4[2]].filter(Boolean);
+    }
+    return seeded.slice(0, 2);
+  }
+
   function buildSeededKnockoutRounds(teamNames) {
-    const entrants = [...teamNames].filter(Boolean);
+    const entrants = buildQualifiedKnockoutEntrants(teamNames);
     if (entrants.length < 2) return null;
 
     const size = nextPow2(Math.max(2, entrants.length));
