@@ -97,6 +97,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const liveListEl = document.getElementById("schedule-live-list");
   const liveEmptyEl = document.getElementById("schedule-live-empty");
+  const liveToastEl = document.getElementById("schedule-live-toast");
 
   const leaderboardGroupsEl = document.getElementById("schedule-leaderboard-groups");
   const leaderboardEmptyEl = document.getElementById("schedule-leaderboard-empty");
@@ -107,6 +108,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     activeCategoryId: null,
     activeView: "bracket",
     refreshHandle: null,
+    liveScoreSignatures: new Map(),
+    liveScoreSnapshotReady: false,
+    liveToastHandle: null,
   };
 
   async function apiGet(url) {
@@ -230,6 +234,61 @@ document.addEventListener("DOMContentLoaded", async () => {
     return `Round ${r + 1}`;
   }
 
+  function getLivePinsStorageKey() {
+    return `schedule_live_pins::${tournamentId}`;
+  }
+
+  function getLiveMatchKey(entry, match, roundIndex, matchIndex) {
+    return String(
+      match?.matchId ||
+      `${entry?.id || "cat"}::${roundIndex}::${matchIndex}::${match?.home || ""}::${match?.away || ""}`
+    ).trim();
+  }
+
+  function loadPinnedLiveMatchKeys() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(getLivePinsStorageKey()) || "[]");
+      return Array.isArray(parsed) ? parsed.map((value) => String(value || "").trim()).filter(Boolean).slice(0, 4) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function savePinnedLiveMatchKeys(keys) {
+    localStorage.setItem(getLivePinsStorageKey(), JSON.stringify(keys.slice(0, 4)));
+  }
+
+  function togglePinnedLiveMatch(matchKey) {
+    const keys = loadPinnedLiveMatchKeys();
+    const index = keys.indexOf(matchKey);
+    if (index >= 0) {
+      keys.splice(index, 1);
+      savePinnedLiveMatchKeys(keys);
+      return true;
+    }
+    if (keys.length >= 4) return false;
+    keys.unshift(matchKey);
+    savePinnedLiveMatchKeys(keys);
+    return true;
+  }
+
+  function parseMatchDateTime(match) {
+    const dateText = String(match?.date || "").trim();
+    const timeText = String(match?.time || "").trim();
+    if (!dateText) return Number.NEGATIVE_INFINITY;
+
+    let candidate = `${dateText}T00:00:00`;
+    if (timeText) {
+      const timeMatch = timeText.match(/^(\d{1,2}):(\d{2})$/);
+      if (timeMatch) {
+        candidate = `${dateText}T${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}:00`;
+      }
+    }
+
+    const value = new Date(candidate).getTime();
+    return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+  }
+
   function getBucketScore(bucket) {
     if (!bucket || typeof bucket !== "object") return null;
     const candidateKeys = ["points", "score", "goals", "runs"];
@@ -242,6 +301,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       return key !== "players" && key !== "meta" && Number.isFinite(Number(value));
     });
     return anyNumeric ? Number(anyNumeric[1]) : null;
+  }
+
+  function showLiveToast(message) {
+    if (!liveToastEl) return;
+    liveToastEl.textContent = message;
+    liveToastEl.classList.add("is-visible");
+    liveToastEl.setAttribute("aria-hidden", "false");
+    if (state.liveToastHandle) clearTimeout(state.liveToastHandle);
+    state.liveToastHandle = setTimeout(() => {
+      liveToastEl.classList.remove("is-visible");
+      liveToastEl.setAttribute("aria-hidden", "true");
+    }, 1200);
   }
 
   function getPlayerStateScore(playerState) {
@@ -823,7 +894,81 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   }
 
-  function buildTeamScheduleLiveCard(entry, match, roundIndex, matchIndex, status) {
+  function buildLiveScoreSignature(match, isTeamSchedule, status) {
+    if (isTeamSchedule) {
+      const totals = getTeamTotals(match);
+      const rawSubmatches = Array.isArray(match?.submatches) ? match.submatches : [];
+      const backendTieState = getTeamTieStateFromBackend(match);
+      const submatches = rawSubmatches.length ? rawSubmatches : categoriesFromTeamTieState(backendTieState, match);
+      const submatchSignature = submatches.map((submatch) => {
+        const home = getBucketScore(submatch?.score?.state?.A) ?? 0;
+        const away = getBucketScore(submatch?.score?.state?.B) ?? 0;
+        const winnerSide = String(submatch?.score?.computed?.winnerSide || submatch?.winnerSide || "").trim();
+        return `${home}-${away}-${winnerSide}`;
+      }).join("|");
+      return `${status}::${totals.homePoints}-${totals.awayPoints}::${totals.homeWins}-${totals.awayWins}::${submatchSignature}`;
+    }
+
+    const homeScore = getBucketScore(match?.score?.state?.A) ?? 0;
+    const awayScore = getBucketScore(match?.score?.state?.B) ?? 0;
+    const winnerSide = String(match?.score?.computed?.winnerSide || match?.winnerSide || "").trim();
+    return `${status}::${homeScore}-${awayScore}::${winnerSide}`;
+  }
+
+  function captureLiveScoreSignatures(fixturesDoc) {
+    const categories = fixturesDoc?.categories || {};
+    const signatures = new Map();
+
+    Object.entries(categories).forEach(([entryId, cat]) => {
+      const entry = { id: entryId, cat };
+      const rounds = getRounds(cat);
+      rounds.forEach((round, roundIndex) => {
+        (Array.isArray(round) ? round : []).forEach((match, matchIndex) => {
+          const displayMode = String(cat?.displayMode || "").toLowerCase();
+          const isTeamSchedule = displayMode === "team_schedule" || String(entryId) === TEAM_EVENT_CATEGORY_ID;
+          const status = isTeamSchedule ? getTeamScheduleStatus(match) : getSimpleStatus(match);
+          if (status === "pending") return;
+          const matchKey = getLiveMatchKey(entry, match, roundIndex, matchIndex);
+          signatures.set(matchKey, buildLiveScoreSignature(match, isTeamSchedule, status));
+        });
+      });
+    });
+
+    return signatures;
+  }
+
+  function detectLiveScoreChanges(nextSignatures) {
+    if (!state.liveScoreSnapshotReady) {
+      state.liveScoreSignatures = nextSignatures;
+      state.liveScoreSnapshotReady = true;
+      return false;
+    }
+
+    let changed = false;
+    nextSignatures.forEach((signature, matchKey) => {
+      if (state.liveScoreSignatures.get(matchKey) !== signature) {
+        changed = true;
+      }
+    });
+
+    state.liveScoreSignatures = nextSignatures;
+    return changed;
+  }
+
+  function buildPinButtonMarkup(matchKey, pinned) {
+    return `
+      <button
+        type="button"
+        class="live-pin-btn${pinned ? " is-pinned" : ""}"
+        data-live-pin="${escapeHtml(matchKey)}"
+        aria-pressed="${pinned ? "true" : "false"}"
+      >
+        ${pinned ? "Pinned" : "Pin"}
+      </button>
+    `;
+  }
+
+  function buildTeamScheduleLiveCard(entry, match, roundIndex, matchIndex, status, matchKey, pinned) {
     const backendTieState = getTeamTieStateFromBackend(match);
     const rawSubmatches = Array.isArray(match?.submatches) ? match.submatches : [];
     const submatches = rawSubmatches.length ? rawSubmatches : categoriesFromTeamTieState(backendTieState, match);
@@ -862,7 +1007,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             ${match?.court ? `<span class="live-badge">${escapeHtml(match.court)}</span>` : ""}
             ${match?.time ? `<span class="live-badge">${escapeHtml(match.time)}</span>` : ""}
           </div>
-          <span class="live-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+          <div class="live-tv-card-actions">
+            ${buildPinButtonMarkup(matchKey, pinned)}
+            <span class="live-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+          </div>
         </div>
 
         <div class="live-tv-teams">
@@ -887,7 +1035,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
-  function buildSimpleLiveCard(entry, match, roundIndex, matchIndex, status) {
+  function buildSimpleLiveCard(entry, match, roundIndex, matchIndex, status, matchKey, pinned) {
     const homeScore = getBucketScore(match?.score?.state?.A);
     const awayScore = getBucketScore(match?.score?.state?.B);
     const homePlayers = Array.isArray(match?.homePlayers) && match.homePlayers.length
@@ -906,7 +1054,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             ${match?.court ? `<span class="live-badge">${escapeHtml(match.court)}</span>` : ""}
             ${match?.time ? `<span class="live-badge">${escapeHtml(match.time)}</span>` : ""}
           </div>
-          <span class="live-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+          <div class="live-tv-card-actions">
+            ${buildPinButtonMarkup(matchKey, pinned)}
+            <span class="live-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+          </div>
         </div>
 
         <div class="live-tv-simple-main">
@@ -935,6 +1086,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const entries = getFixtureCategoryEntries();
     const cards = [];
+    const pinnedKeys = loadPinnedLiveMatchKeys();
     entries.forEach((entry) => {
       const rounds = getRounds(entry.cat);
       rounds.forEach((round, roundIndex) => {
@@ -943,16 +1095,34 @@ document.addEventListener("DOMContentLoaded", async () => {
           const isTeamSchedule = displayMode === "team_schedule" || String(entry.id) === TEAM_EVENT_CATEGORY_ID;
           const status = isTeamSchedule ? getTeamScheduleStatus(match) : getSimpleStatus(match);
           if (status === "pending") return;
-          cards.push({ entry, roundIndex, matchIndex, match, status, isTeamSchedule });
+          const matchKey = getLiveMatchKey(entry, match, roundIndex, matchIndex);
+          cards.push({
+            entry,
+            roundIndex,
+            matchIndex,
+            match,
+            status,
+            isTeamSchedule,
+            matchKey,
+            pinned: pinnedKeys.includes(matchKey),
+            sortTime: parseMatchDateTime(match),
+          });
         });
       });
     });
 
     cards.sort((a, b) => {
+      const pinDelta = Number(b.pinned) - Number(a.pinned);
+      if (pinDelta !== 0) return pinDelta;
+      if (a.pinned && b.pinned) {
+        return pinnedKeys.indexOf(a.matchKey) - pinnedKeys.indexOf(b.matchKey);
+      }
+      const byTime = b.sortTime - a.sortTime;
+      if (byTime !== 0) return byTime;
       const byStatus = getStatusRank(a.status) - getStatusRank(b.status);
       if (byStatus !== 0) return byStatus;
-      if (a.roundIndex !== b.roundIndex) return a.roundIndex - b.roundIndex;
-      return a.matchIndex - b.matchIndex;
+      if (a.roundIndex !== b.roundIndex) return b.roundIndex - a.roundIndex;
+      return b.matchIndex - a.matchIndex;
     });
 
     if (!cards.length) {
@@ -963,12 +1133,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     liveEmptyEl?.classList.add("hidden");
 
     liveListEl.innerHTML = cards
-      .map(({ entry, roundIndex, matchIndex, match, status, isTeamSchedule }) => {
+      .map(({ entry, roundIndex, matchIndex, match, status, isTeamSchedule, matchKey, pinned }) => {
         return isTeamSchedule
-          ? buildTeamScheduleLiveCard(entry, match, roundIndex, matchIndex, status)
-          : buildSimpleLiveCard(entry, match, roundIndex, matchIndex, status);
+          ? buildTeamScheduleLiveCard(entry, match, roundIndex, matchIndex, status, matchKey, pinned)
+          : buildSimpleLiveCard(entry, match, roundIndex, matchIndex, status, matchKey, pinned);
       })
       .join("");
+
+    liveListEl.querySelectorAll("[data-live-pin]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const matchKey = String(button.getAttribute("data-live-pin") || "").trim();
+        const ok = togglePinnedLiveMatch(matchKey);
+        if (!ok) {
+          alert("You can pin up to 4 matches only.");
+          return;
+        }
+        renderLiveView();
+      });
+    });
   }
 
   function isTournamentTeamEventSchedule() {
@@ -1175,7 +1357,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!response.ok) continue;
       const parsed = response.data?.data || response.data || null;
       if (parsed?.categories) {
-        state.fixtures = migrateFixtures(parsed);
+        const nextFixtures = migrateFixtures(parsed);
+        const nextSignatures = captureLiveScoreSignatures(nextFixtures);
+        const changed = detectLiveScoreChanges(nextSignatures);
+        state.fixtures = nextFixtures;
+        if (changed && state.activeView === "live") {
+          showLiveToast("Live score updated");
+        }
         return;
       }
     }
