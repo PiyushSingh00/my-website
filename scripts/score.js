@@ -105,6 +105,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const teamEventShell = document.getElementById("team-event-shell");
   const lineupReviewPanel = document.getElementById("lineup-review-panel");
   const lineupReviewList = document.getElementById("lineup-review-list");
+  const lineupSaveStatusEl = document.getElementById("lineup-save-status");
   const teamCategoryBars = document.getElementById("team-category-bars");
   const teamCategoryHelp = document.getElementById("team-category-help");
   const teamOverallHomeName = document.getElementById("team-overall-home-name");
@@ -2627,6 +2628,7 @@ try {
     }
 
     async function persistCanonicalHostLineup() {
+      if (lineupSaveStatusEl) lineupSaveStatusEl.textContent = "Saving lineup...";
       const payload = {
         categoryId: resolvedCategoryId,
         tieId,
@@ -2642,12 +2644,16 @@ try {
         `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups`,
         payload
       );
+      if (lineupSaveStatusEl) lineupSaveStatusEl.textContent = "Lineup saved";
     }
 
     const canonicalSavedTie = await loadCanonicalHostLineupTie();
     if (canonicalSavedTie) {
       applyHostSavedLineupTie(canonicalSavedTie, teamTieState);
       saveTeamTieState(teamTieState);
+    }
+    if (lineupSaveStatusEl) {
+      lineupSaveStatusEl.textContent = canonicalSavedTie ? "Lineup saved" : "Lineup not saved yet";
     }
 
     let savingTeam = false;
@@ -3055,6 +3061,7 @@ try {
         });
       } catch (err) {
         console.error(err);
+        if (lineupSaveStatusEl) lineupSaveStatusEl.textContent = "Lineup save failed";
         if (!silent) alert(err?.message || "Could not auto-save tie data.");
       } finally {
         savingTeam = false;
