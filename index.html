@@ -57,6 +57,25 @@
     </div>
   </header>
 
+  <section class="contact-strip" aria-labelledby="contact-strip-title">
+    <div class="contact-strip__inner">
+      <p class="contact-strip__eyebrow">Contact Us</p>
+      <h2 id="contact-strip-title">Contact us for more details.</h2>
+
+      <div class="contact-strip__people">
+        <a class="contact-card" href="tel:+919650464857">
+          <span class="contact-card__label">Piyush Singh</span>
+          <span class="contact-card__phone">9650464857</span>
+        </a>
+
+        <a class="contact-card" href="tel:+918849998698">
+          <span class="contact-card__label">Vedangraj Vala</span>
+          <span class="contact-card__phone">8849998698</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
   <!-- Create account modal -->
   <div class="modal-overlay" id="signup-modal" aria-hidden="true">
     <div class="modal">
@@ -94,13 +113,17 @@
           <label for="signup-phone">
             Phone Number <span class="required-asterisk">*</span>
           </label>
-          <input
-            type="tel"
-            id="signup-phone"
-            name="phone"
-            placeholder="e.g. +91 98765 43210"
-            required
-          />
+          <div class="phone-field">
+            <select id="signup-phone-code" class="phone-code-select" aria-label="Select country code"></select>
+            <input
+              type="tel"
+              id="signup-phone"
+              name="phone"
+              placeholder="98765 43210"
+              inputmode="numeric"
+              required
+            />
+          </div>
         </div>
 
         <div class="field-group">
@@ -159,6 +182,33 @@
               </span>
             </button>
           </div>
+        </div>
+
+        <div class="field-group">
+          <label for="signup-security-question">
+            Security Question <span class="required-asterisk">*</span>
+          </label>
+          <select id="signup-security-question" name="securityQuestion" required>
+            <option value="" selected disabled>Select a question</option>
+            <option value="first_school">What was the name of your first school?</option>
+            <option value="childhood_nickname">What was your childhood nickname?</option>
+            <option value="first_coach">What was the name of your first coach?</option>
+            <option value="favorite_teacher">What was the name of your favorite teacher?</option>
+            <option value="birth_city">In which city were you born?</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="signup-security-answer">
+            Security Answer <span class="required-asterisk">*</span>
+          </label>
+          <input
+            type="text"
+            id="signup-security-answer"
+            name="securityAnswer"
+            placeholder="Enter your answer"
+            required
+          />
         </div>
 
         <!-- Photo field -->
@@ -241,9 +291,99 @@
           Sign in
         </button>
 
+        <button type="button" class="text-button" id="forgot-password-btn">
+          Forgot password?
+        </button>
+
         <p class="form-footnote">
           New here?
           <a href="#" id="signin-create-link">Create account</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="forgot-password-modal" aria-hidden="true">
+    <div class="modal">
+      <button class="modal-close" type="button" aria-label="Close forgot password form">&times;</button>
+
+      <h2 class="modal-title">Reset password</h2>
+
+      <form id="forgot-password-form">
+        <div class="field-group">
+          <label for="forgot-username">
+            Username <span class="required-asterisk">*</span>
+          </label>
+          <input
+            type="text"
+            id="forgot-username"
+            name="username"
+            placeholder="Your username"
+            required
+          />
+        </div>
+
+        <div class="field-group">
+          <label for="forgot-phone">
+            Phone Number <span class="required-asterisk">*</span>
+          </label>
+          <div class="phone-field">
+            <select id="forgot-phone-code" class="phone-code-select" aria-label="Select country code"></select>
+            <input
+              type="tel"
+              id="forgot-phone"
+              name="phone"
+              placeholder="Registered phone number"
+              inputmode="numeric"
+              required
+            />
+          </div>
+        </div>
+
+        <button type="button" class="btn ghost full-width" id="verify-reset-btn">
+          Verify account
+        </button>
+
+        <div class="field-group hidden" id="forgot-new-password-group">
+          <label for="forgot-new-password">
+            New Password <span class="required-asterisk">*</span>
+          </label>
+          <div class="password-field">
+            <input
+              type="password"
+              id="forgot-new-password"
+              name="newPassword"
+              placeholder="Create a new password"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              data-target="forgot-new-password"
+              aria-label="Show password"
+            >
+              <span class="password-toggle-icon icon-eye" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" focusable="false" aria-hidden="true">
+                  <path fill="currentColor" d="M12 5c-5 0-9.27 3.11-11 7.5C2.73 16.89 7 20 12 20s9.27-3.11 11-7.5C21.27 8.11 17 5 12 5Zm0 12c-2.49 0-4.5-2.01-4.5-4.5S9.51 8 12 8s4.5 2.01 4.5 4.5S14.49 17 12 17Zm0-2.2a2.3 2.3 0 1 0 0-4.6 2.3 2.3 0 0 0 0 4.6Z"/>
+                </svg>
+              </span>
+              <span class="password-toggle-icon icon-eye-off" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" focusable="false" aria-hidden="true">
+                  <path fill="currentColor" d="M2.1 3.51 3.51 2.1l18.39 18.39-1.41 1.41-2.34-2.34A11.9 11.9 0 0 1 12 20C7 20 2.73 16.89 1 12.5c.84-2.12 2.35-3.97 4.33-5.3L2.1 3.51Zm6.1 6.1a4.5 4.5 0 0 0 6.17 6.17l-1.7-1.7a2.3 2.3 0 0 1-2.78-2.78l-1.69-1.69Zm3.02-3.02 2.2 2.2c.19.2.37.4.52.63A4.48 4.48 0 0 0 12 8c-.36 0-.7.04-1.03.1l-.75-.75c.56-.22 1.16-.35 1.78-.35 2.49 0 4.5 2.01 4.5 4.5 0 .62-.13 1.22-.35 1.78l2.15 2.15c1.54-1.06 2.74-2.52 3.46-4.23C21.27 8.11 17 5 12 5c-1.33 0-2.6.22-3.8.63l2.02 2.02Z"/>
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <p class="field-hint" id="forgot-password-status"></p>
+
+        <button type="submit" class="btn primary full-width hidden" id="forgot-password-submit">
+          Reset password
+        </button>
+
+        <p class="form-footnote">
+          Remembered your password?
+          <a href="#" id="forgot-back-signin-link">Back to sign in</a>
         </p>
       </form>
     </div>

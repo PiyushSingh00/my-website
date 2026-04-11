@@ -266,6 +266,86 @@ h1 {
   margin-right: 8px;
 }
 
+.contact-strip {
+  padding: 8px clamp(20px, 5vw, 64px) 64px;
+  background: linear-gradient(180deg, rgba(5, 11, 24, 0) 0%, rgba(5, 11, 24, 0.72) 100%);
+}
+
+.contact-strip__inner {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 22px 28px;
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(77, 208, 225, 0.12) 0%, rgba(10, 16, 30, 0.94) 34%, rgba(242, 95, 76, 0.14) 100%);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(14px);
+}
+
+.contact-strip__eyebrow {
+  margin-bottom: -6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.contact-strip__inner h2 {
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.25;
+  font-family: "Space Grotesk", "Barlow", sans-serif;
+  color: var(--text);
+  max-width: 560px;
+}
+
+.contact-strip__people {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 14px;
+  width: 100%;
+}
+
+.contact-card {
+  display: grid;
+  gap: 2px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.contact-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(77, 208, 225, 0.34);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.contact-card__label {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.contact-card__phone {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #dbe8ff;
+}
+
+.contact-card__phone:hover {
+  color: #ffffff;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -316,6 +396,18 @@ h1 {
 
   .hero {
     padding-top: 24px;
+  }
+
+  .contact-strip {
+    padding: 0 16px 44px;
+  }
+
+  .contact-strip__inner {
+    padding: 16px;
+  }
+
+  .contact-strip__people {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -395,6 +487,16 @@ h1 {
   background: rgba(5, 11, 24, 0.95);
   color: var(--text);
   font: inherit;
+}
+
+.phone-field {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.phone-code-select {
+  min-width: 0;
 }
 
 .field-group input::placeholder {
@@ -524,6 +626,51 @@ h1 {
   text-decoration: underline;
 }
 
+.text-button {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 10px;
+  border: none;
+  background: transparent;
+  color: var(--accent-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  color: #c2f5ff;
+  text-decoration: underline;
+}
+
+.security-question-panel {
+  margin: 14px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(77, 208, 225, 0.24);
+  background: rgba(77, 208, 225, 0.08);
+}
+
+.security-question-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.security-question-text {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.hidden {
+  display: none !important;
+}
+
 /* --- Signup modal: shorter + scrollable form --- */
 #signup-modal .modal {
   max-height: 80vh;          /* keeps modal short */
@@ -544,3 +691,8 @@ h1 {
   margin-bottom: 10px;
 }
 
+@media (max-width: 520px) {
+  .phone-field {
+    grid-template-columns: 1fr;
+  }
+}

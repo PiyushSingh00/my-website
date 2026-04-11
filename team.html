@@ -89,6 +89,9 @@
             <button type="button" class="team-tab is-active" data-tab="my-team">
               My team
             </button>
+            <button type="button" class="team-tab" data-tab="my-matches" id="my-matches-tab-btn">
+              My matches
+            </button>
             <button type="button" class="team-tab" data-tab="create-team" id="create-team-tab-btn">
               Create team
             </button>
@@ -141,6 +144,26 @@
                 </p>
               </div>
             </div>
+          </section>
+
+          <section class="team-tab-panel" data-panel="my-matches" id="my-matches-panel">
+            <div class="my-matches-head">
+              <div>
+                <h3>My match cards</h3>
+                <p class="helper-text">
+                  See the matches you actually played in and create a shareable story card.
+                </p>
+              </div>
+            </div>
+
+            <div id="my-matches-empty-state" class="empty-state-card hidden">
+              <h3>No matches yet</h3>
+              <p class="helper-text" id="my-matches-empty-text">
+                Once you appear in a scored or scheduled match, it will show up here.
+              </p>
+            </div>
+
+            <div id="my-matches-list" class="my-matches-list"></div>
           </section>
 
           <section class="team-tab-panel" data-panel="create-team" id="create-team-panel">
@@ -226,6 +249,29 @@
           </section>
         </section>
       </main>
+    </div>
+
+    <div class="match-share-modal hidden" id="match-share-modal" aria-hidden="true">
+      <div class="match-share-backdrop" data-share-close></div>
+      <div class="match-share-card" role="dialog" aria-modal="true" aria-labelledby="match-share-title">
+        <div class="match-share-head">
+          <div>
+            <p class="eyebrow">Share poster</p>
+            <h2 id="match-share-title">Story card preview</h2>
+            <p class="helper-text">Optimized for Instagram story size.</p>
+          </div>
+          <button type="button" class="match-share-close" id="match-share-close-btn" aria-label="Close share preview">✕</button>
+        </div>
+
+        <div class="match-share-preview-wrap">
+          <img id="match-share-preview" class="match-share-preview" alt="Match story poster preview" />
+        </div>
+
+        <div class="match-share-actions">
+          <button type="button" class="btn-dark" id="match-share-download-btn">Download image</button>
+          <button type="button" class="btn-primary" id="match-share-native-btn">Share image</button>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="scripts/team.js"></script>

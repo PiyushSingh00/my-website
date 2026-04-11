@@ -912,8 +912,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="live-tv-simple-main">
           <div class="live-tv-team-block">
             <div class="live-tv-team-name">${escapeHtml(match?.home || "Home")}</div>
-            <div class="live-tv-player-list">
-              ${(homePlayers.length ? homePlayers : ["-"]).map((name) => `<span class="live-tv-player-pill">${escapeHtml(name)}</span>`).join("")}
+            <div class="live-tv-player-stack" role="list">
+              ${(homePlayers.length ? homePlayers : ["-"]).map((name) => `<span class="live-tv-player-row" role="listitem">${escapeHtml(name)}</span>`).join("")}
             </div>
           </div>
 
@@ -921,8 +921,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           <div class="live-tv-team-block live-tv-team-block--right">
             <div class="live-tv-team-name">${escapeHtml(match?.away || "Away")}</div>
-            <div class="live-tv-player-list live-tv-player-list--right">
-              ${(awayPlayers.length ? awayPlayers : ["-"]).map((name) => `<span class="live-tv-player-pill">${escapeHtml(name)}</span>`).join("")}
+            <div class="live-tv-player-stack live-tv-player-stack--right" role="list">
+              ${(awayPlayers.length ? awayPlayers : ["-"]).map((name) => `<span class="live-tv-player-row live-tv-player-row--right" role="listitem">${escapeHtml(name)}</span>`).join("")}
             </div>
           </div>
         </div>
