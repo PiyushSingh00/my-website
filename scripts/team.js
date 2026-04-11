@@ -456,7 +456,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   function getSubmatchPlayerLabel(submatch, side, fallback) {
     const key = side === "A" ? "homePlayers" : "awayPlayers";
     const values = Array.isArray(submatch?.[key]) ? submatch[key] : [];
-    return values.length ? values.join(" + ") : fallback;
+    if (values.length) return values.join(" + ");
+
+    const directLabel = side === "A" ? submatch?.homePlayer : submatch?.awayPlayer;
+    if (typeof directLabel === "string" && directLabel.trim()) return directLabel.trim();
+
+    const snapshot = submatch?.score?.state?.meta?.categorySnapshot || submatch?.categorySnapshot || null;
+    const selected = side === "A" ? snapshot?.homePlayersSelected : snapshot?.awayPlayersSelected;
+    if (Array.isArray(selected) && selected.length) return selected.join(" + ");
+
+    const snapshotLabel = side === "A" ? snapshot?.homePlayer : snapshot?.awayPlayer;
+    if (typeof snapshotLabel === "string" && snapshotLabel.trim()) return snapshotLabel.trim();
+
+    return fallback;
   }
 
   function getTeamTotals(match) {
@@ -579,7 +591,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
           `;
         }).join("")
-      : '<div class="live-tv-empty-note">No player-level submatch score is available yet.</div>';
+      : '<div class="live-tv-empty-note">Player-level submatches are not available for this match yet.</div>';
 
     return `
       <section class="live-score-card live-tv-card">
