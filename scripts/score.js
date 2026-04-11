@@ -160,7 +160,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (!res.ok) {
-      throw new Error(`GET ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`);
+      const err = new Error(
+        data?.message || `GET ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`
+      );
+      err.status = res.status;
+      err.data = data;
+      throw err;
     }
     return data;
   }
@@ -192,7 +197,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (!res.ok) {
-      throw new Error(`PUT ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`);
+      const err = new Error(
+        data?.message || `PUT ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`
+      );
+      err.status = res.status;
+      err.data = data;
+      throw err;
     }
     return data;
   }
@@ -216,7 +226,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (!res.ok) {
-      throw new Error(`POST ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`);
+      const err = new Error(
+        data?.message || `POST ${url} failed: ${res.status}${data?._nonJson ? " (non-JSON)" : ""}`
+      );
+      err.status = res.status;
+      err.data = data;
+      throw err;
     }
     return data;
   }
@@ -603,6 +618,14 @@ function mergeUniqueRoster(...sources) {
     return rawFixtures?.categories || rawFixtures?.fixtureCategories || rawFixtures?.data?.categories || {};
   }
 
+  function getStableTieId(matchObj, resolvedCategoryIdValue = "") {
+    return String(
+      matchObj?.tieId ||
+      matchObj?.matchId ||
+      `${resolvedCategoryIdValue || categoryId || "team"}-${roundIndex}-${matchIndex}`
+    ).trim();
+  }
+
   function findFirstMatch(rawFixtures, explicitCategoryId, rIndex, mIndex) {
     const categoriesMap = getMatchCategoryMap(rawFixtures);
 
@@ -952,6 +975,53 @@ function mergeUniqueRoster(...sources) {
     if (count === 2) return "Doubles";
     if (count === 3) return "Triples";
     return `${count} players`;
+  }
+
+  function buildHostLineupAssignments(teamTieState) {
+    return toArray(teamTieState?.categories).map((category, index) => {
+      syncCategoryPlayerStrings(category);
+      return {
+        scoreIndex: index,
+        categoryId: safeText(category?.categoryId || category?.id || `CAT-${index + 1}`),
+        categoryName: safeText(category?.name || category?.eventName || `Submatch ${index + 1}`),
+        slotCount: getCategorySlotCount(category),
+        homePlayers: getSelectedPlayers(category, "A"),
+        awayPlayers: getSelectedPlayers(category, "B"),
+        homePlayer: safeText(category?.homePlayer),
+        awayPlayer: safeText(category?.awayPlayer),
+        notes: safeText(category?.notes),
+      };
+    });
+  }
+
+  function applyHostSavedLineupTie(savedTie, teamTieState) {
+    if (!savedTie || !teamTieState) return;
+
+    const assignments = toArray(savedTie?.assignments);
+    teamTieState.tieLocked = Boolean(savedTie?.locked || savedTie?.lineupLocked || teamTieState?.tieLocked);
+
+    assignments.forEach((assignment) => {
+      const index = Number(assignment?.scoreIndex);
+      if (!Number.isInteger(index) || index < 0 || !teamTieState.categories?.[index]) return;
+
+      const category = teamTieState.categories[index];
+      const homePlayers = toArray(assignment?.homePlayers || assignment?.playersHome || assignment?.teamAPlayers)
+        .map((name) => safeText(name))
+        .filter(Boolean);
+      const awayPlayers = toArray(assignment?.awayPlayers || assignment?.playersAway || assignment?.teamBPlayers)
+        .map((name) => safeText(name))
+        .filter(Boolean);
+
+      if (homePlayers.length) category.homePlayersSelected = Array.from(new Set(homePlayers));
+      if (awayPlayers.length) category.awayPlayersSelected = Array.from(new Set(awayPlayers));
+      if (safeText(assignment?.notes)) category.notes = safeText(assignment.notes);
+
+      syncCategoryPlayerStrings(category);
+      category.lineupStatus = isCategoryLineupComplete(category) ? "accepted" : "pending";
+      if (teamTieState.tieLocked) {
+        category.isScoringOpen = false;
+      }
+    });
   }
 
   function getPickleballPlayerLabels(category, homeTeamLabel, awayTeamLabel) {
@@ -2541,6 +2611,45 @@ try {
     hydrateTeamTieStateFromMatch(match, teamTieState, fixtures);
     await refreshLatestTeamRostersIntoState(match, teamTieState);
 
+    const tieId = getStableTieId(match, resolvedCategoryId);
+
+    async function loadCanonicalHostLineupTie() {
+      try {
+        const resp = await apiGet(
+          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups?categoryId=${encodeURIComponent(resolvedCategoryId)}`
+        );
+        const ties = toArray(resp?.ties || resp?.data?.ties || resp?.data || []);
+        return ties.find((tie) => String(tie?.tieId || "").trim() === tieId) || null;
+      } catch (err) {
+        console.warn("Could not load canonical host lineup tie", err);
+        return null;
+      }
+    }
+
+    async function persistCanonicalHostLineup() {
+      const payload = {
+        categoryId: resolvedCategoryId,
+        tieId,
+        tieLabel: safeText(match?.roundLabel || match?.tieLabel || `Round ${roundIndex + 1} Match ${matchIndex + 1}`),
+        teamA: safeText(homeLabel),
+        teamB: safeText(awayLabel),
+        teamPlayers: mergeUniqueRoster(teamTieState.homeRoster, teamTieState.awayRoster).map((playerName) => ({ playerName })),
+        assignments: buildHostLineupAssignments(teamTieState),
+        locked: Boolean(teamTieState.tieLocked),
+      };
+
+      await apiPost(
+        `/api/host/tournaments/${encodeURIComponent(tournamentId)}/lineups`,
+        payload
+      );
+    }
+
+    const canonicalSavedTie = await loadCanonicalHostLineupTie();
+    if (canonicalSavedTie) {
+      applyHostSavedLineupTie(canonicalSavedTie, teamTieState);
+      saveTeamTieState(teamTieState);
+    }
+
     let savingTeam = false;
     const scheduleTeamAutoSave = debounce(() => {
       saveTeamEventAggregate({ silent: true });
@@ -2836,6 +2945,8 @@ try {
       const hasSubmatches = Array.isArray(match?.submatches) && match.submatches.length >= teamTieState.categories.length;
 
       try {
+        await persistCanonicalHostLineup();
+
         if (hasSubmatches) {
           for (let index = 0; index < teamTieState.categories.length; index += 1) {
             const category = teamTieState.categories[index];
@@ -3501,7 +3612,25 @@ try {
 
     if (!saved) {
       console.error(lastError);
-      if (saveMsg) saveMsg.textContent = "Auto-save failed";
+      const isConflict = Number(lastError?.status) === 409;
+      const conflictMessage =
+        lastError?.data?.message ||
+        lastError?.message ||
+        "This match was updated from another device. Refresh and try again.";
+
+      if (saveMsg) {
+        saveMsg.textContent = isConflict
+          ? "Updated from another device. Refresh and try again."
+          : "Auto-save failed";
+      }
+
+      if (isConflict) {
+        if (!silent) {
+          alert(conflictMessage);
+        }
+        return;
+      }
+
       if (!silent) alert(lastError?.message || "Could not save score.");
       return;
     }
