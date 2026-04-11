@@ -72,16 +72,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const signinForm = document.getElementById("signin-form");
   const signupForm = document.getElementById("signup-form");
   const forgotPasswordForm = document.getElementById("forgot-password-form");
-  const securityQuestionPanel = document.getElementById("security-question-panel");
-  const securityQuestionText = document.getElementById("security-question-text");
-  const forgotAnswerGroup = document.getElementById("forgot-answer-group");
   const forgotNewPasswordGroup = document.getElementById("forgot-new-password-group");
   const forgotPasswordStatus = document.getElementById("forgot-password-status");
   const forgotPasswordSubmit = document.getElementById("forgot-password-submit");
   const forgotUsernameInput = document.getElementById("forgot-username");
   const forgotPhoneInput = document.getElementById("forgot-phone");
   const forgotPhoneCodeSelect = document.getElementById("forgot-phone-code");
-  const forgotSecurityAnswerInput = document.getElementById("forgot-security-answer");
   const forgotNewPasswordInput = document.getElementById("forgot-new-password");
   const signupPhoneInput = document.getElementById("signup-phone");
   const signupPhoneCodeSelect = document.getElementById("signup-phone-code");
@@ -127,7 +123,7 @@ function closeModal(modal) {
   modal.setAttribute("aria-hidden", "true");
 }
 
-function resetForgotPasswordState(options = {}) {
+  function resetForgotPasswordState(options = {}) {
   const preserveIdentityInputs = Boolean(options.preserveIdentityInputs);
   const usernameValue = String(forgotUsernameInput?.value || "");
   const phoneValue = String(forgotPhoneInput?.value || "");
@@ -142,12 +138,8 @@ function resetForgotPasswordState(options = {}) {
     forgotPasswordStatus.textContent = "";
     forgotPasswordStatus.className = "field-hint";
   }
-  if (securityQuestionText) securityQuestionText.textContent = "-";
-  securityQuestionPanel?.classList.add("hidden");
-  forgotAnswerGroup?.classList.add("hidden");
   forgotNewPasswordGroup?.classList.add("hidden");
   forgotPasswordSubmit?.classList.add("hidden");
-  if (forgotSecurityAnswerInput) forgotSecurityAnswerInput.required = false;
   if (forgotNewPasswordInput) forgotNewPasswordInput.required = false;
 }
 
@@ -278,17 +270,12 @@ function setForgotPasswordStatus(message = "", type = "") {
       verifiedResetIdentity = {
         username,
         phone,
-        securityQuestionKey: result.securityQuestionKey,
       };
 
-      securityQuestionText.textContent = result.securityQuestionLabel || "-";
-      securityQuestionPanel?.classList.remove("hidden");
-      forgotAnswerGroup?.classList.remove("hidden");
       forgotNewPasswordGroup?.classList.remove("hidden");
       forgotPasswordSubmit?.classList.remove("hidden");
-      if (forgotSecurityAnswerInput) forgotSecurityAnswerInput.required = true;
       if (forgotNewPasswordInput) forgotNewPasswordInput.required = true;
-      setForgotPasswordStatus("Identity verified. Answer the question and choose a new password.", "success");
+      setForgotPasswordStatus("Identity verified. Choose a new password.", "success");
     } catch (err) {
       console.error("Forgot password verification error:", err);
       setForgotPasswordStatus("Network error while verifying account.", "error");
@@ -398,11 +385,10 @@ function setForgotPasswordStatus(message = "", type = "") {
         return;
       }
 
-      const securityAnswer = String(forgotSecurityAnswerInput?.value || "").trim();
       const newPassword = String(forgotNewPasswordInput?.value || "");
 
-      if (!securityAnswer || !newPassword) {
-        setForgotPasswordStatus("Enter security answer and new password.", "error");
+      if (!newPassword) {
+        setForgotPasswordStatus("Enter a new password.", "error");
         return;
       }
 
@@ -415,7 +401,6 @@ function setForgotPasswordStatus(message = "", type = "") {
           body: JSON.stringify({
             username: verifiedResetIdentity.username,
             phone: verifiedResetIdentity.phone,
-            securityAnswer,
             newPassword,
           }),
         });

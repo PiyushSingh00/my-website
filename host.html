@@ -683,6 +683,10 @@
               <label for="poster-organizer-name">Organizer / hosted by</label>
               <input type="text" id="poster-organizer-name" placeholder="e.g. Shakti Sports Club" />
             </div>
+            <div class="field-group poster-fontsize-group">
+              <label for="poster-organizer-font-size">Font size</label>
+              <input type="number" id="poster-organizer-font-size" min="16" max="52" step="1" />
+            </div>
             <label class="poster-toggle">
               <input type="checkbox" id="poster-show-organizer-name" />
               <span>Show on poster</span>
@@ -691,6 +695,10 @@
             <div class="field-group poster-settings-grid-full">
               <label for="poster-sponsor-names">Sponsors</label>
               <textarea id="poster-sponsor-names" rows="3" placeholder="One sponsor per line or comma separated"></textarea>
+            </div>
+            <div class="field-group poster-fontsize-group">
+              <label for="poster-sponsor-font-size">Font size</label>
+              <input type="number" id="poster-sponsor-font-size" min="16" max="52" step="1" />
             </div>
             <label class="poster-toggle">
               <input type="checkbox" id="poster-show-sponsor-names" />
@@ -701,6 +709,10 @@
               <label for="poster-venue-label">Venue label</label>
               <input type="text" id="poster-venue-label" placeholder="e.g. Center Court Arena" />
             </div>
+            <div class="field-group poster-fontsize-group">
+              <label for="poster-venue-font-size">Font size</label>
+              <input type="number" id="poster-venue-font-size" min="16" max="52" step="1" />
+            </div>
             <label class="poster-toggle">
               <input type="checkbox" id="poster-show-venue-label" />
               <span>Show on poster</span>
@@ -709,6 +721,10 @@
             <div class="field-group">
               <label for="poster-city-name">City</label>
               <input type="text" id="poster-city-name" placeholder="e.g. Lucknow" />
+            </div>
+            <div class="field-group poster-fontsize-group">
+              <label for="poster-city-font-size">Font size</label>
+              <input type="number" id="poster-city-font-size" min="16" max="52" step="1" />
             </div>
             <label class="poster-toggle">
               <input type="checkbox" id="poster-show-city-name" />
@@ -719,6 +735,10 @@
               <label for="poster-tagline">Tagline</label>
               <input type="text" id="poster-tagline" placeholder="e.g. The city showdown series" />
             </div>
+            <div class="field-group poster-fontsize-group">
+              <label for="poster-tagline-font-size">Font size</label>
+              <input type="number" id="poster-tagline-font-size" min="16" max="52" step="1" />
+            </div>
             <label class="poster-toggle">
               <input type="checkbox" id="poster-show-tagline" />
               <span>Show on poster</span>
@@ -728,6 +748,10 @@
               <label for="poster-social-handle">Instagram / website</label>
               <input type="text" id="poster-social-handle" placeholder="e.g. @scheduleit.sports" />
             </div>
+            <div class="field-group poster-fontsize-group">
+              <label for="poster-social-font-size">Font size</label>
+              <input type="number" id="poster-social-font-size" min="16" max="52" step="1" />
+            </div>
             <label class="poster-toggle">
               <input type="checkbox" id="poster-show-social-handle" />
               <span>Show on poster</span>
@@ -736,9 +760,12 @@
             <div class="field-group poster-settings-grid-full">
               <div class="poster-custom-head">
                 <label>Custom fields</label>
-                <button type="button" class="btn-dark poster-add-field-btn" id="poster-add-custom-field-btn">+ Add field</button>
+                <div class="poster-custom-actions">
+                  <button type="button" class="btn-dark poster-add-field-btn" id="poster-add-custom-field-btn">+ Add field</button>
+                  <button type="button" class="btn-dark poster-add-field-btn" id="poster-add-custom-line-btn">+ Add line</button>
+                </div>
               </div>
-              <p class="helper-text">Add up to 4 extra lines like “Presented by”, “Powered by”, or any custom label.</p>
+              <p class="helper-text">Add up to 4 extra items. Use a field for label + value, or a line for free text.</p>
               <div id="poster-custom-fields-list" class="poster-custom-fields-list"></div>
             </div>
           </div>

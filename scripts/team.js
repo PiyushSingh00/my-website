@@ -694,27 +694,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     const linesTop = [];
     const linesBottom = [];
     const visibility = settings.visibility || {};
+    const fontSizes = settings.fontSizes || {};
 
-    if (visibility.organizerName && settings.organizerName) linesTop.push(`Hosted by ${settings.organizerName}`);
-    if (visibility.tagline && settings.tagline) linesTop.push(settings.tagline);
+    if (visibility.organizerName && settings.organizerName) {
+      linesTop.push({
+        text: settings.organizerName,
+        fontSize: Number(fontSizes.organizerName || 34) || 34,
+      });
+    }
+    if (visibility.tagline && settings.tagline) {
+      linesTop.push({
+        text: settings.tagline,
+        fontSize: Number(fontSizes.tagline || 30) || 30,
+      });
+    }
 
     (Array.isArray(settings.customFields) ? settings.customFields : [])
-      .filter((field) => field?.enabled !== false && field?.label && field?.value)
+      .filter((field) => field?.enabled !== false && (field?.type === "line" ? field?.text : field?.label && field?.value))
       .forEach((field) => {
-        const line = `${field.label}: ${field.value}`;
-        if (String(field.position || "bottom").toLowerCase() === "top") linesTop.push(line);
-        else linesBottom.push(line);
+        const line = field.type === "line" ? field.text : `${field.label}: ${field.value}`;
+        const target = String(field.position || "bottom").toLowerCase() === "top" ? linesTop : linesBottom;
+        target.push({
+          text: line,
+          fontSize: Number(field.fontSize || 24) || 24,
+        });
       });
 
     if (visibility.sponsorNames && Array.isArray(settings.sponsorNames) && settings.sponsorNames.length) {
-      linesBottom.push(`Sponsors: ${settings.sponsorNames.join(" • ")}`);
+      linesBottom.push({
+        text: settings.sponsorNames.join(" • "),
+        fontSize: Number(fontSizes.sponsorNames || 24) || 24,
+      });
     }
 
-    const footerBits = [];
-    if (visibility.venueLabel && settings.venueLabel) footerBits.push(settings.venueLabel);
-    if (visibility.cityName && settings.cityName) footerBits.push(settings.cityName);
-    if (visibility.socialHandle && settings.socialHandle) footerBits.push(settings.socialHandle);
-    if (footerBits.length) linesBottom.push(footerBits.join(" • "));
+    if (visibility.venueLabel && settings.venueLabel) {
+      linesBottom.push({
+        text: settings.venueLabel,
+        fontSize: Number(fontSizes.venueLabel || 24) || 24,
+      });
+    }
+    if (visibility.cityName && settings.cityName) {
+      linesBottom.push({
+        text: settings.cityName,
+        fontSize: Number(fontSizes.cityName || 24) || 24,
+      });
+    }
+    if (visibility.socialHandle && settings.socialHandle) {
+      linesBottom.push({
+        text: settings.socialHandle,
+        fontSize: Number(fontSizes.socialHandle || 24) || 24,
+      });
+    }
 
     return { top: linesTop, bottom: linesBottom };
   }
@@ -802,22 +832,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     ctx.fillStyle = "#7dd3fc";
     ctx.font = '700 34px "Space Grotesk", sans-serif';
-    let cursorY = 120;
+    let cursorY = 210;
     posterMeta.top.forEach((line) => {
-      cursorY = drawWrappedText(ctx, line, 84, cursorY, 912, 42, 2);
+      const fontSize = Number(line?.fontSize || 34) || 34;
+      ctx.font = `700 ${fontSize}px "Space Grotesk", sans-serif`;
+      cursorY = drawWrappedText(ctx, line?.text || "", 84, cursorY, 912, Math.round(fontSize * 1.24), 2);
     });
 
     ctx.fillStyle = "#e6eef8";
     ctx.font = '700 70px "Space Grotesk", sans-serif';
     cursorY = drawWrappedText(ctx, tournamentMeta?.tournamentName || "ScheduleIt", 84, cursorY + 34, 912, 82, 3);
 
-    drawRoundedRect(ctx, 64, 330, 952, match?.isTeamSchedule ? 990 : 790, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
+    drawRoundedRect(ctx, 64, 470, 952, match?.isTeamSchedule ? 990 : 790, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
 
     ctx.fillStyle = "#f8fafc";
     ctx.font = '700 54px "Space Grotesk", sans-serif';
-    drawWrappedText(ctx, match?.home || "Home", 116, 440, 300, 60, 2);
+    drawWrappedText(ctx, match?.home || "Home", 116, 580, 300, 60, 2);
     ctx.textAlign = "right";
-    drawWrappedText(ctx, match?.away || "Away", 964, 440, 300, 60, 2);
+    drawWrappedText(ctx, match?.away || "Away", 964, 580, 300, 60, 2);
     ctx.textAlign = "left";
 
     if (match?.isTeamSchedule) {
@@ -837,14 +869,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? `${mainHomeScore} - ${mainAwayScore}`
           : `${totals.homeWins} - ${totals.awayWins}`,
         width / 2,
-        560
+        700
       );
       ctx.fillStyle = "rgba(230, 238, 248, 0.8)";
       ctx.font = '600 24px "Inter", sans-serif';
-      ctx.fillText(hasMainScore ? "Match score" : "Tie score", width / 2, 610);
+      ctx.fillText(hasMainScore ? "Match score" : "Tie score", width / 2, 750);
       ctx.textAlign = "left";
 
-      let y = 700;
+      let y = 840;
       const submatches = Array.isArray(match?.submatches) ? match.submatches : [];
       submatches.slice(0, 6).forEach((submatch, index) => {
         const highlight = Boolean(submatch?.isMine);
@@ -888,7 +920,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ctx.fillStyle = "rgba(230, 238, 248, 0.72)";
         ctx.font = '600 24px "Inter", sans-serif';
         ctx.textAlign = "center";
-        ctx.fillText("Lineups are shown below. Player-level scores were not saved for this tie.", width / 2, 760);
+        ctx.fillText("Lineups are shown below. Player-level scores were not saved for this tie.", width / 2, 900);
         ctx.textAlign = "left";
       }
     } else {
@@ -897,13 +929,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       ctx.fillStyle = "rgba(230, 238, 248, 0.92)";
       ctx.font = '600 30px "Inter", sans-serif';
-      let leftY = 540;
+      let leftY = 680;
       homePlayers.forEach((player) => {
         leftY = drawWrappedText(ctx, player, 116, leftY, 280, 38, 2);
       });
 
       ctx.textAlign = "right";
-      let rightY = 540;
+      let rightY = 680;
       awayPlayers.forEach((player) => {
         rightY = drawWrappedText(ctx, player, 964, rightY, 280, 38, 2);
       });
@@ -912,7 +944,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ctx.fillStyle = "#4dd0e1";
       ctx.font = '700 130px "Space Grotesk", sans-serif';
       ctx.textAlign = "center";
-      ctx.fillText(`${getDisplayedMatchScore(match, "home")} - ${getDisplayedMatchScore(match, "away")}`, width / 2, 700);
+      ctx.fillText(`${getDisplayedMatchScore(match, "home")} - ${getDisplayedMatchScore(match, "away")}`, width / 2, 840);
       ctx.textAlign = "left";
     }
 
@@ -921,12 +953,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const footerYStart = height - 240;
     let footerY = footerYStart;
     posterMeta.bottom.forEach((line) => {
-      footerY = drawWrappedText(ctx, line, 84, footerY, 912, 34, 3);
+      const fontSize = Number(line?.fontSize || 24) || 24;
+      ctx.font = `600 ${fontSize}px "Inter", sans-serif`;
+      footerY = drawWrappedText(ctx, line?.text || "", 84, footerY, 912, Math.round(fontSize * 1.35), 3);
     });
 
     ctx.fillStyle = "#7dd3fc";
     ctx.font = '700 24px "Inter", sans-serif';
     ctx.fillText("Built on ScheduleIt", 84, height - 88);
+    ctx.textAlign = "right";
+    ctx.fillText("scheduleit.co.in", width - 84, height - 88);
+    ctx.textAlign = "left";
 
     return canvas.toDataURL("image/png");
   }

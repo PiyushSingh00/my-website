@@ -164,6 +164,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const posterCityNameInput = document.getElementById("poster-city-name");
   const posterTaglineInput = document.getElementById("poster-tagline");
   const posterSocialHandleInput = document.getElementById("poster-social-handle");
+  const posterOrganizerFontSizeInput = document.getElementById("poster-organizer-font-size");
+  const posterSponsorFontSizeInput = document.getElementById("poster-sponsor-font-size");
+  const posterVenueFontSizeInput = document.getElementById("poster-venue-font-size");
+  const posterCityFontSizeInput = document.getElementById("poster-city-font-size");
+  const posterTaglineFontSizeInput = document.getElementById("poster-tagline-font-size");
+  const posterSocialFontSizeInput = document.getElementById("poster-social-font-size");
   const posterShowOrganizerCheckbox = document.getElementById("poster-show-organizer-name");
   const posterShowSponsorsCheckbox = document.getElementById("poster-show-sponsor-names");
   const posterShowVenueCheckbox = document.getElementById("poster-show-venue-label");
@@ -171,6 +177,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const posterShowTaglineCheckbox = document.getElementById("poster-show-tagline");
   const posterShowSocialCheckbox = document.getElementById("poster-show-social-handle");
   const posterAddCustomFieldBtn = document.getElementById("poster-add-custom-field-btn");
+  const posterAddCustomLineBtn = document.getElementById("poster-add-custom-line-btn");
   const posterCustomFieldsList = document.getElementById("poster-custom-fields-list");
   const posterPreviewImage = document.getElementById("poster-preview-image");
   const posterPreviewDownloadBtn = document.getElementById("poster-preview-download-btn");
@@ -340,6 +347,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       tagline: "",
       socialHandle: "",
       customFields: [],
+      fontSizes: {
+        organizerName: 34,
+        sponsorNames: 24,
+        venueLabel: 24,
+        cityName: 24,
+        tagline: 30,
+        socialHandle: 24,
+      },
       visibility: {
         organizerName: true,
         sponsorNames: true,
@@ -354,6 +369,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   function normalizePosterSettings(settings, tournament = null) {
     const defaults = getDefaultPosterSettings(tournament);
     const visibility = settings?.visibility && typeof settings.visibility === "object" ? settings.visibility : {};
+    const fontSizes = settings?.fontSizes && typeof settings.fontSizes === "object" ? settings.fontSizes : {};
+    const normalizeFontSize = (value, fallback) => {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return fallback;
+      return Math.max(16, Math.min(52, Math.round(num)));
+    };
     const sponsorNames = Array.isArray(settings?.sponsorNames)
       ? settings.sponsorNames
       : String(settings?.sponsorNames || "")
@@ -364,12 +385,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     const customFields = Array.isArray(settings?.customFields)
       ? settings.customFields
           .map((field) => ({
+            type: String(field?.type || "pair").trim().toLowerCase() === "line" ? "line" : "pair",
             label: String(field?.label || "").trim(),
             value: String(field?.value || "").trim(),
+            text: String(field?.text || "").trim(),
             position: String(field?.position || "bottom").trim().toLowerCase() === "top" ? "top" : "bottom",
             enabled: field?.enabled !== false,
+            fontSize: normalizeFontSize(field?.fontSize, 24),
           }))
-          .filter((field) => field.label && field.value)
+          .filter((field) => (field.type === "line" ? field.text : field.label && field.value))
           .slice(0, 4)
       : [];
 
@@ -381,6 +405,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       tagline: String(settings?.tagline || defaults.tagline).trim(),
       socialHandle: String(settings?.socialHandle || defaults.socialHandle).trim(),
       customFields,
+      fontSizes: {
+        organizerName: normalizeFontSize(fontSizes.organizerName, defaults.fontSizes.organizerName),
+        sponsorNames: normalizeFontSize(fontSizes.sponsorNames, defaults.fontSizes.sponsorNames),
+        venueLabel: normalizeFontSize(fontSizes.venueLabel, defaults.fontSizes.venueLabel),
+        cityName: normalizeFontSize(fontSizes.cityName, defaults.fontSizes.cityName),
+        tagline: normalizeFontSize(fontSizes.tagline, defaults.fontSizes.tagline),
+        socialHandle: normalizeFontSize(fontSizes.socialHandle, defaults.fontSizes.socialHandle),
+      },
       visibility: {
         organizerName: Boolean(visibility.organizerName ?? defaults.visibility.organizerName),
         sponsorNames: Boolean(visibility.sponsorNames ?? defaults.visibility.sponsorNames),
@@ -413,27 +445,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     const linesTop = [];
     const linesBottom = [];
     const visibility = settings.visibility || {};
+    const fontSizes = settings.fontSizes || {};
 
-    if (visibility.organizerName && settings.organizerName) linesTop.push(`Hosted by ${settings.organizerName}`);
-    if (visibility.tagline && settings.tagline) linesTop.push(settings.tagline);
+    if (visibility.organizerName && settings.organizerName) {
+      linesTop.push({
+        text: settings.organizerName,
+        fontSize: Number(fontSizes.organizerName || 34) || 34,
+      });
+    }
+    if (visibility.tagline && settings.tagline) {
+      linesTop.push({
+        text: settings.tagline,
+        fontSize: Number(fontSizes.tagline || 30) || 30,
+      });
+    }
 
     (Array.isArray(settings.customFields) ? settings.customFields : [])
-      .filter((field) => field?.enabled !== false && field?.label && field?.value)
+      .filter((field) => field?.enabled !== false && (field?.type === "line" ? field?.text : field?.label && field?.value))
       .forEach((field) => {
-        const line = `${field.label}: ${field.value}`;
-        if (field.position === "top") linesTop.push(line);
-        else linesBottom.push(line);
+        const line = field.type === "line" ? field.text : `${field.label}: ${field.value}`;
+        const target = field.position === "top" ? linesTop : linesBottom;
+        target.push({
+          text: line,
+          fontSize: Number(field.fontSize || 24) || 24,
+        });
       });
 
     if (visibility.sponsorNames && Array.isArray(settings.sponsorNames) && settings.sponsorNames.length) {
-      linesBottom.push(`Sponsors: ${settings.sponsorNames.join(" • ")}`);
+      linesBottom.push({
+        text: settings.sponsorNames.join(" • "),
+        fontSize: Number(fontSizes.sponsorNames || 24) || 24,
+      });
     }
 
-    const footerBits = [];
-    if (visibility.venueLabel && settings.venueLabel) footerBits.push(settings.venueLabel);
-    if (visibility.cityName && settings.cityName) footerBits.push(settings.cityName);
-    if (visibility.socialHandle && settings.socialHandle) footerBits.push(settings.socialHandle);
-    if (footerBits.length) linesBottom.push(footerBits.join(" • "));
+    if (visibility.venueLabel && settings.venueLabel) {
+      linesBottom.push({
+        text: settings.venueLabel,
+        fontSize: Number(fontSizes.venueLabel || 24) || 24,
+      });
+    }
+    if (visibility.cityName && settings.cityName) {
+      linesBottom.push({
+        text: settings.cityName,
+        fontSize: Number(fontSizes.cityName || 24) || 24,
+      });
+    }
+    if (visibility.socialHandle && settings.socialHandle) {
+      linesBottom.push({
+        text: settings.socialHandle,
+        fontSize: Number(fontSizes.socialHandle || 24) || 24,
+      });
+    }
 
     return { top: linesTop, bottom: linesBottom };
   }
@@ -521,9 +583,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const posterMeta = getPosterMetaLines(settings);
     ctx.fillStyle = "#7dd3fc";
     ctx.font = '700 34px "Space Grotesk", sans-serif';
-    let cursorY = 120;
+    let cursorY = 210;
     posterMeta.top.forEach((line) => {
-      cursorY = drawWrappedText(ctx, line, 84, cursorY, 912, 42, 2);
+      const fontSize = Number(line?.fontSize || 34) || 34;
+      ctx.font = `700 ${fontSize}px "Space Grotesk", sans-serif`;
+      cursorY = drawWrappedText(ctx, line?.text || "", 84, cursorY, 912, Math.round(fontSize * 1.24), 2);
     });
 
     ctx.fillStyle = "#e6eef8";
@@ -534,23 +598,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     ctx.font = '500 30px "Inter", sans-serif';
     cursorY = drawWrappedText(ctx, [match.categoryLabel, match.roundLabel, match.court].filter(Boolean).join(" • "), 84, cursorY + 10, 912, 40, 2);
 
-    drawRoundedRect(ctx, 64, 360, 952, 760, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
+    drawRoundedRect(ctx, 64, 470, 952, 760, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
 
     ctx.fillStyle = "#f8fafc";
     ctx.font = '700 54px "Space Grotesk", sans-serif';
-    drawWrappedText(ctx, match.home, 116, 470, 300, 60, 2);
+    drawWrappedText(ctx, match.home, 116, 580, 300, 60, 2);
     ctx.textAlign = "right";
-    drawWrappedText(ctx, match.away, 964, 470, 300, 60, 2);
+    drawWrappedText(ctx, match.away, 964, 580, 300, 60, 2);
     ctx.textAlign = "left";
 
     ctx.fillStyle = "rgba(230, 238, 248, 0.92)";
     ctx.font = '600 30px "Inter", sans-serif';
-    let leftY = 580;
+    let leftY = 690;
     match.homePlayers.forEach((player) => {
       leftY = drawWrappedText(ctx, player, 116, leftY, 280, 38, 2);
     });
     ctx.textAlign = "right";
-    let rightY = 580;
+    let rightY = 690;
     match.awayPlayers.forEach((player) => {
       rightY = drawWrappedText(ctx, player, 964, rightY, 280, 38, 2);
     });
@@ -559,19 +623,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     ctx.fillStyle = "#4dd0e1";
     ctx.font = '700 130px "Space Grotesk", sans-serif';
     ctx.textAlign = "center";
-    ctx.fillText("0 - 0", width / 2, 760);
+    ctx.fillText("0 - 0", width / 2, 870);
     ctx.textAlign = "left";
 
     ctx.fillStyle = "rgba(230,238,248,0.86)";
     ctx.font = '600 24px "Inter", sans-serif';
     let footerY = height - 240;
     posterMeta.bottom.forEach((line) => {
-      footerY = drawWrappedText(ctx, line, 84, footerY, 912, 34, 3);
+      const fontSize = Number(line?.fontSize || 24) || 24;
+      ctx.font = `600 ${fontSize}px "Inter", sans-serif`;
+      footerY = drawWrappedText(ctx, line?.text || "", 84, footerY, 912, Math.round(fontSize * 1.35), 3);
     });
 
     ctx.fillStyle = "#7dd3fc";
     ctx.font = '700 24px "Inter", sans-serif';
     ctx.fillText("Built on ScheduleIt", 84, height - 88);
+    ctx.textAlign = "right";
+    ctx.fillText("scheduleit.co.in", width - 84, height - 88);
+    ctx.textAlign = "left";
 
     return canvas.toDataURL("image/png");
   }
@@ -588,8 +657,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     normalized.forEach((field, index) => {
       const row = document.createElement("div");
       row.className = "poster-custom-field-card";
+      const type = field?.type === "line" ? "line" : "pair";
       row.innerHTML = `
-        <div class="poster-custom-field-grid">
+        <div class="poster-custom-field-grid${type === "line" ? " poster-custom-field-grid--line" : ""}">
+          ${type === "line" ? `
+          <div class="field-group">
+            <label>Line text</label>
+            <input type="text" data-custom-text="${index}" value="${escapeHtml(field.text || "")}" placeholder="e.g. Presented by Shakti Sports Club" />
+          </div>
+          ` : `
           <div class="field-group">
             <label>Label</label>
             <input type="text" data-custom-label="${index}" value="${escapeHtml(field.label || "")}" placeholder="e.g. Presented by" />
@@ -597,6 +673,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="field-group">
             <label>Value</label>
             <input type="text" data-custom-value="${index}" value="${escapeHtml(field.value || "")}" placeholder="e.g. Shakti Sports Club" />
+          </div>
+          `}
+          <div class="field-group">
+            <label>Font size</label>
+            <input type="number" min="16" max="52" step="1" data-custom-font-size="${index}" value="${escapeHtml(String(field.fontSize || 24))}" />
           </div>
           <div class="field-group">
             <label>Position</label>
@@ -611,6 +692,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           </label>
         </div>
         <div class="poster-custom-field-actions">
+          <input type="hidden" data-custom-type="${index}" value="${type}" />
           <button type="button" class="btn-secondary" data-remove-custom-field="${index}">Remove</button>
         </div>
       `;
@@ -640,13 +722,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!posterCustomFieldsList) return [];
     const rows = Array.from(posterCustomFieldsList.querySelectorAll(".poster-custom-field-card"));
     return rows
-      .map((row, index) => ({
-        label: row.querySelector(`[data-custom-label="${index}"]`)?.value?.trim() || "",
-        value: row.querySelector(`[data-custom-value="${index}"]`)?.value?.trim() || "",
-        position: row.querySelector(`[data-custom-position="${index}"]`)?.value === "top" ? "top" : "bottom",
-        enabled: Boolean(row.querySelector(`[data-custom-enabled="${index}"]`)?.checked),
-      }))
-      .filter((field) => field.label && field.value)
+      .map((row, index) => {
+        const type = row.querySelector(`[data-custom-type="${index}"]`)?.value === "line" ? "line" : "pair";
+        return {
+          type,
+          label: row.querySelector(`[data-custom-label="${index}"]`)?.value?.trim() || "",
+          value: row.querySelector(`[data-custom-value="${index}"]`)?.value?.trim() || "",
+          text: row.querySelector(`[data-custom-text="${index}"]`)?.value?.trim() || "",
+          fontSize: Number(row.querySelector(`[data-custom-font-size="${index}"]`)?.value || 24) || 24,
+          position: row.querySelector(`[data-custom-position="${index}"]`)?.value === "top" ? "top" : "bottom",
+          enabled: Boolean(row.querySelector(`[data-custom-enabled="${index}"]`)?.checked),
+        };
+      })
+      .filter((field) => (field.type === "line" ? field.text : field.label && field.value))
       .slice(0, getPosterFieldLimit());
   }
 
@@ -658,6 +746,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (posterCityNameInput) posterCityNameInput.value = normalized.cityName;
     if (posterTaglineInput) posterTaglineInput.value = normalized.tagline;
     if (posterSocialHandleInput) posterSocialHandleInput.value = normalized.socialHandle;
+    if (posterOrganizerFontSizeInput) posterOrganizerFontSizeInput.value = String(normalized.fontSizes.organizerName || 34);
+    if (posterSponsorFontSizeInput) posterSponsorFontSizeInput.value = String(normalized.fontSizes.sponsorNames || 24);
+    if (posterVenueFontSizeInput) posterVenueFontSizeInput.value = String(normalized.fontSizes.venueLabel || 24);
+    if (posterCityFontSizeInput) posterCityFontSizeInput.value = String(normalized.fontSizes.cityName || 24);
+    if (posterTaglineFontSizeInput) posterTaglineFontSizeInput.value = String(normalized.fontSizes.tagline || 30);
+    if (posterSocialFontSizeInput) posterSocialFontSizeInput.value = String(normalized.fontSizes.socialHandle || 24);
     if (posterShowOrganizerCheckbox) posterShowOrganizerCheckbox.checked = normalized.visibility.organizerName;
     if (posterShowSponsorsCheckbox) posterShowSponsorsCheckbox.checked = normalized.visibility.sponsorNames;
     if (posterShowVenueCheckbox) posterShowVenueCheckbox.checked = normalized.visibility.venueLabel;
@@ -676,6 +770,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       tagline: posterTaglineInput?.value || "",
       socialHandle: posterSocialHandleInput?.value || "",
       customFields: readPosterCustomFields(),
+      fontSizes: {
+        organizerName: posterOrganizerFontSizeInput?.value || "",
+        sponsorNames: posterSponsorFontSizeInput?.value || "",
+        venueLabel: posterVenueFontSizeInput?.value || "",
+        cityName: posterCityFontSizeInput?.value || "",
+        tagline: posterTaglineFontSizeInput?.value || "",
+        socialHandle: posterSocialFontSizeInput?.value || "",
+      },
       visibility: {
         organizerName: Boolean(posterShowOrganizerCheckbox?.checked),
         sponsorNames: Boolean(posterShowSponsorsCheckbox?.checked),
@@ -2010,7 +2112,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       alert(`You can add up to ${getPosterFieldLimit()} custom fields.`);
       return;
     }
-    current.push({ label: "", value: "", position: "bottom", enabled: true });
+    current.push({ type: "pair", label: "", value: "", position: "bottom", enabled: true, fontSize: 24 });
+    renderPosterCustomFields(current);
+    void refreshPosterPreview();
+  });
+  posterAddCustomLineBtn?.addEventListener("click", () => {
+    const current = readPosterCustomFields();
+    if (current.length >= getPosterFieldLimit()) {
+      alert(`You can add up to ${getPosterFieldLimit()} custom fields.`);
+      return;
+    }
+    current.push({ type: "line", text: "", position: "bottom", enabled: true, fontSize: 24 });
     renderPosterCustomFields(current);
     void refreshPosterPreview();
   });
@@ -2023,6 +2135,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     posterCityNameInput,
     posterTaglineInput,
     posterSocialHandleInput,
+    posterOrganizerFontSizeInput,
+    posterSponsorFontSizeInput,
+    posterVenueFontSizeInput,
+    posterCityFontSizeInput,
+    posterTaglineFontSizeInput,
+    posterSocialFontSizeInput,
     posterShowOrganizerCheckbox,
     posterShowSponsorsCheckbox,
     posterShowVenueCheckbox,

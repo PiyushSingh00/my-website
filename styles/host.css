@@ -993,13 +993,13 @@ body {
 
 .poster-settings-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
   gap: 14px 16px;
   align-items: end;
 }
 
 .poster-settings-grid-full {
-  grid-column: 1;
+  grid-column: 1 / span 2;
 }
 
 .poster-toggle {
@@ -1042,6 +1042,12 @@ body {
   margin-bottom: 8px;
 }
 
+.poster-custom-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .poster-add-field-btn {
   padding: 8px 14px;
 }
@@ -1063,9 +1069,13 @@ body {
 
 .poster-custom-field-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 110px 110px auto;
   gap: 12px;
   align-items: end;
+}
+
+.poster-custom-field-grid--line {
+  grid-template-columns: minmax(0, 1.6fr) 110px 110px auto;
 }
 
 .poster-custom-field-actions {
@@ -1076,6 +1086,11 @@ body {
 .poster-inline-select {
   width: 100%;
   min-width: 0;
+}
+
+.poster-fontsize-group input,
+.poster-custom-field-grid input[type="number"] {
+  text-align: center;
 }
 
 .poster-host-preview {
