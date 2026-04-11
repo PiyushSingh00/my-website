@@ -548,6 +548,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     return y;
   }
 
+  function drawPosterTeamName(ctx, text, x, y, maxWidth, align = "left") {
+    const previousAlign = ctx.textAlign;
+    ctx.textAlign = align;
+
+    let fontSize = 46;
+    let endY = y;
+    while (fontSize >= 26) {
+      ctx.font = `700 ${fontSize}px "Space Grotesk", sans-serif`;
+      const lineHeight = Math.round(fontSize * 1.12);
+      const nextY = drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, 3);
+      const usedHeight = nextY - y;
+      if (usedHeight <= lineHeight * 3) {
+        endY = nextY;
+        break;
+      }
+      fontSize -= 2;
+    }
+
+    ctx.textAlign = previousAlign;
+    return endY;
+  }
+
   async function buildPosterPreviewImage(settings, tournament = null) {
     const match = getPosterPreviewMatch();
     const width = 1080;
@@ -601,10 +623,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     drawRoundedRect(ctx, 64, 470, 952, 760, 44, "rgba(10, 16, 30, 0.88)", "rgba(255,255,255,0.08)");
 
     ctx.fillStyle = "#f8fafc";
-    ctx.font = '700 46px "Space Grotesk", sans-serif';
-    drawWrappedText(ctx, match.home, 116, 580, 250, 52, 2);
+    drawPosterTeamName(ctx, match.home, 116, 580, 250, "left");
     ctx.textAlign = "right";
-    drawWrappedText(ctx, match.away, 964, 580, 250, 52, 2);
+    drawPosterTeamName(ctx, match.away, 964, 580, 250, "right");
     ctx.textAlign = "left";
 
     ctx.fillStyle = "rgba(230, 238, 248, 0.92)";
