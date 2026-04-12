@@ -204,11 +204,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     ];
 
     const merged = new Map();
+    const responses = await Promise.all(candidates.map((url) => apiGet(url)));
 
-    for (const url of candidates) {
-      const r = await apiGet(url);
-      if (!r.ok) continue;
-
+    responses.forEach((r) => {
+      if (!r.ok) return;
       normalizeTournamentList(r.data).forEach((tournament) => {
         const tournamentId = String(tournament?.tournamentId || tournament?.id || "").trim();
         if (!tournamentId) return;
@@ -219,7 +218,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           tournamentId,
         });
       });
-    }
+    });
 
     myJoinedTournaments = [...merged.values()].sort((a, b) =>
       String(b?.createdAt || "").localeCompare(String(a?.createdAt || ""))
@@ -670,9 +669,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     await joinTournamentNow(tournament, code);
   });
 
-  await loadBrowseTournaments();
-  await loadMyTournaments();
-  await loadTeamInvites();
+  await Promise.all([
+    loadBrowseTournaments(),
+    loadMyTournaments(),
+    loadTeamInvites(),
+  ]);
   await loadNotifications();
 
   renderBrowseList();
