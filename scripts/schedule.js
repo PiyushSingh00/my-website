@@ -1188,11 +1188,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function buildTeamLeaderboardRowsFromFixturesSchedule() {
     const cat = getTeamEventFixtureBucket();
-    const matches = Array.isArray(cat?.matches)
-      ? cat.matches
-      : Array.isArray(cat?.rounds?.[0])
-        ? cat.rounds[0]
+
+    const leagueSource = Array.isArray(cat?.rounds?.[0])
+      ? cat.rounds[0]
+      : Array.isArray(cat?.matches)
+        ? cat.matches
         : [];
+
+    const matches = leagueSource.filter(
+      (match) => String(match?.stage || "league").toLowerCase() !== "knockout"
+    );
 
     const stats = new Map();
 
@@ -1219,21 +1224,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const homeRow = ensureTeam(homeTeam);
       const awayRow = ensureTeam(awayTeam);
-      const totals = getTeamTotals(match);
-
-      if (homeRow) homeRow.matchPoints += Number(totals.homePoints || 0);
-      if (awayRow) awayRow.matchPoints += Number(totals.awayPoints || 0);
+      if (!homeRow || !awayRow) return;
 
       const status = getTeamScheduleStatus(match);
-      const countsAsPlayed =
-        status !== "pending" &&
-        isRealLeaderboardTeamName(homeTeam) &&
-        isRealLeaderboardTeamName(awayTeam);
+      if (status !== "completed") return;
 
-      if (countsAsPlayed) {
-        if (homeRow) homeRow.matchesPlayed += 1;
-        if (awayRow) awayRow.matchesPlayed += 1;
-      }
+      const totals = getTeamTotals(match);
+
+      homeRow.matchPoints += Number(totals.homePoints || 0);
+      awayRow.matchPoints += Number(totals.awayPoints || 0);
+      homeRow.matchesPlayed += 1;
+      awayRow.matchesPlayed += 1;
     });
 
     const sorted = [...stats.values()].sort((a, b) => {

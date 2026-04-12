@@ -899,11 +899,16 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
 
     function buildTeamLeaderboardRowsFromFixtures() {
       const cat = getTeamEventFixtureBucket();
-      const matches = Array.isArray(cat?.matches)
-        ? cat.matches
-        : Array.isArray(cat?.rounds?.[0])
-          ? cat.rounds[0]
+
+      const leagueSource = Array.isArray(cat?.rounds?.[0])
+        ? cat.rounds[0]
+        : Array.isArray(cat?.matches)
+          ? cat.matches
           : [];
+
+      const matches = leagueSource.filter(
+        (match) => String(match?.stage || "league").toLowerCase() !== "knockout"
+      );
 
       const stats = new Map();
 
@@ -924,42 +929,35 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
         return stats.get(key);
       }
 
-      matches.forEach((match, matchIndex) => {
-        const homeTeam = String(match?.home || "").trim();
-        const awayTeam = String(match?.away || "").trim();
+      matches.forEach((match) => {
+        const home = ensureTeam(match?.home);
+        const away = ensureTeam(match?.away);
+        if (!home || !away) return;
 
-        const homeRow = ensureTeam(homeTeam);
-        const awayRow = ensureTeam(awayTeam);
+        const status = getMatchStatus(match);
+        if (status !== "completed") return;
 
-        if (homeRow) {
-          homeRow.matchPoints += getFixtureMatchPoints(match, "home");
-        }
+        home.matchesPlayed += 1;
+        away.matchesPlayed += 1;
 
-        if (awayRow) {
-          awayRow.matchPoints += getFixtureMatchPoints(match, "away");
-        }
-
-        const status = getMatchStatus(match, 0, matchIndex);
-        const countsAsPlayed =
-          status !== "pending" &&
-          isRealLeaderboardTeamName(homeTeam) &&
-          isRealLeaderboardTeamName(awayTeam);
-
-        if (countsAsPlayed) {
-          if (homeRow) homeRow.matchesPlayed += 1;
-          if (awayRow) awayRow.matchesPlayed += 1;
-        }
+        home.matchPoints += Number(getFixtureMatchPoints(match, "home") || 0);
+        away.matchPoints += Number(getFixtureMatchPoints(match, "away") || 0);
       });
 
-      const sorted = [...stats.values()].sort((a, b) => {
-        if (b.matchPoints !== a.matchPoints) return b.matchPoints - a.matchPoints;
-        if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed;
-        return a.teamName.localeCompare(b.teamName);
+      const rows = [...stats.values()].sort((a, b) => {
+        if (Number(b.matchPoints || 0) !== Number(a.matchPoints || 0)) {
+          return Number(b.matchPoints || 0) - Number(a.matchPoints || 0);
+        }
+        if (Number(b.matchesPlayed || 0) !== Number(a.matchesPlayed || 0)) {
+          return Number(b.matchesPlayed || 0) - Number(a.matchesPlayed || 0);
+        }
+        return String(a.teamName || "").localeCompare(String(b.teamName || ""));
       });
 
-      const qualifierCount = Number(getAdvancedSettings()?.qualifierCount || 0) || Math.min(4, sorted.length);
+      const qualifierCount =
+        Number(getAdvancedSettings()?.qualifierCount || 0) || Math.min(4, rows.length);
 
-      return sorted.map((row, index) => ({
+      return rows.map((row, index) => ({
         ...row,
         rank: index + 1,
         qualified: index < qualifierCount,
@@ -3064,11 +3062,15 @@ function renderCaptainsSummary() {
   }
 
   function renderTeamEventScheduleTable(cat) {
-    const matches = Array.isArray(cat?.matches)
+    const sourceMatches = Array.isArray(cat?.matches)
       ? cat.matches
       : Array.isArray(cat?.rounds?.[0])
         ? cat.rounds[0]
         : [];
+
+    const matches = sourceMatches.filter(
+      (match) => String(match?.stage || "league").toLowerCase() !== "knockout"
+    );
 
     if (!matches.length) {
       fixturesUi.groupsEl.innerHTML = `
@@ -3084,7 +3086,23 @@ function renderCaptainsSummary() {
     }
 
     const editing = Boolean(fixturesState.bulkEditMode);
-    const knockoutMarkup = buildKnockoutBracketMarkup(cat?.knockout, TEAM_EVENT_CATEGORY_ID);
+
+    console.log("TEAM CAT FULL", cat);
+    console.log("TEAM CAT KNOCKOUT", cat?.knockout);
+    
+    const knockoutSource =
+      cat?.knockout ||
+      (
+        Array.isArray(cat?.rounds) && cat.rounds.length > 1
+          ? {
+              rounds: cat.rounds.slice(1),
+              totalRounds: Math.max(0, cat.rounds.length - 1),
+              label: "Knockout",
+            }
+          : null
+      );
+
+    const knockoutMarkup = buildKnockoutBracketMarkup(knockoutSource, TEAM_EVENT_CATEGORY_ID);
 
     fixturesUi.groupsEl.innerHTML = `
       <div class="fixtures-group">
