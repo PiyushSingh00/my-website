@@ -2774,9 +2774,24 @@ function renderCaptainsSummary() {
 }
 
   async function persistFixturesState() {
-    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`, fixturesState.fixtures || { categories: {} });
+    const categoryId = isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : fixturesState.activeCategoryId;
+    const activeBucket =
+      categoryId && fixturesState.fixtures?.categories
+        ? fixturesState.fixtures.categories[categoryId]
+        : null;
+
+    const r = activeBucket
+      ? await apiPost(
+          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/category-update`,
+          { categoryId, bucket: activeBucket }
+        )
+      : await apiPost(
+          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
+          fixturesState.fixtures || { categories: {} }
+        );
+
     if (!r.ok) throw new Error(r.data?.message || "Failed to save fixtures");
-    fixturesState.fixtures = migrateFixtures(r.data || fixturesState.fixtures || { categories: {} });
+    fixturesState.fixtures = migrateFixtures(r.data?.fixtures || r.data || fixturesState.fixtures || { categories: {} });
   }
 
   function migrateFixtures(fixturesObj) {
