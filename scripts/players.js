@@ -3071,8 +3071,6 @@ function renderCaptainsSummary() {
         : [];
 
     if (!matches.length) {
-      console.log("TEAM CAT FULL", cat);
-      console.log("TEAM CAT KNOCKOUT", cat?.knockout);
       fixturesUi.groupsEl.innerHTML = `
         <div class="empty-state" style="display:flex;">
           <div class="feature-icon">🗓️</div>
@@ -3086,6 +3084,10 @@ function renderCaptainsSummary() {
     }
 
     const editing = Boolean(fixturesState.bulkEditMode);
+
+    console.log("TEAM CAT FULL", cat);
+    console.log("TEAM CAT KNOCKOUT", cat?.knockout);
+    
     const knockoutMarkup = buildKnockoutBracketMarkup(cat?.knockout, TEAM_EVENT_CATEGORY_ID);
 
     fixturesUi.groupsEl.innerHTML = `
