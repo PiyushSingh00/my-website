@@ -929,42 +929,35 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
         return stats.get(key);
       }
 
-      matches.forEach((match, matchIndex) => {
-        const homeTeam = String(match?.home || "").trim();
-        const awayTeam = String(match?.away || "").trim();
+      matches.forEach((match) => {
+        const home = ensureTeam(match?.home);
+        const away = ensureTeam(match?.away);
+        if (!home || !away) return;
 
-        const homeRow = ensureTeam(homeTeam);
-        const awayRow = ensureTeam(awayTeam);
+        const status = getMatchStatus(match);
+        if (status !== "completed") return;
 
-        if (homeRow) {
-          homeRow.matchPoints += getFixtureMatchPoints(match, "home");
-        }
+        home.matchesPlayed += 1;
+        away.matchesPlayed += 1;
 
-        if (awayRow) {
-          awayRow.matchPoints += getFixtureMatchPoints(match, "away");
-        }
-
-        const status = getMatchStatus(match, 0, matchIndex);
-        const countsAsPlayed =
-          status !== "pending" &&
-          isRealLeaderboardTeamName(homeTeam) &&
-          isRealLeaderboardTeamName(awayTeam);
-
-        if (countsAsPlayed) {
-          if (homeRow) homeRow.matchesPlayed += 1;
-          if (awayRow) awayRow.matchesPlayed += 1;
-        }
+        home.matchPoints += Number(getFixtureMatchPoints(match, "home") || 0);
+        away.matchPoints += Number(getFixtureMatchPoints(match, "away") || 0);
       });
 
-      const sorted = [...stats.values()].sort((a, b) => {
-        if (b.matchPoints !== a.matchPoints) return b.matchPoints - a.matchPoints;
-        if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed;
-        return a.teamName.localeCompare(b.teamName);
+      const rows = [...stats.values()].sort((a, b) => {
+        if (Number(b.matchPoints || 0) !== Number(a.matchPoints || 0)) {
+          return Number(b.matchPoints || 0) - Number(a.matchPoints || 0);
+        }
+        if (Number(b.matchesPlayed || 0) !== Number(a.matchesPlayed || 0)) {
+          return Number(b.matchesPlayed || 0) - Number(a.matchesPlayed || 0);
+        }
+        return String(a.teamName || "").localeCompare(String(b.teamName || ""));
       });
 
-      const qualifierCount = Number(getAdvancedSettings()?.qualifierCount || 0) || Math.min(4, sorted.length);
+      const qualifierCount =
+        Number(getAdvancedSettings()?.qualifierCount || 0) || Math.min(4, rows.length);
 
-      return sorted.map((row, index) => ({
+      return rows.map((row, index) => ({
         ...row,
         rank: index + 1,
         qualified: index < qualifierCount,
