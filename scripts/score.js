@@ -372,7 +372,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const categoryBucket = fixturesDoc.categories?.[targetCategoryId];
-      if (Array.isArray(categoryBucket?.matches) && categoryBucket.matches[matchIndex]) {
+
+      // Keep categoryBucket.matches in sync only for league round 0.
+      // For knockout rounds, targetMatch inside categoryBucket.rounds is already updated above.
+      if (
+        Number(roundIndex) === 0 &&
+        Array.isArray(categoryBucket?.matches) &&
+        categoryBucket.matches[matchIndex]
+      ) {
         categoryBucket.matches[matchIndex].status = targetMatch.status;
         if (winnerName) categoryBucket.matches[matchIndex].winner = winnerName;
         else delete categoryBucket.matches[matchIndex].winner;
