@@ -3042,7 +3042,12 @@ try {
             },
             computed: {
               status: aggregateStatus,
-              winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
+              winnerSide:
+                aggregateWinner === homeLabel
+                  ? "A"
+                  : aggregateWinner === awayLabel
+                    ? "B"
+                    : null,
               winnerName: aggregateWinner,
               homeCategoryWins: Number(summary?.homeCategoryWins ?? summary?.homeWins ?? 0),
               awayCategoryWins: Number(summary?.awayCategoryWins ?? summary?.awayWins ?? 0),
