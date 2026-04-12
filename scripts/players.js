@@ -899,11 +899,16 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
 
     function buildTeamLeaderboardRowsFromFixtures() {
       const cat = getTeamEventFixtureBucket();
-      const matches = Array.isArray(cat?.matches)
-        ? cat.matches
-        : Array.isArray(cat?.rounds?.[0])
-          ? cat.rounds[0]
+
+      const leagueSource = Array.isArray(cat?.rounds?.[0])
+        ? cat.rounds[0]
+        : Array.isArray(cat?.matches)
+          ? cat.matches
           : [];
+
+      const matches = leagueSource.filter(
+        (match) => String(match?.stage || "league").toLowerCase() !== "knockout"
+      );
 
       const stats = new Map();
 
