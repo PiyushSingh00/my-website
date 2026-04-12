@@ -3088,7 +3088,19 @@ function renderCaptainsSummary() {
     console.log("TEAM CAT FULL", cat);
     console.log("TEAM CAT KNOCKOUT", cat?.knockout);
     
-    const knockoutMarkup = buildKnockoutBracketMarkup(cat?.knockout, TEAM_EVENT_CATEGORY_ID);
+    const knockoutSource =
+      cat?.knockout ||
+      (
+        Array.isArray(cat?.rounds) && cat.rounds.length > 1
+          ? {
+              rounds: cat.rounds.slice(1),
+              totalRounds: Math.max(0, cat.rounds.length - 1),
+              label: "Knockout",
+            }
+          : null
+      );
+
+    const knockoutMarkup = buildKnockoutBracketMarkup(knockoutSource, TEAM_EVENT_CATEGORY_ID);
 
     fixturesUi.groupsEl.innerHTML = `
       <div class="fixtures-group">
