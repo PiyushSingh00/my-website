@@ -3006,20 +3006,6 @@ try {
               break;
             }
 
-            await patchFixtureStatusInBackend({
-              explicitCategoryId: resolvedCategoryId,
-              roundIndex,
-              matchIndex,
-              scoreIndex: index,
-              status: category.winnerSide ? "completed" : (isCategoryLineupComplete(category) ? "live" : "pending"),
-              winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
-              computed: {
-                status: category.winnerSide ? "completed" : (isCategoryLineupComplete(category) ? "live" : "pending"),
-                winnerSide: category.winnerSide || null,
-                winnerName: category.winnerSide === "A" ? homeLabel : category.winnerSide === "B" ? awayLabel : null,
-              },
-              scorePayload: payload.score,
-            });
           }
         }
 
@@ -3062,15 +3048,6 @@ try {
           await apiPut(candidateUrls[0], aggregatePayload);
         }
 
-        await patchFixtureStatusInBackend({
-          explicitCategoryId: resolvedCategoryId,
-          roundIndex,
-          matchIndex,
-          status: aggregateStatus,
-          winnerName: aggregateWinner,
-          computed: aggregatePayload.score.computed,
-          scorePayload: aggregatePayload.score,
-        });
       } catch (err) {
         console.error(err);
         if (lineupSaveStatusEl) lineupSaveStatusEl.textContent = "Lineup save failed";
@@ -3653,17 +3630,6 @@ try {
       if (!silent) alert(lastError?.message || "Could not save score.");
       return;
     }
-
-    await patchFixtureStatusInBackend({
-      explicitCategoryId: resolvedCategoryId,
-      roundIndex,
-      matchIndex,
-      scoreIndex,
-      status: computed?.status || "pending",
-      winnerName: computed?.winnerName || null,
-      computed,
-      scorePayload: payload.score,
-    });
 
     if (saveMsg) saveMsg.textContent = "Saved";
     suppressIndividualAutoSave = true;
