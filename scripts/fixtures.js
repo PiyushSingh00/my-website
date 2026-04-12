@@ -4,6 +4,7 @@ import { requireAuth, logout } from "./auth.js";
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
+  const TEAM_EVENT_CATEGORY_ID = "__team_event__";
 
   // ---------------------------------------------------------------------------
   // TOPBAR
@@ -91,6 +92,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const backBtn = document.getElementById("fixtures-back-btn");
   const generateBtn = document.getElementById("fixtures-generate-btn");
+  const undoBtn = document.getElementById("fixtures-undo-btn");
+  const progressionBtn = document.getElementById("fixtures-go-knockout-btn");
   const toastEl = document.getElementById("fixtures-toast");
   const noneSelectedEl = document.getElementById("fixtures-none-selected");
   const toggleWrap = document.getElementById("fixtures-toggle");
@@ -405,6 +408,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function isLeagueModeActive() {
+    const advanced = safeJson(tournamentMeta?.advancedSettings, tournamentMeta?.advancedSettings) || {};
+    return (
+      tournamentMeta?.stageFormat === "number_draw_league_knockout" ||
+      advanced?.advancedMode === "pickleball_team_league"
+    );
+  }
+
+  function updateFixtureActionButtons() {
+    if (generateBtn) generateBtn.disabled = false;
+    if (undoBtn) {
+      const hasFixtures = Boolean(fixtures?.categories && Object.keys(fixtures.categories).length);
+      undoBtn.disabled = !hasFixtures;
+    }
+    if (progressionBtn) {
+      progressionBtn.style.display = isLeagueModeActive() ? "inline-flex" : "none";
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // LOADERS
   // ---------------------------------------------------------------------------
@@ -494,6 +516,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     datesEl.textContent = tournamentMeta?.tournamentDates || "";
     codeEl.textContent = tournamentMeta?.accessCode || "";
     updatePageModeCopy();
+    updateFixtureActionButtons();
   }
 
   function renderCategoryToggles() {
@@ -647,17 +670,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    const advanced =
-      safeJson(tournamentMeta?.advancedSettings, tournamentMeta?.advancedSettings) || {};
-
-    const isLeagueMode =
-      tournamentMeta?.stageFormat === "number_draw_league_knockout" ||
-      advanced?.advancedMode === "pickleball_team_league";
+    const isLeagueMode = isLeagueModeActive();
+    const requestCategoryId =
+      String(tournamentMeta?.tournamentType || "").toLowerCase() === "team"
+        ? TEAM_EVENT_CATEGORY_ID
+        : categoryId;
 
     if (isLeagueMode) {
       const r = await apiPost(
         `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/generate-league`,
-        { categoryId }
+        { categoryId: requestCategoryId }
       );
 
       if (!r.ok) {
@@ -667,7 +689,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       fixtures = r.data?.fixtures || r.data || fixtures;
       fixtures.__locked = true;
-      generateBtn.disabled = true;
+      generateBtn.disabled = false;
       editMode = false;
       setEditUI();
       showToast("League ties generated");
@@ -749,10 +771,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     fixtures = saved;
     fixtures.__locked = true;
-    generateBtn.disabled = true;
+    generateBtn.disabled = false;
     editMode = false;
     setEditUI();
     showToast("Fixtures generated");
+    updateFixtureActionButtons();
 
     renderCategoryToggles();
     if (activeCategoryId) renderCategoryBracket(activeCategoryId);
@@ -762,13 +785,54 @@ document.addEventListener("DOMContentLoaded", async () => {
     await generateCategoryFixturesFromBackend(activeCategoryId);
   });
 
+  undoBtn?.addEventListener("click", async () => {
+    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/undo`, {});
+    if (!r.ok) {
+      showToast(r.data?.message || "Could not restore previous fixture");
+      return;
+    }
+    fixtures = migrateFixtures(r.data?.fixtures || fixtures || { categories: {} });
+    fixtures.__locked = true;
+    editMode = false;
+    setEditUI();
+    updateFixtureActionButtons();
+    renderCategoryToggles();
+    if (activeCategoryId) renderCategoryBracket(activeCategoryId);
+    showToast(r.data?.message || "Previous fixture restored");
+  });
+
+  progressionBtn?.addEventListener("click", async () => {
+    if (!isLeagueModeActive()) {
+      showToast("Progression refresh is only available for league knockout fixtures");
+      return;
+    }
+    const r = await apiPost(
+      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/progression/finalize`,
+      {
+        categoryId:
+          String(tournamentMeta?.tournamentType || "").toLowerCase() === "team"
+            ? TEAM_EVENT_CATEGORY_ID
+            : (activeCategoryId || categories?.[0]?.categoryId || categories?.[0]?.id || ""),
+      }
+    );
+    if (!r.ok) {
+      showToast(r.data?.message || "Could not regenerate progression");
+      return;
+    }
+    fixtures = migrateFixtures(r.data?.fixtures || fixtures || { categories: {} });
+    fixtures.__locked = true;
+    editMode = false;
+    setEditUI();
+    updateFixtureActionButtons();
+    renderCategoryToggles();
+    if (activeCategoryId) renderCategoryBracket(activeCategoryId);
+    showToast(r.data?.message || "Progression regenerated");
+  });
+
   editBtn?.addEventListener("click", async () => {
     if (!fixtures?.__locked) return;
 
-    const advanced = safeJson(tournamentMeta?.advancedSettings, tournamentMeta?.advancedSettings) || {};
-    const isLeagueMode =
-      tournamentMeta?.stageFormat === "number_draw_league_knockout" ||
-      advanced?.advancedMode === "pickleball_team_league";
+    const isLeagueMode = isLeagueModeActive();
 
     if (isLeagueMode) {
       showToast("Edit flow for league ties is not enabled yet.");
@@ -831,6 +895,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else {
     fixtures = { categories: {} };
   }
+  updateFixtureActionButtons();
 
   await loadScoringSchema();
 
@@ -846,8 +911,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderCategoryBracket(activeCategoryId);
   }
 
-  if (fixtures?.__locked) {
-    generateBtn.disabled = true;
-  }
+  generateBtn.disabled = false;
   setEditUI();
 });
