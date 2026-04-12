@@ -3071,6 +3071,8 @@ function renderCaptainsSummary() {
         : [];
 
     if (!matches.length) {
+      console.log("TEAM CAT FULL", cat);
+      console.log("TEAM CAT KNOCKOUT", cat?.knockout);
       fixturesUi.groupsEl.innerHTML = `
         <div class="empty-state" style="display:flex;">
           <div class="feature-icon">🗓️</div>
