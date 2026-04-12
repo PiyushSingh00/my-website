@@ -2773,7 +2773,7 @@ function renderCaptainsSummary() {
   return null;
 }
 
-  async function persistFixturesState() {
+  async function persistFixturesState(options = {}) {
     const categoryId = isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : fixturesState.activeCategoryId;
     const activeBucket =
       categoryId && fixturesState.fixtures?.categories
@@ -2783,7 +2783,9 @@ function renderCaptainsSummary() {
     const r = activeBucket
       ? await apiPost(
           `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/category-update`,
-          { categoryId, bucket: activeBucket }
+          options.edits?.length
+            ? { categoryId, edits: options.edits }
+            : { categoryId, bucket: activeBucket }
         )
       : await apiPost(
           `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
@@ -3258,6 +3260,7 @@ function renderCaptainsSummary() {
 
     const root = fixturesUi.groupsEl;
     const rounds = Array.isArray(cat.rounds) ? cat.rounds : [];
+    const edits = [];
 
     rounds.forEach((round, roundIndex) => {
       if (!Array.isArray(round)) return;
@@ -3275,6 +3278,15 @@ function renderCaptainsSummary() {
         match.date = date;
         match.time = time;
         match.court = court;
+        edits.push({
+          roundIndex,
+          matchIndex,
+          home,
+          away,
+          date,
+          time,
+          court,
+        });
       });
     });
 
@@ -3290,7 +3302,7 @@ function renderCaptainsSummary() {
     }
     cat.totalRounds = rounds.length;
 
-    await persistFixturesState();
+    await persistFixturesState({ edits });
     fixturesState.bulkEditMode = false;
     renderTeamEventScheduleTable(getTeamEventFixtureBucket());
     showToast("Fixtures updated");
