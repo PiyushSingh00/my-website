@@ -2,6 +2,13 @@
 console.log("🔥 home.js loaded");
 console.log("🚨 HOME.JS VERSION = PROD_NO_8080");
 
+function cacheAuthenticatedUser(user) {
+  if (!user || typeof user !== "object") return;
+  try {
+    localStorage.setItem("scheduleit_user", JSON.stringify(user));
+    localStorage.setItem("scheduleit_user_cached_at", String(Date.now()));
+  } catch {}
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const COUNTRY_CODES = [
@@ -312,15 +319,8 @@ function setForgotPasswordStatus(message = "", type = "") {
         }
 
         localStorage.setItem("token", result.token);
-
-        // 🔍 Ask backend who the user is
-        const meRes = await fetch("/api/me", {
-          headers: {
-            Authorization: "Bearer " + result.token
-          }
-        });
-
-        const me = await meRes.json();
+        cacheAuthenticatedUser(result.user || null);
+        const me = result.user || { mode: "player" };
 
         // 🚦 Role-based redirect
         if (me.mode === "host") window.location.href = "host.html";

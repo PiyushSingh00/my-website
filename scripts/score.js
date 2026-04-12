@@ -282,17 +282,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   function getTeamAggregateWinner(summary, status) {
     if (status !== "completed") return null;
 
-    const homeCategoryWins = Number(summary?.homeCategoryWins ?? summary?.homeWins ?? 0);
-    const awayCategoryWins = Number(summary?.awayCategoryWins ?? summary?.awayWins ?? 0);
-
-    if (homeCategoryWins > awayCategoryWins) return homeLabel;
-    if (awayCategoryWins > homeCategoryWins) return awayLabel;
-
     const homeMatchPoints = Number(summary?.homeMatchPoints ?? summary?.homePoints ?? 0);
     const awayMatchPoints = Number(summary?.awayMatchPoints ?? summary?.awayPoints ?? 0);
 
     if (homeMatchPoints > awayMatchPoints) return homeLabel;
     if (awayMatchPoints > homeMatchPoints) return awayLabel;
+
+    const homeCategoryWins = Number(summary?.homeCategoryWins ?? summary?.homeWins ?? 0);
+    const awayCategoryWins = Number(summary?.awayCategoryWins ?? summary?.awayWins ?? 0);
+
+    if (homeCategoryWins > awayCategoryWins) return homeLabel;
+    if (awayCategoryWins > homeCategoryWins) return awayLabel;
 
     return null;
   }
@@ -3042,7 +3042,12 @@ try {
             },
             computed: {
               status: aggregateStatus,
-              winnerSide: summary.homeWins > summary.awayWins ? "A" : summary.awayWins > summary.homeWins ? "B" : null,
+              winnerSide:
+                aggregateWinner === homeLabel
+                  ? "A"
+                  : aggregateWinner === awayLabel
+                    ? "B"
+                    : null,
               winnerName: aggregateWinner,
               homeCategoryWins: Number(summary?.homeCategoryWins ?? summary?.homeWins ?? 0),
               awayCategoryWins: Number(summary?.awayCategoryWins ?? summary?.awayWins ?? 0),
