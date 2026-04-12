@@ -3064,11 +3064,15 @@ function renderCaptainsSummary() {
   }
 
   function renderTeamEventScheduleTable(cat) {
-    const matches = Array.isArray(cat?.matches)
+    const sourceMatches = Array.isArray(cat?.matches)
       ? cat.matches
       : Array.isArray(cat?.rounds?.[0])
         ? cat.rounds[0]
         : [];
+
+    const matches = sourceMatches.filter(
+      (match) => String(match?.stage || "league").toLowerCase() !== "knockout"
+    );
 
     if (!matches.length) {
       fixturesUi.groupsEl.innerHTML = `
