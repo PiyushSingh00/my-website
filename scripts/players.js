@@ -147,7 +147,6 @@ const playersListSection = document.getElementById("players-list-section");
 
   const fixturesEmbed = document.getElementById("fixtures-embed");
   const fixturesGenerateBtn = document.getElementById("fixtures-generate-btn");
-  const fixturesUndoBtn = document.getElementById("fixtures-undo-btn");
   const fixturesGoKnockoutBtn = document.getElementById("fixtures-go-knockout-btn");
   const fixturesConfigureBtn = document.getElementById("fixtures-configure-fields-btn");
   const fixturesEditBtn = document.getElementById("fixtures-edit-btn");
@@ -200,7 +199,6 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
   const fixturesUi = {
     wrap: fixturesEmbed,
     generateBtn: fixturesGenerateBtn,
-    undoBtn: fixturesUndoBtn,
     configureBtn: fixturesConfigureBtn,
     editBtn: fixturesEditBtn,
     toggleWrap: fixturesToggle,
@@ -1070,7 +1068,7 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
   function canGenerateKnockout(cat) {
     if (!cat || !isLeagueKnockoutFormat()) return false;
     const matches = Array.isArray(cat.matches) ? cat.matches : Array.isArray(cat.rounds?.[0]) ? cat.rounds[0] : [];
-    if (!matches.length) return false;
+    if (!matches.length || cat.knockout) return false;
     return matches.every((match, index) => getMatchStatus(match, 0, index) === "completed");
   }
 
@@ -1078,15 +1076,6 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
     if (!fixturesGoKnockoutBtn) return;
     const show = Boolean(isTournamentTeamEvent() && isLeagueKnockoutFormat() && canGenerateKnockout(cat));
     fixturesGoKnockoutBtn.classList.toggle("hidden", !show);
-  }
-
-  function updateUndoFixtureButtonState() {
-    if (!fixturesUi.undoBtn) return;
-    const hasAnyFixtures = Boolean(
-      fixturesState.fixtures?.categories &&
-      Object.keys(fixturesState.fixtures.categories).length
-    );
-    fixturesUi.undoBtn.disabled = !hasAnyFixtures;
   }
 
   function updateFixturesEditButtonState() {
@@ -2773,27 +2762,10 @@ function renderCaptainsSummary() {
   return null;
 }
 
-  async function persistFixturesState(options = {}) {
-    const categoryId = isTournamentTeamEvent() ? TEAM_EVENT_CATEGORY_ID : fixturesState.activeCategoryId;
-    const activeBucket =
-      categoryId && fixturesState.fixtures?.categories
-        ? fixturesState.fixtures.categories[categoryId]
-        : null;
-
-    const r = activeBucket
-      ? await apiPost(
-          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/category-update`,
-          options.edits?.length
-            ? { categoryId, edits: options.edits }
-            : { categoryId, bucket: activeBucket }
-        )
-      : await apiPost(
-          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`,
-          fixturesState.fixtures || { categories: {} }
-        );
-
+  async function persistFixturesState() {
+    const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/update`, fixturesState.fixtures || { categories: {} });
     if (!r.ok) throw new Error(r.data?.message || "Failed to save fixtures");
-    fixturesState.fixtures = migrateFixtures(r.data?.fixtures || r.data || fixturesState.fixtures || { categories: {} });
+    fixturesState.fixtures = migrateFixtures(r.data || fixturesState.fixtures || { categories: {} });
   }
 
   function migrateFixtures(fixturesObj) {
@@ -3090,18 +3062,17 @@ function renderCaptainsSummary() {
   }
 
   function renderTeamEventScheduleTable(cat) {
-    const rounds = Array.isArray(cat?.rounds) ? cat.rounds : [];
     const sourceMatches = Array.isArray(cat?.matches)
       ? cat.matches
-      : Array.isArray(rounds?.[0])
-        ? rounds[0]
+      : Array.isArray(cat?.rounds?.[0])
+        ? cat.rounds[0]
         : [];
 
-    const leagueMatches = sourceMatches.filter(
+    const matches = sourceMatches.filter(
       (match) => String(match?.stage || "league").toLowerCase() !== "knockout"
     );
 
-    if (!leagueMatches.length) {
+    if (!matches.length) {
       fixturesUi.groupsEl.innerHTML = `
         <div class="empty-state" style="display:flex;">
           <div class="feature-icon">🗓️</div>
@@ -3115,115 +3086,23 @@ function renderCaptainsSummary() {
     }
 
     const editing = Boolean(fixturesState.bulkEditMode);
+
+    console.log("TEAM CAT FULL", cat);
+    console.log("TEAM CAT KNOCKOUT", cat?.knockout);
     
     const knockoutSource =
       cat?.knockout ||
       (
-        Array.isArray(rounds) && rounds.length > 1
+        Array.isArray(cat?.rounds) && cat.rounds.length > 1
           ? {
-              rounds: rounds.slice(1),
-              totalRounds: Math.max(0, rounds.length - 1),
+              rounds: cat.rounds.slice(1),
+              totalRounds: Math.max(0, cat.rounds.length - 1),
               label: "Knockout",
             }
           : null
       );
 
-    const renderMatchRow = (match, roundIndex, matchIndex, matchNoLabel = "—") => {
-      const team1Cell = editing
-        ? `
-          <select class="schedule-edit-input" data-edit-field="home" data-round-index="${roundIndex}" data-match-index="${matchIndex}">
-            <option value="">Select team</option>
-            ${buildTeamNameSelectOptions(match.home || "")}
-          </select>
-        `
-        : escapeHtml(match.home || "—");
-
-      const team2Cell = editing
-        ? `
-          <select class="schedule-edit-input" data-edit-field="away" data-round-index="${roundIndex}" data-match-index="${matchIndex}">
-            <option value="">Select team</option>
-            ${buildTeamNameSelectOptions(match.away || "")}
-          </select>
-        `
-        : escapeHtml(match.away || "—");
-
-      const dateCell = editing
-        ? `<input class="schedule-edit-input" type="date" data-edit-field="date" data-round-index="${roundIndex}" data-match-index="${matchIndex}" value="${escapeHtml(match.date || "")}" />`
-        : escapeHtml(match.date || "—");
-
-      const timeCell = editing
-        ? `<input class="schedule-edit-input" type="time" data-edit-field="time" data-round-index="${roundIndex}" data-match-index="${matchIndex}" value="${escapeHtml(match.time || "")}" />`
-        : escapeHtml(match.time || "—");
-
-      const courtCell = editing
-        ? `<input class="schedule-edit-input" type="text" data-edit-field="court" data-round-index="${roundIndex}" data-match-index="${matchIndex}" value="${escapeHtml(match.court || "")}" placeholder="Court name" />`
-        : escapeHtml(match.court || "—");
-
-      const status = getMatchStatus(match, roundIndex, matchIndex);
-      const canScore =
-        !editing &&
-        String(match.home || "").toUpperCase() !== "BYE" &&
-        String(match.away || "").toUpperCase() !== "BYE" &&
-        String(match.home || "").toUpperCase() !== "TBD" &&
-        String(match.away || "").toUpperCase() !== "TBD";
-
-      return `
-        <tr>
-          <td>${escapeHtml(matchNoLabel)}</td>
-          <td>${team1Cell}</td>
-          <td>${team2Cell}</td>
-          <td>${dateCell}</td>
-          <td>${timeCell}</td>
-          <td>${courtCell}</td>
-          <td>${getStatusPillMarkup(status)}</td>
-          <td>
-            <div class="row-actions">
-              ${editing
-                ? `<span class="captain-summary-meta">Editing…</span>`
-                : canScore
-                  ? `<button type="button" class="action-btn accept start-scoring-btn" data-tournament-id="${escapeHtml(tournamentId)}" data-category-id="${escapeHtml(TEAM_EVENT_CATEGORY_ID)}" data-round="${roundIndex}" data-match="${matchIndex}">Start scoring</button>`
-                  : `<span class="captain-summary-meta">—</span>`}
-            </div>
-          </td>
-        </tr>
-      `;
-    };
-
-    const leagueRows = leagueMatches.map((match, index) => renderMatchRow(match, 0, index, match.matchNo || index + 1)).join("");
-
-    const knockoutEditSections = editing && knockoutSource?.rounds?.length
-      ? knockoutSource.rounds.map((round, knockoutRoundIndex) => {
-          const roundIndex = knockoutRoundIndex + 1;
-          const rowsHtml = (Array.isArray(round) ? round : [])
-            .map((match, matchIndex) => renderMatchRow(match, roundIndex, matchIndex, `K${roundIndex}.${matchIndex + 1}`))
-            .join("");
-
-          return `
-            <div class="fixtures-group" style="margin-top: 18px;">
-              <h3 class="fixtures-group-title">${escapeHtml(getRoundLabel(knockoutRoundIndex, knockoutSource.totalRounds || knockoutSource.rounds.length))}</h3>
-              <div class="players-table-wrapper">
-                <table class="players-table">
-                  <thead>
-                    <tr>
-                      <th>Match no</th>
-                      <th>Team 1</th>
-                      <th>Team 2</th>
-                      <th>Date</th>
-                      <th>Time</th>
-                      <th>Court</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>${rowsHtml}</tbody>
-                </table>
-              </div>
-            </div>
-          `;
-        }).join("")
-      : "";
-
-    const knockoutMarkup = editing ? knockoutEditSections : buildKnockoutBracketMarkup(knockoutSource, TEAM_EVENT_CATEGORY_ID);
+    const knockoutMarkup = buildKnockoutBracketMarkup(knockoutSource, TEAM_EVENT_CATEGORY_ID);
 
     fixturesUi.groupsEl.innerHTML = `
       <div class="fixtures-group">
@@ -3243,7 +3122,56 @@ function renderCaptainsSummary() {
               </tr>
             </thead>
             <tbody>
-              ${leagueRows}
+              ${matches.map((match, index) => {
+                const team1Cell = editing
+                  ? `
+                    <select class="schedule-edit-input" data-edit-field="home" data-index="${index}">
+                      <option value="">Select team</option>
+                      ${buildTeamNameSelectOptions(match.home || "")}
+                    </select>
+                  `
+                  : escapeHtml(match.home || "—");
+
+                const team2Cell = editing
+                  ? `
+                    <select class="schedule-edit-input" data-edit-field="away" data-index="${index}">
+                      <option value="">Select team</option>
+                      ${buildTeamNameSelectOptions(match.away || "")}
+                    </select>
+                  `
+                  : escapeHtml(match.away || "—");
+                const dateCell = editing
+                  ? `<input class="schedule-edit-input" type="date" data-edit-field="date" data-index="${index}" value="${escapeHtml(match.date || "")}" />`
+                  : escapeHtml(match.date || "—");
+                const timeCell = editing
+                  ? `<input class="schedule-edit-input" type="time" data-edit-field="time" data-index="${index}" value="${escapeHtml(match.time || "")}" />`
+                  : escapeHtml(match.time || "—");
+                const courtCell = editing
+                  ? `<input class="schedule-edit-input" type="text" data-edit-field="court" data-index="${index}" value="${escapeHtml(match.court || "")}" placeholder="Court name" />`
+                  : escapeHtml(match.court || "—");
+                const status = getMatchStatus(match, 0, index);
+                const canScore = !editing && String(match.home || '').toUpperCase() !== 'BYE' && String(match.away || '').toUpperCase() !== 'BYE' && String(match.home || '').toUpperCase() !== 'TBD' && String(match.away || '').toUpperCase() !== 'TBD';
+                return `
+                  <tr>
+                    <td>${escapeHtml(match.matchNo || index + 1)}</td>
+                    <td>${team1Cell}</td>
+                    <td>${team2Cell}</td>
+                    <td>${dateCell}</td>
+                    <td>${timeCell}</td>
+                    <td>${courtCell}</td>
+                    <td>${getStatusPillMarkup(status)}</td>
+                    <td>
+                      <div class="row-actions">
+                        ${editing
+                          ? `<span class="captain-summary-meta">Editing…</span>`
+                          : canScore
+                            ? `<button type="button" class="action-btn accept start-scoring-btn" data-tournament-id="${escapeHtml(tournamentId)}" data-category-id="${escapeHtml(TEAM_EVENT_CATEGORY_ID)}" data-round="0" data-match="${index}">Start scoring</button>`
+                            : `<span class="captain-summary-meta">—</span>`}
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join("")}
             </tbody>
           </table>
         </div>
@@ -3258,51 +3186,33 @@ function renderCaptainsSummary() {
     const cat = getTeamEventFixtureBucket();
     if (!cat) return;
 
-    const root = fixturesUi.groupsEl;
-    const rounds = Array.isArray(cat.rounds) ? cat.rounds : [];
-    const edits = [];
+    const matches = Array.isArray(cat.matches)
+      ? cat.matches
+      : Array.isArray(cat.rounds?.[0])
+        ? cat.rounds[0]
+        : [];
 
-    rounds.forEach((round, roundIndex) => {
-      if (!Array.isArray(round)) return;
-      round.forEach((match, matchIndex) => {
-        const home = root?.querySelector(`[data-edit-field="home"][data-round-index="${roundIndex}"][data-match-index="${matchIndex}"]`)?.value?.trim() || match.home || "";
-        const away = root?.querySelector(`[data-edit-field="away"][data-round-index="${roundIndex}"][data-match-index="${matchIndex}"]`)?.value?.trim() || match.away || "";
-        const date = root?.querySelector(`input[data-edit-field="date"][data-round-index="${roundIndex}"][data-match-index="${matchIndex}"]`)?.value || match.date || "";
-        const time = root?.querySelector(`input[data-edit-field="time"][data-round-index="${roundIndex}"][data-match-index="${matchIndex}"]`)?.value || match.time || "";
-        const court = root?.querySelector(`input[data-edit-field="court"][data-round-index="${roundIndex}"][data-match-index="${matchIndex}"]`)?.value?.trim() || match.court || "";
+    matches.forEach((match, index) => {
+      const root = fixturesUi.groupsEl;
+      const home = root?.querySelector(`[data-edit-field="home"][data-index="${index}"]`)?.value?.trim() || match.home || "";
+      const away = root?.querySelector(`[data-edit-field="away"][data-index="${index}"]`)?.value?.trim() || match.away || "";
+      const date = root?.querySelector(`input[data-edit-field="date"][data-index="${index}"]`)?.value || match.date || "";
+      const time = root?.querySelector(`input[data-edit-field="time"][data-index="${index}"]`)?.value || match.time || "";
+      const court = root?.querySelector(`input[data-edit-field="court"][data-index="${index}"]`)?.value?.trim() || match.court || "";
 
-        match.home = home;
-        match.away = away;
-        match.homePlayers = home ? [home] : [];
-        match.awayPlayers = away ? [away] : [];
-        match.date = date;
-        match.time = time;
-        match.court = court;
-        edits.push({
-          roundIndex,
-          matchIndex,
-          home,
-          away,
-          date,
-          time,
-          court,
-        });
-      });
+      match.home = home;
+      match.away = away;
+      match.homePlayers = home ? [home] : [];
+      match.awayPlayers = away ? [away] : [];
+      match.date = date;
+      match.time = time;
+      match.court = court;
     });
 
-    const leagueMatches = Array.isArray(rounds[0]) ? rounds[0] : [];
-    cat.matches = leagueMatches;
-    cat.rounds = rounds;
-    if (cat.knockout && Array.isArray(cat.knockout.rounds)) {
-      cat.knockout = {
-        ...cat.knockout,
-        rounds: rounds.slice(1),
-        totalRounds: Math.max(0, rounds.length - 1),
-      };
-    }
-    cat.totalRounds = rounds.length;
+    cat.matches = matches;
+    cat.rounds = [matches];
 
-    await persistFixturesState({ edits });
+    await persistFixturesState();
     fixturesState.bulkEditMode = false;
     renderTeamEventScheduleTable(getTeamEventFixtureBucket());
     showToast("Fixtures updated");
@@ -3332,7 +3242,6 @@ function renderCaptainsSummary() {
       `;
       updateFixturesEditButtonState();
       updateGoToKnockoutButton(cat);
-      updateUndoFixtureButtonState();
       return;
     }
 
@@ -3367,7 +3276,6 @@ function renderCaptainsSummary() {
     fixturesUi.groupsEl.appendChild(wrapper);
     updateFixturesEditButtonState();
     updateGoToKnockoutButton(cat);
-    updateUndoFixtureButtonState();
   }
 
   function renderCategoryBracket(categoryId) {
@@ -3388,20 +3296,38 @@ function renderCaptainsSummary() {
       }
 
       if (isLeagueKnockoutFormat()) {
-        const r = await apiPost(
-          `/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/generate-league`,
-          { categoryId: TEAM_EVENT_CATEGORY_ID }
-        );
-        if (!r.ok) {
-          showToast(r.data?.message || "Could not regenerate league fixtures");
+        const requestedRounds = getRequestedLeagueRounds() || 1;
+        const { pairs, matchesPerTeam } = buildBalancedLeaguePairs(teams.map((team) => team.teamName), requestedRounds);
+        if (!pairs.length) {
+          showToast("Could not build league fixtures for the selected number of rounds");
           return;
         }
+
+        const scheduledMatches = scheduleLeaguePairs(pairs, shuffle(getAvailableCourtNames()), getTournamentStartDate());
         fixturesState.bulkEditMode = false;
-        fixturesState.fixtures = migrateFixtures(r.data?.fixtures || r.data || fixturesState.fixtures || { categories: {} });
-        await loadLeaderboardFromDb();
-        renderLeaderboard();
-        showToast("League fixtures regenerated");
-        renderTeamEventFixtures();
+        fixturesState.bulkEditMode = false;
+      fixturesState.fixtures = migrateFixtures({
+          tournamentType: "team",
+          teamCategories: tournamentCategories,
+          categories: {
+            [TEAM_EVENT_CATEGORY_ID]: {
+              categoryId: TEAM_EVENT_CATEGORY_ID,
+              label: `League schedule • ${matchesPerTeam} matches per team`,
+              displayMode: "team_schedule",
+              rounds: [scheduledMatches],
+              matches: scheduledMatches,
+              totalRounds: 1,
+            },
+          },
+        });
+
+        try {
+          await persistFixturesState();
+          showToast("League fixtures generated");
+          renderTeamEventFixtures();
+        } catch (err) {
+          alert(err.message || "Could not save league fixtures.");
+        }
         return;
       }
 
@@ -3470,7 +3396,6 @@ function renderCaptainsSummary() {
     showToast("Fixtures regenerated");
     renderCategoryToggles();
     if (fixturesState.activeCategoryId) renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
-    updateUndoFixtureButtonState();
   }
 
   async function generateKnockoutFromLeaderboard() {
@@ -3480,19 +3405,30 @@ function renderCaptainsSummary() {
       return;
     }
 
-    const r = await apiPost(
-      `/api/host/tournaments/${encodeURIComponent(tournamentId)}/progression/finalize`,
-      { categoryId: TEAM_EVENT_CATEGORY_ID }
-    );
-    if (!r.ok) {
-      showToast(r.data?.message || "Could not regenerate progression");
+    const qualifiedRows = getQualifiedLeaderboardRows();
+    const teamNames = qualifiedRows.map((row) => String(row?.teamName || row?.team || "").trim()).filter(Boolean);
+    if (teamNames.length < 2) {
+      showToast("Not enough qualified teams for knockout");
       return;
     }
-    fixturesState.fixtures = migrateFixtures(r.data?.fixtures || fixturesState.fixtures || { categories: {} });
-    await loadLeaderboardFromDb();
-    renderLeaderboard();
+
+    const knockout = buildSeededKnockoutRounds(teamNames);
+    if (!knockout) {
+      showToast("Could not generate knockout schedule");
+      return;
+    }
+
+    knockout.label = `Knockout • ${teamNames.length} qualified teams`;
+    knockout.qualifiedTeams = teamNames;
+    autoAdvanceKnockoutByes(knockout);
+
+    cat.knockout = knockout;
+    const leagueMatches = Array.isArray(cat.matches) ? cat.matches : Array.isArray(cat.rounds?.[0]) ? cat.rounds[0] : [];
+    cat.rounds = [leagueMatches, ...knockout.rounds];
+    cat.totalRounds = cat.rounds.length;
+    await persistFixturesState();
     renderTeamEventFixtures();
-    showToast(r.data?.message || "Progression regenerated");
+    showToast("Knockout schedule created");
   }
 
   async function initFixturesIfNeeded() {
@@ -3520,23 +3456,6 @@ function renderCaptainsSummary() {
 
     fixturesUi.generateBtn?.addEventListener("click", async () => {
       await generateAndSaveFixtures();
-    });
-
-    fixturesUi.undoBtn?.addEventListener("click", async () => {
-      const r = await apiPost(`/api/host/tournaments/${encodeURIComponent(tournamentId)}/fixtures/undo`, {});
-      if (!r.ok) {
-        showToast(r.data?.message || "Could not restore previous fixture");
-        return;
-      }
-      fixturesState.bulkEditMode = false;
-      fixturesState.fixtures = migrateFixtures(r.data?.fixtures || fixturesState.fixtures || { categories: {} });
-      renderCategoryToggles();
-      renderCategoryBracket(fixturesState.activeCategoryId);
-      await loadLeaderboardFromDb();
-      renderLeaderboard();
-      updateFixturesEditButtonState();
-      updateUndoFixtureButtonState();
-      showToast(r.data?.message || "Previous fixture restored");
     });
 
     fixturesGoKnockoutBtn?.addEventListener("click", async () => {
@@ -3574,7 +3493,6 @@ function renderCaptainsSummary() {
       if (!existing) return;
 
       fixturesState.fixtures = migrateFixtures(existing);
-      updateUndoFixtureButtonState();
 
       if (isTournamentTeamEvent()) {
         fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
@@ -3628,7 +3546,6 @@ function renderCaptainsSummary() {
 
       const existing = await loadFixturesFromDb();
       fixturesState.fixtures = existing ? migrateFixtures(existing) : { categories: {} };
-      updateUndoFixtureButtonState();
 
       if (isTournamentTeamEvent()) {
         fixturesState.activeCategoryId = TEAM_EVENT_CATEGORY_ID;
