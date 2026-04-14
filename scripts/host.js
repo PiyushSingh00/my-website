@@ -2731,8 +2731,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   resetWizardState();
-  await Promise.all([
-    loadSports(),
-    loadMyTournaments(),
-  ]);
+  await loadSports();
+  await loadMyTournaments();
 });
