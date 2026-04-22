@@ -1461,19 +1461,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (n === 1) {
       const stageFormat = document.getElementById("w-stage-format")?.value || "";
+      const tournamentType = document.getElementById("w-tournament-type")?.value || "";
+
       if (!stageFormat) {
         alert("Please select the format of tournament.");
         return false;
       }
 
       if (stageFormat === "group_knockout") {
-        const groupCount = document.getElementById("w-group-count")?.value;
+        const groupCount = Number(document.getElementById("w-group-count")?.value || 0);
         if (!groupCount) {
           alert("Please enter number of groups.");
           return false;
         }
         if (!isPowerOfTwo(groupCount)) {
           alert("Number of groups must be a power of 2, like 2, 4, 8 or 16.");
+          return false;
+        }
+        if (groupCount < 2) {
+          alert("Please enter at least 2 groups.");
           return false;
         }
       }
@@ -1485,24 +1491,40 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const advancedMode = advancedModeInput?.value || "";
-        if (advancedMode === "pickleball_team_league" || stageFormat === "round_robin_knockout") {
-          const rrRounds = Number(rrRoundsInput?.value || 0);
-          const qualifiers = Number(qualifierCountInput?.value || 0);
-          const submatches = getEffectiveTieSubmatchCount();
+      if (advancedMode === "pickleball_team_league" || stageFormat === "round_robin_knockout") {
+        const rrRounds = Number(rrRoundsInput?.value || 0);
+        const qualifiers = Number(qualifierCountInput?.value || 0);
+        const submatches = getEffectiveTieSubmatchCount();
 
-          if (!rrRounds || rrRounds < 1) {
-            alert("Please enter the number of league rounds.");
-            return false;
-          }
-          if (!qualifiers || qualifiers < 2) {
-            alert("Please enter how many teams qualify.");
-            return false;
-          }
-          if (!submatches || submatches < 1) {
-            alert("Please enter number of submatches per tie.");
-            return false;
-          }
+        if (!rrRounds || rrRounds < 1) {
+          alert("Please enter the number of league rounds.");
+          return false;
         }
+        if (!qualifiers || qualifiers < 2) {
+          alert("Please enter how many teams qualify.");
+          return false;
+        }
+        if (!submatches || submatches < 1) {
+          alert("Please enter number of submatches per tie.");
+          return false;
+        }
+      }
+
+      if (tournamentType === "team" && stageFormat === "round_robin") {
+        const submatches = getEffectiveTieSubmatchCount();
+        if (!submatches || submatches < 1) {
+          alert("Please enter number of categories/submatches.");
+          return false;
+        }
+      }
+
+      if (tournamentType === "team" && stageFormat === "group_knockout") {
+        const submatches = getEffectiveTieSubmatchCount();
+        if (!submatches || submatches < 1) {
+          alert("Please enter number of categories/submatches.");
+          return false;
+        }
+      }
     }
 
     if (n === 2) {
