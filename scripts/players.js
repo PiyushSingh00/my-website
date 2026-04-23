@@ -1091,20 +1091,37 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
     return matches.every((match, index) => getMatchStatus(match, 0, index) === "completed");
   }
 
-  function updateGoToKnockoutButton(cat = getTeamEventFixtureBucket()) {
+  function updateGoToKnockoutButton(cat = null) {
     if (!fixturesGoKnockoutBtn) return;
 
-    const show = Boolean(
-      isTournamentTeamEvent() &&
-      (
-        (isLeagueKnockoutFormat() && canGenerateKnockout(cat)) ||
-        (isTeamGroupKnockoutFormat() && canGenerateGroupKnockout(cat))
-      )
-    );
+    let show = false;
+
+    if (isTournamentTeamEvent()) {
+      const bucket = cat || getTeamEventFixtureBucket();
+      show = Boolean(
+        bucket &&
+        (
+          (isLeagueKnockoutFormat() && canGenerateKnockout(bucket)) ||
+          (isTeamGroupKnockoutFormat() && canGenerateGroupKnockout(bucket))
+        )
+      );
+    } else {
+      const targetCategoryId = fixturesState.activeCategoryId;
+      const bucket =
+        cat ||
+        (targetCategoryId ? fixturesState.fixtures?.categories?.[targetCategoryId] : null);
+
+      if (bucket) {
+        const format = String(bucket?.stageFormat || tournamentMetaCache?.stageFormat || "").trim();
+        show = Boolean(
+          (format === "round_robin_knockout" && canGenerateCategoryKnockout(bucket)) ||
+          (format === "group_knockout" && canGenerateCategoryGroupKnockout(bucket))
+        );
+      }
+    }
 
     fixturesGoKnockoutBtn.classList.toggle("hidden", !show);
   }
-
   function updateFixturesEditButtonState() {
     if (!fixturesEditBtn) return;
     const cat = getTeamEventFixtureBucket();
@@ -1151,20 +1168,28 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
       return;
     }
 
-    if (isLeagueKnockoutFormat()) {
+    const stageFormat = String(tournamentMetaCache?.stageFormat || "").trim();
+
+    if (stageFormat === "group_knockout") {
       embeddedFixturesHelperTextEl.textContent =
-        "View generated fixtures for each category. League + knockout formats will show league rounds first, followed by knockout progression.";
+        "For individual events in Group + Knockout, every category gets its own groups, round robin fixtures inside each group, and its own knockout qualification.";
       return;
     }
 
-    if (isGroupKnockoutFormat()) {
+    if (stageFormat === "round_robin_knockout") {
       embeddedFixturesHelperTextEl.textContent =
-        "View generated fixtures for each category. Group + knockout uses the created pools first and knockout progression follows later.";
+        "For individual events in Round Robin + Knockout, every category gets its own league schedule first, then qualified entrants move into category-specific knockout fixtures.";
+      return;
+    }
+
+    if (stageFormat === "round_robin") {
+      embeddedFixturesHelperTextEl.textContent =
+        "For individual events in Round Robin, every category gets its own league schedule where all entrants in that category play each other.";
       return;
     }
 
     embeddedFixturesHelperTextEl.textContent =
-      "Fixtures are auto-generated in random order for each category. BYE indicates a free pass to the next round.";
+      "For individual events, fixtures are generated separately for each category.";
   }
 
   async function loadTournamentMeta() {
@@ -2931,6 +2956,7 @@ function renderCaptainsSummary() {
     wrapper.appendChild(roundsWrap);
     fixturesUi.groupsEl.appendChild(wrapper);
     updateFixturesEditButtonState();
+    updateGoToKnockoutButton(cat);
   }
 
   function getPairKey(a, b) {
@@ -3133,6 +3159,150 @@ function renderCaptainsSummary() {
     });
 
     return { rounds: allRounds, groupMeta };
+  }
+
+  function buildScheduledMatchesWithRoster(pairs, teamMap, courtNames, baseDate) {
+    const scheduled = scheduleLeaguePairs(pairs, courtNames, baseDate);
+    return scheduled.map((match) => {
+      const home = String(match?.home || "").trim();
+      const away = String(match?.away || "").trim();
+      return ensureMatchMeta({
+        ...match,
+        type: "match",
+        homePlayers: Array.isArray(teamMap?.[home]) ? [...teamMap[home]] : splitTeamName(home),
+        awayPlayers: Array.isArray(teamMap?.[away]) ? [...teamMap[away]] : splitTeamName(away),
+      });
+    });
+  }
+
+  function buildCategoryGroupRoundRobinSchedule(groups, teamMap, courtNames, baseDate) {
+    const allRounds = [];
+    const groupMeta = [];
+
+    let runningBase = new Date(baseDate.getTime());
+
+    groups.forEach((group) => {
+      const pairs = buildFullRoundRobinPairs(group.teams);
+      const scheduledMatches = buildScheduledMatchesWithRoster(
+        pairs,
+        teamMap,
+        shuffle(courtNames),
+        runningBase
+      );
+
+      allRounds.push(scheduledMatches);
+
+      groupMeta.push({
+        groupIndex: group.groupIndex,
+        groupName: group.groupName,
+        teamNames: [...group.teams],
+        roundIndex: allRounds.length - 1,
+        qualifierCount: 2,
+      });
+
+      if (scheduledMatches.length) {
+        const latestStart = scheduledMatches.reduce((maxTs, match) => {
+          const dateValue = match?.date || match?.matchDate || "";
+          const timeValue = match?.time || match?.matchTime || "09:00";
+          const dt = new Date(`${dateValue}T${timeValue}`);
+          const ts = dt.getTime();
+          return Number.isFinite(ts) ? Math.max(maxTs, ts) : maxTs;
+        }, runningBase.getTime());
+
+        runningBase = new Date(latestStart + 24 * 60 * 60 * 1000);
+      }
+    });
+
+    return { rounds: allRounds, groupMeta };
+  }
+
+  function getGenericGroupLeaderboardRows(cat, roundIndex) {
+    const roundMatches = Array.isArray(cat?.rounds?.[roundIndex]) ? cat.rounds[roundIndex] : [];
+    const stats = new Map();
+
+    function ensureEntrant(name) {
+      const key = String(name || "").trim();
+      if (!key || key === "BYE" || key === "TBD") return null;
+
+      if (!stats.has(key)) {
+        stats.set(key, {
+          teamName: key,
+          rank: 0,
+          matchPoints: 0,
+          matchesPlayed: 0,
+          qualified: false,
+        });
+      }
+
+      return stats.get(key);
+    }
+
+    roundMatches.forEach((match, matchIndex) => {
+      const home = ensureEntrant(match?.home);
+      const away = ensureEntrant(match?.away);
+      if (!home || !away) return;
+
+      const status = getMatchStatus(match, roundIndex, matchIndex);
+      if (status !== "completed") return;
+
+      home.matchesPlayed += 1;
+      away.matchesPlayed += 1;
+
+      home.matchPoints += Number(getFixtureMatchPoints(match, "home") || 0);
+      away.matchPoints += Number(getFixtureMatchPoints(match, "away") || 0);
+    });
+
+    const rows = [...stats.values()].sort((a, b) => {
+      if (Number(b.matchPoints || 0) !== Number(a.matchPoints || 0)) {
+        return Number(b.matchPoints || 0) - Number(a.matchPoints || 0);
+      }
+      if (Number(b.matchesPlayed || 0) !== Number(a.matchesPlayed || 0)) {
+        return Number(b.matchesPlayed || 0) - Number(a.matchesPlayed || 0);
+      }
+      return String(a.teamName || "").localeCompare(String(b.teamName || ""));
+    });
+
+    return rows.map((row, index) => ({
+      ...row,
+      rank: index + 1,
+    }));
+  }
+
+  function getQualifiedEntrantsFromGroups(cat) {
+    const groups = Array.isArray(cat?.groups) ? cat.groups : [];
+    const qualified = [];
+
+    groups.forEach((group) => {
+      const rows = getGenericGroupLeaderboardRows(cat, group.roundIndex);
+      const top = rows.slice(0, Number(group.qualifierCount || 2));
+      top.forEach((row) => {
+        if (row?.teamName) qualified.push(row.teamName);
+      });
+    });
+
+    return qualified;
+  }
+
+  function canGenerateCategoryKnockout(cat) {
+    if (!cat || cat.knockout) return false;
+    const matches = Array.isArray(cat.matches)
+      ? cat.matches
+      : Array.isArray(cat.rounds?.[0])
+        ? cat.rounds[0]
+        : [];
+    if (!matches.length) return false;
+    return matches.every((match, index) => getMatchStatus(match, 0, index) === "completed");
+  }
+
+  function canGenerateCategoryGroupKnockout(cat) {
+    if (!cat || cat.knockout) return false;
+    const groups = Array.isArray(cat?.groups) ? cat.groups : [];
+    if (!groups.length) return false;
+
+    return groups.every((group) => {
+      const matches = Array.isArray(cat?.rounds?.[group.roundIndex]) ? cat.rounds[group.roundIndex] : [];
+      return matches.length && matches.every((match, index) => getMatchStatus(match, group.roundIndex, index) === "completed");
+    });
   }
 
   function isTeamRoundRobinFormat() {
@@ -3654,23 +3824,104 @@ function renderCaptainsSummary() {
       return;
     }
 
-    // INDIVIDUAL EVENT LOGIC (keep category-wise brackets)
+    // SINGLE / INDIVIDUAL EVENT LOGIC
     const categoriesPayload = {};
-    const teamMap = buildPartnerTeamsFromAcceptedPlayers();
+    let createdAny = false;
 
     fixturesState.categories.forEach((category) => {
-      const entrants = getFixtureEntrantsForCategory(category);
-      const bracket = createBracket(entrants, teamMap);
-      if (!bracket) return;
+      const cid = String(category?.categoryId || category?.id || "").trim();
+      if (!cid) return;
 
-      categoriesPayload[category.categoryId] = {
-        categoryId: category.categoryId,
+      const entrantInfo = getFixtureEntrantsForCategory(category);
+      const entrants = Array.isArray(entrantInfo?.entrants) ? entrantInfo.entrants : [];
+      const teamMap = entrantInfo?.teamMap || {};
+      const stageFormat = String(tournamentMetaCache?.stageFormat || "").trim();
+      const courtNames = shuffle(getAvailableCourtNames());
+      const startDate = getTournamentStartDate();
+
+      // SINGLE + ROUND ROBIN
+      if (stageFormat === "round_robin") {
+        const pairs = buildFullRoundRobinPairs(entrants);
+        const scheduledMatches = buildScheduledMatchesWithRoster(pairs, teamMap, courtNames, startDate);
+
+        categoriesPayload[cid] = {
+          categoryId: cid,
+          label: category.label,
+          displayMode: "league_rounds",
+          stageFormat: "round_robin",
+          rounds: [scheduledMatches],
+          matches: scheduledMatches,
+          totalRounds: 1,
+        };
+
+        if (scheduledMatches.length) createdAny = true;
+        return;
+      }
+
+      // SINGLE + GROUP + KNOCKOUT
+      if (stageFormat === "group_knockout") {
+        const requestedGroupCount = Math.max(
+          2,
+          Number(tournamentMetaCache?.groupCount || 0) || 2
+        );
+
+        const groups = chunkTeamsNearlyEqual(entrants, requestedGroupCount)
+          .filter((group) => group.teams.length >= 2);
+
+        const { rounds, groupMeta } = buildCategoryGroupRoundRobinSchedule(
+          groups,
+          teamMap,
+          courtNames,
+          startDate
+        );
+
+        categoriesPayload[cid] = {
+          categoryId: cid,
+          label: category.label,
+          displayMode: "league_rounds",
+          stageFormat: "group_knockout",
+          rounds,
+          matches: rounds[0] || [],
+          totalRounds: rounds.length,
+          groups: groupMeta,
+          knockout: null,
+        };
+
+        if (rounds.some((round) => Array.isArray(round) && round.length)) createdAny = true;
+        return;
+      }
+
+      // SINGLE + ROUND ROBIN + KNOCKOUT
+      if (stageFormat === "round_robin_knockout") {
+        const requestedRounds = getRequestedLeagueRounds() || 1;
+        const { pairs, matchesPerTeam } = buildBalancedLeaguePairs(entrants, requestedRounds);
+        const scheduledMatches = buildScheduledMatchesWithRoster(pairs, teamMap, courtNames, startDate);
+
+        categoriesPayload[cid] = {
+          categoryId: cid,
+          label: `${category.label} • ${matchesPerTeam} matches per entrant`,
+          displayMode: "league_rounds",
+          stageFormat: "round_robin_knockout",
+          rounds: [scheduledMatches],
+          matches: scheduledMatches,
+          totalRounds: 1,
+        };
+
+        if (scheduledMatches.length) createdAny = true;
+        return;
+      }
+
+      // SINGLE FALLBACK => knockout
+      const bracket = createBracket(entrants, teamMap);
+      categoriesPayload[cid] = {
+        categoryId: cid,
         label: category.label,
-        ...bracket,
+        ...(bracket ? bracket : { rounds: [], totalRounds: 0 }),
       };
+      if (bracket) createdAny = true;
     });
 
-    if (!Object.keys(categoriesPayload).length) {
+    if (!createdAny) {
       showToast("Not enough accepted players to generate fixtures");
       return;
     }
@@ -3684,58 +3935,136 @@ function renderCaptainsSummary() {
     try {
       await persistFixturesState();
       showToast("Fixtures regenerated");
-      renderFixtures();
+      renderCategoryToggles();
+      if (fixturesState.activeCategoryId) renderIndividualCategoryFixtures(fixturesState.activeCategoryId);
     } catch (err) {
       alert(err.message || "Could not save fixtures.");
     }
   }
 
   async function generateKnockoutFromLeaderboard() {
-    const cat = getTeamEventFixtureBucket();
+    const targetCategoryId = isTournamentTeamEvent()
+      ? TEAM_EVENT_CATEGORY_ID
+      : fixturesState.activeCategoryId;
+
+    if (!targetCategoryId) {
+      showToast("Select a category first");
+      return;
+    }
+
+    const cat = isTournamentTeamEvent()
+      ? getTeamEventFixtureBucket()
+      : fixturesState.fixtures?.categories?.[targetCategoryId];
+
     if (!cat) {
       showToast("Fixtures not found");
       return;
     }
 
-    let teamNames = [];
+    let entrantNames = [];
 
-    if (isTeamGroupKnockoutFormat()) {
-      if (!canGenerateGroupKnockout(cat)) {
-        showToast("Complete all group matches first");
-        return;
+    if (isTournamentTeamEvent()) {
+      if (isTeamGroupKnockoutFormat()) {
+        if (!canGenerateGroupKnockout(cat)) {
+          showToast("Complete all group matches first");
+          return;
+        }
+        entrantNames = getQualifiedTeamsFromGroups(cat);
+      } else {
+        if (!canGenerateKnockout(cat)) {
+          showToast("Complete all league matches first");
+          return;
+        }
+        const qualifiedRows = getQualifiedLeaderboardRows();
+        entrantNames = qualifiedRows
+          .map((row) => String(row?.teamName || row?.team || "").trim())
+          .filter(Boolean);
       }
-
-      teamNames = getQualifiedTeamsFromGroups(cat);
     } else {
-      if (!cat || !canGenerateKnockout(cat)) {
-        showToast("Complete all league matches first");
-        return;
-      }
+      if (String(cat?.stageFormat || "") === "group_knockout") {
+        if (!canGenerateCategoryGroupKnockout(cat)) {
+          showToast("Complete all group matches first");
+          return;
+        }
+        entrantNames = getQualifiedEntrantsFromGroups(cat);
+      } else {
+        if (!canGenerateCategoryKnockout(cat)) {
+          showToast("Complete all league matches first");
+          return;
+        }
 
-      const qualifiedRows = getQualifiedLeaderboardRows();
-      teamNames = qualifiedRows
-        .map((row) => String(row?.teamName || row?.team || "").trim())
-        .filter(Boolean);
+        const leagueMatches = Array.isArray(cat.matches)
+          ? cat.matches
+          : Array.isArray(cat.rounds?.[0])
+            ? cat.rounds[0]
+            : [];
+
+        const stats = new Map();
+
+        function ensureEntrant(name) {
+          const key = String(name || "").trim();
+          if (!key || key === "BYE" || key === "TBD") return null;
+
+          if (!stats.has(key)) {
+            stats.set(key, {
+              teamName: key,
+              matchPoints: 0,
+              matchesPlayed: 0,
+            });
+          }
+
+          return stats.get(key);
+        }
+
+        leagueMatches.forEach((match, index) => {
+          const home = ensureEntrant(match?.home);
+          const away = ensureEntrant(match?.away);
+          if (!home || !away) return;
+
+          const status = getMatchStatus(match, 0, index);
+          if (status !== "completed") return;
+
+          home.matchesPlayed += 1;
+          away.matchesPlayed += 1;
+          home.matchPoints += Number(getFixtureMatchPoints(match, "home") || 0);
+          away.matchPoints += Number(getFixtureMatchPoints(match, "away") || 0);
+        });
+
+        const rows = [...stats.values()].sort((a, b) => {
+          if (Number(b.matchPoints || 0) !== Number(a.matchPoints || 0)) {
+            return Number(b.matchPoints || 0) - Number(a.matchPoints || 0);
+          }
+          if (Number(b.matchesPlayed || 0) !== Number(a.matchesPlayed || 0)) {
+            return Number(b.matchesPlayed || 0) - Number(a.matchesPlayed || 0);
+          }
+          return String(a.teamName || "").localeCompare(String(b.teamName || ""));
+        });
+
+        const qualifierCount =
+          Number(getAdvancedSettings()?.qualifierCount || 0) || Math.min(4, rows.length);
+
+        entrantNames = rows.slice(0, qualifierCount).map((row) => String(row.teamName || "").trim()).filter(Boolean);
+      }
     }
 
-    if (teamNames.length < 2) {
-      showToast("Not enough qualified teams for knockout");
+    if (entrantNames.length < 2) {
+      showToast("Not enough qualified entrants for knockout");
       return;
     }
 
-    const knockout = buildSeededKnockoutRounds(teamNames);
+    const knockout = buildSeededKnockoutRounds(entrantNames);
     if (!knockout) {
       showToast("Could not generate knockout schedule");
       return;
     }
 
-    knockout.label = `Knockout • ${teamNames.length} qualified teams`;
-    knockout.qualifiedTeams = teamNames;
+    knockout.label = `Knockout • ${entrantNames.length} qualified entrants`;
+    knockout.qualifiedTeams = entrantNames;
     autoAdvanceKnockoutByes(knockout);
 
     cat.knockout = knockout;
 
-    if (isTeamGroupKnockoutFormat()) {
+    if (String(cat?.stageFormat || "") === "group_knockout") {
       cat.rounds = [...(cat.rounds || []), ...knockout.rounds];
     } else {
       const leagueMatches = Array.isArray(cat.matches)
@@ -3749,7 +4078,14 @@ function renderCaptainsSummary() {
     cat.totalRounds = cat.rounds.length;
 
     await persistFixturesState();
-    renderTeamEventFixtures();
+
+    if (isTournamentTeamEvent()) {
+      renderTeamEventFixtures();
+    } else {
+      renderCategoryToggles();
+      renderIndividualCategoryFixtures(targetCategoryId);
+    }
+
     showToast("Knockout schedule created");
   }
 
