@@ -115,6 +115,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const teamOverallHomePoints = document.getElementById("team-overall-home-points");
   const teamOverallAwayPoints = document.getElementById("team-overall-away-points");
   const teamOverallSub = document.getElementById("team-overall-sub");
+  const teamOverallBoard = document.getElementById("team-overall-board");
   const toggleLineupReviewBtn = document.getElementById("toggle-lineup-review");
   const teamLineupToggleText = document.getElementById("team-lineup-toggle-text");
   const lockTeamScoresBtn = document.getElementById("lock-team-scores-btn");
@@ -2579,8 +2580,12 @@ try {
   const homeLabel = match?.home ?? "Home";
   const awayLabel = match?.away ?? "Away";
   const isTeamEvent = detectTeamEvent(fixtures);
+  const tournamentSportKeyGlobal = detectEffectiveSportKey(fixtures);
+  const isPickleballTournament = tournamentSportKeyGlobal === "pickleball";
+  // Individual pickleball: use team-event shell without lineup, just pickleball scoring
+  const isIndividualPickleball = isPickleballTournament && !isTeamEvent;
 
-  if (isTeamEvent) {
+  if (isTeamEvent || isIndividualPickleball) {
     await loadTeamRosterLookup();
   }
 
@@ -2594,7 +2599,7 @@ try {
   if (String(homeLabel).toUpperCase() === "BYE" || String(awayLabel).toUpperCase() === "BYE") {
     titleEl.textContent = `${homeLabel} vs ${awayLabel}`;
     subEl.textContent = `Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
-    if (isTeamEvent) showTeamEventShell();
+    if (isTeamEvent || isIndividualPickleball) showTeamEventShell();
     statusPill?.classList.add("error");
     if (statusPill) statusPill.innerHTML = `Status: <strong>BYE</strong>`;
     if (winnerPill) winnerPill.innerHTML = `Winner: <strong>-</strong>`;
@@ -2603,21 +2608,76 @@ try {
     return;
   }
 
-  if (isTeamEvent) {
+  if (isTeamEvent || isIndividualPickleball) {
     showTeamEventShell();
 
+    // For individual pickleball: hide the lineup review panel and overall board entirely
+    if (isIndividualPickleball) {
+      lineupReviewPanel?.classList.add("hidden");
+      teamOverallBoard?.classList.add("hidden");
+    }
+
     titleEl.textContent = `${homeLabel} vs ${awayLabel}`;
-    subEl.textContent = `Team event • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
+    subEl.textContent = isIndividualPickleball
+      ? `Pickleball • Round ${roundIndex + 1} • Match ${matchIndex + 1}`
+      : `Team event • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
 
     if (teamOverallHomeName) teamOverallHomeName.textContent = homeLabel;
     if (teamOverallAwayName) teamOverallAwayName.textContent = awayLabel;
     if (teamOverallSub) {
-      teamOverallSub.textContent = "Cumulative match points are shown prominently. Category wins are shown below.";
+      teamOverallSub.textContent = isIndividualPickleball
+        ? "Pickleball match score."
+        : "Cumulative match points are shown prominently. Category wins are shown below.";
     }
 
-    const teamTieState = loadTeamTieState(match, fixtures);
-    hydrateTeamTieStateFromMatch(match, teamTieState, fixtures);
-    await refreshLatestTeamRostersIntoState(match, teamTieState);
+    let teamTieState;
+    if (isIndividualPickleball) {
+      // Build a synthetic single-category team tie state for individual pickleball
+      // — players are the match home/away directly, no lineup needed
+      const storedState = loadTeamTieState(match, fixtures);
+      if (storedState && storedState.categories?.length === 1 && storedState.categories[0].sportKey === "pickleball") {
+        teamTieState = storedState;
+      } else {
+        teamTieState = {
+          homeRoster: [homeLabel],
+          awayRoster: [awayLabel],
+          tournamentSportKey: "pickleball",
+          tieLocked: false,
+          lineupCollapsed: false,
+          categories: [{
+            id: "singles",
+            name: "Match",
+            slotCount: 1,
+            homePlayersSelected: [homeLabel],
+            awayPlayersSelected: [awayLabel],
+            homePlayer: homeLabel,
+            awayPlayer: awayLabel,
+            lineupStatus: "accepted",
+            notes: "",
+            homeScore: 0,
+            awayScore: 0,
+            winnerSide: null,
+            isScoringOpen: true,
+            categoryLocked: false,
+            sportKey: "pickleball",
+            sportData: cloneDefaultPresetSportData("pickleball", fixtures),
+          }],
+        };
+        // Merge any existing saved state
+        const saved = loadTeamTieState(match, fixtures);
+        if (saved?.categories?.[0]?.sportKey === "pickleball") {
+          teamTieState.categories[0].sportData = saved.categories[0].sportData || teamTieState.categories[0].sportData;
+          teamTieState.categories[0].winnerSide = saved.categories[0].winnerSide || null;
+          teamTieState.categories[0].categoryLocked = Boolean(saved.categories[0].categoryLocked);
+          teamTieState.tieLocked = Boolean(saved.tieLocked);
+        }
+      }
+      hydrateTeamTieStateFromMatch(match, teamTieState, fixtures);
+    } else {
+      teamTieState = loadTeamTieState(match, fixtures);
+      hydrateTeamTieStateFromMatch(match, teamTieState, fixtures);
+      await refreshLatestTeamRostersIntoState(match, teamTieState);
+    }
 
     const tieId = getStableTieId(match, resolvedCategoryId);
 
