@@ -693,6 +693,7 @@ function mergeUniqueRoster(...sources) {
     if (value.includes("pickle")) return "pickleball";
     if (value.includes("badminton")) return "badminton";
     if (value.includes("tennis")) return "tennis";
+    if (value.includes("volleyball") || value.includes("volley")) return "volleyball";
     if (value.includes("football") || value.includes("soccer")) return "football";
     if (value.includes("cricket")) return "cricket";
     return value;
@@ -884,7 +885,7 @@ function mergeUniqueRoster(...sources) {
   }
 
   function hasPresetSportSchema(sportKey) {
-    return ["cricket", "badminton", "tennis", "pickleball", "football"].includes(sportKey);
+    return ["cricket", "badminton", "tennis", "pickleball", "football", "volleyball"].includes(sportKey);
   }
 
   function createDefaultPresetSportData(sportKey, rawFixtures) {
@@ -923,6 +924,10 @@ function mergeUniqueRoster(...sources) {
 
     if (sportKey === "pickleball") {
       return createDefaultPickleballTeamData(rawFixtures);
+    }
+
+    if (sportKey === "volleyball") {
+      return createDefaultVolleyballData();
     }
 
     if (sportKey === "tennis") {
@@ -1127,8 +1132,7 @@ function mergeUniqueRoster(...sources) {
     }
 
     if (category.sportKey === "pickleball") {
-      const pb = ensurePickleballTeamData(category.sportData, fixtures);
-      const currentSet =
+      const pb = ensurePickleballTeamData(category.sportData, fixtures);      const currentSet =
         Number.isInteger(pb.currentSetIndex) && pb.sets[pb.currentSetIndex]
           ? pb.sets[pb.currentSetIndex]
           : null;
@@ -1161,6 +1165,31 @@ function mergeUniqueRoster(...sources) {
         chipClass: "category-result-chip pending",
         text: "Awaiting toss, first server & first receiver",
       };
+    }
+
+    if (category.sportKey === "badminton") {
+      const bd = ensureBadmintonData(category.sportData);
+      const currentGame = Number.isInteger(bd.currentGameIndex) ? bd.games[bd.currentGameIndex] : null;
+      if (currentGame && currentGame.started && !currentGame.completed) {
+        return { chipClass: "category-result-chip pending", text: `Game ${currentGame.number} live • Serve: ${safeText(currentGame.currentServerName, currentGame.currentServer === "A" ? homeTeamLabel : awayTeamLabel)}` };
+      }
+      const { aWins, bWins } = getBadmintonGameWins(bd);
+      if (aWins > 0 || bWins > 0) return { chipClass: "category-result-chip pending", text: `Games ${aWins}-${bWins}` };
+      if (bd.tossWinner && bd.startingServer) return { chipClass: "category-result-chip pending", text: "Ready to start game 1" };
+      return { chipClass: "category-result-chip pending", text: "Awaiting toss & first server" };
+    }
+
+    if (category.sportKey === "volleyball") {
+      const vb = ensureVolleyballData(category.sportData);
+      const currentSet = Number.isInteger(vb.currentSetIndex) ? vb.sets[vb.currentSetIndex] : null;
+      if (currentSet && currentSet.started && !currentSet.completed) {
+        return { chipClass: "category-result-chip pending", text: `Set ${currentSet.number} live • ${currentSet.homePoints}-${currentSet.awayPoints}` };
+      }
+      const { aWins, bWins } = getVolleyballSetWins(vb);
+      if (aWins > 0 || bWins > 0) return { chipClass: "category-result-chip pending", text: `Sets ${aWins}-${bWins}` };
+      if (!vb.rotationSetupDone) return { chipClass: "category-result-chip pending", text: "Set up rotation order" };
+      if (vb.tossWinner && vb.startingServer) return { chipClass: "category-result-chip pending", text: "Ready to start set 1" };
+      return { chipClass: "category-result-chip pending", text: "Awaiting toss & serving team" };
     }
 
     return { chipClass: "category-result-chip pending", text: "Ready to score" };
@@ -1995,6 +2024,10 @@ normalized.awayRoster = mergeUniqueRoster(
 
     if (target.sportKey === "pickleball") {
       target.sportData = ensurePickleballTeamData(snapshot.sportData, rawFixtures);
+    } else if (target.sportKey === "badminton") {
+      target.sportData = ensureBadmintonData(snapshot.sportData);
+    } else if (target.sportKey === "volleyball") {
+      target.sportData = ensureVolleyballData(snapshot.sportData);
     } else {
       target.sportData =
         snapshot?.sportData ??
@@ -2041,6 +2074,10 @@ teamTieState.awayRoster = mergeUniqueRoster(teamTieState.awayRoster, awayUsage);
 
       if (category.sportKey === "pickleball") {
         category.sportData = ensurePickleballTeamData(category.sportData, rawFixtures);
+      } else if (category.sportKey === "badminton") {
+        category.sportData = ensureBadmintonData(category.sportData);
+      } else if (category.sportKey === "volleyball") {
+        category.sportData = ensureVolleyballData(category.sportData);
       }
 
       syncCategoryPlayerStrings(category);
@@ -2085,6 +2122,10 @@ teamTieState.awayRoster = mergeUniqueRoster(
 
       if (category.sportKey === "pickleball") {
         category.sportData = ensurePickleballTeamData(category.sportData, rawFixtures);
+      } else if (category.sportKey === "badminton") {
+        category.sportData = ensureBadmintonData(category.sportData);
+      } else if (category.sportKey === "volleyball") {
+        category.sportData = ensureVolleyballData(category.sportData);
       }
 
       syncCategoryPlayerStrings(category);
@@ -2340,6 +2381,868 @@ teamTieState.awayRoster = mergeUniqueRoster(
     category.sportData = pb;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  BADMINTON ENGINE  (BWF rally-point rules)
+  //  • 21 pts to win a game, win by 2, cap at 30 (30-29 wins)
+  //  • Rally winner gets the point AND the serve
+  //  • Best of 3 games; side-change at start of game 3 (and when either team reaches 11)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  function createDefaultBadmintonData() {
+    return {
+      totalGames: 3,
+      tossWinner: null,
+      startingServer: null,         // "A" | "B"
+      startingServerPlayer: null,
+      startingReceiver: null,
+      startingReceiverPlayer: null,
+      currentGameIndex: null,
+      categoryLocked: false,
+      games: Array.from({ length: 3 }, (_, i) => ({
+        number: i + 1,
+        started: false,
+        completed: false,
+        currentServer: null,
+        currentServerName: null,
+        homePoints: 0,
+        awayPoints: 0,
+        winnerSide: null,
+        history: [],
+      })),
+    };
+  }
+
+  function ensureBadmintonData(existingData) {
+    const defaults = createDefaultBadmintonData();
+    const existing = existingData && typeof existingData === "object" ? existingData : {};
+    const games = Array.from({ length: 3 }, (_, i) => {
+      const eg = Array.isArray(existing.games) ? existing.games[i] : null;
+      return {
+        number: i + 1,
+        started: false,
+        completed: false,
+        currentServer: null,
+        currentServerName: null,
+        homePoints: 0,
+        awayPoints: 0,
+        winnerSide: null,
+        history: [],
+        ...(eg || {}),
+        history: Array.isArray(eg?.history) ? eg.history : [],
+      };
+    });
+    let currentGameIndex = Number.isInteger(existing.currentGameIndex) ? existing.currentGameIndex : null;
+    if (currentGameIndex != null && (!games[currentGameIndex] || games[currentGameIndex].completed)) currentGameIndex = null;
+    return {
+      totalGames: 3,
+      tossWinner: existing.tossWinner || null,
+      startingServer: existing.startingServer || null,
+      startingServerPlayer: existing.startingServerPlayer || null,
+      startingReceiver: existing.startingReceiver || null,
+      startingReceiverPlayer: existing.startingReceiverPlayer || null,
+      currentGameIndex,
+      categoryLocked: Boolean(existing.categoryLocked),
+      games,
+    };
+  }
+
+  function getBadmintonGameWins(bd) {
+    const games = Array.isArray(bd?.games) ? bd.games : [];
+    return {
+      aWins: games.filter((g) => g?.winnerSide === "A").length,
+      bWins: games.filter((g) => g?.winnerSide === "B").length,
+    };
+  }
+
+  function badmintonGameTarget(gameNumber) {
+    // All games: 21, win by 2, cap 30
+    return 21;
+  }
+
+  function checkBadmintonGameWinner(game) {
+    const a = Number(game.homePoints || 0);
+    const b = Number(game.awayPoints || 0);
+    const target = 21;
+    const cap = 30;
+    if ((a >= target && a - b >= 2) || a >= cap) return "A";
+    if ((b >= target && b - a >= 2) || b >= cap) return "B";
+    return null;
+  }
+
+  function startBadmintonGame(category, gameIndex) {
+    const bd = ensureBadmintonData(category?.sportData);
+    if (bd.categoryLocked || category?.categoryLocked) return;
+    if (!bd.startingServer || !bd.startingServerPlayer) return;
+    if (!Number.isInteger(gameIndex) || gameIndex < 0 || gameIndex >= bd.games.length) return;
+    const game = bd.games[gameIndex];
+    if (!game || game.started || game.completed) return;
+    // Ensure no other game is live
+    if (bd.games.some((g) => g.started && !g.completed)) return;
+
+    // Determine server for this game:
+    // Game 1: toss winner's choice (startingServer)
+    // Game 2: previous game loser serves
+    // Game 3: same as game 2 rule; coin flip in practice; we use prev-game loser
+    let server = bd.startingServer;
+    let serverName = bd.startingServerPlayer;
+    if (gameIndex > 0) {
+      const prevGame = bd.games[gameIndex - 1];
+      const loserSide = prevGame?.winnerSide === "A" ? "B" : "A";
+      server = loserSide;
+      const labels = getBadmintonPlayerLabels(category, "Home", "Away");
+      serverName = (server === "A" ? labels.homePlayers[0] : labels.awayPlayers[0]) || (server === "A" ? "Home" : "Away");
+    }
+
+    game.history.push({ homePoints: 0, awayPoints: 0, currentServer: game.currentServer, currentServerName: game.currentServerName });
+    game.started = true;
+    game.completed = false;
+    game.currentServer = server;
+    game.currentServerName = serverName;
+    game.homePoints = 0;
+    game.awayPoints = 0;
+    game.winnerSide = null;
+
+    bd.currentGameIndex = gameIndex;
+    category.sportData = bd;
+  }
+
+  function applyBadmintonRally(category, rallyWinnerSide) {
+    const bd = ensureBadmintonData(category?.sportData);
+    const gameIndex = bd.currentGameIndex;
+    if (bd.categoryLocked || category?.categoryLocked) return;
+    if (!Number.isInteger(gameIndex) || !bd.games[gameIndex]) return;
+    const game = bd.games[gameIndex];
+    if (!game.started || game.completed) return;
+
+    // Save history snapshot
+    game.history.push({
+      homePoints: Number(game.homePoints || 0),
+      awayPoints: Number(game.awayPoints || 0),
+      currentServer: game.currentServer,
+      currentServerName: game.currentServerName,
+    });
+
+    const winner = rallyWinnerSide === "B" ? "B" : "A";
+
+    // BWF: rally winner always gets the point
+    if (winner === "A") game.homePoints = Number(game.homePoints || 0) + 1;
+    else game.awayPoints = Number(game.awayPoints || 0) + 1;
+
+    // BWF: rally winner gets (keeps) the serve
+    game.currentServer = winner;
+    const labels = getBadmintonPlayerLabels(category, "Home", "Away");
+    const winnerPlayers = winner === "A" ? labels.homePlayers : labels.awayPlayers;
+    // For doubles we cycle through the player who was originally due to serve; for simplicity use first player of winning side
+    game.currentServerName = winnerPlayers[0] || (winner === "A" ? "Home" : "Away");
+
+    // Check set win
+    const winnerSide = checkBadmintonGameWinner(game);
+    if (winnerSide) {
+      game.completed = true;
+      game.winnerSide = winnerSide;
+      bd.currentGameIndex = null;
+    }
+
+    category.sportData = bd;
+  }
+
+  function undoBadmintonRally(category, gameIndex) {
+    const bd = ensureBadmintonData(category?.sportData);
+    if (!Number.isInteger(gameIndex) || !bd.games[gameIndex]) return;
+    const game = bd.games[gameIndex];
+    if (!game.started) return;
+    const snap = game.history.pop();
+    if (!snap) return;
+    game.homePoints = snap.homePoints;
+    game.awayPoints = snap.awayPoints;
+    game.currentServer = snap.currentServer;
+    game.currentServerName = snap.currentServerName;
+    game.completed = false;
+    game.winnerSide = null;
+    bd.currentGameIndex = gameIndex;
+    bd.categoryLocked = false;
+    category.categoryLocked = false;
+    category.winnerSide = null;
+    category.sportData = bd;
+  }
+
+  function resetBadmintonGame(category, gameIndex) {
+    const bd = ensureBadmintonData(category?.sportData);
+    if (!Number.isInteger(gameIndex) || !bd.games[gameIndex]) return;
+    bd.games[gameIndex] = {
+      number: gameIndex + 1,
+      started: false,
+      completed: false,
+      currentServer: null,
+      currentServerName: null,
+      homePoints: 0,
+      awayPoints: 0,
+      winnerSide: null,
+      history: [],
+    };
+    if (bd.currentGameIndex === gameIndex) bd.currentGameIndex = null;
+    bd.categoryLocked = false;
+    category.categoryLocked = false;
+    category.winnerSide = null;
+    category.sportData = bd;
+  }
+
+  function getBadmintonPlayerLabels(category, homeTeamLabel, awayTeamLabel) {
+    const homePlayers = getSelectedPlayers(category, "A");
+    const awayPlayers = getSelectedPlayers(category, "B");
+    return {
+      homePlayerLabel: homePlayers.length ? homePlayers.join(" + ") : safeText(category?.homePlayer, homeTeamLabel),
+      awayPlayerLabel: awayPlayers.length ? awayPlayers.join(" + ") : safeText(category?.awayPlayer, awayTeamLabel),
+      homePlayers,
+      awayPlayers,
+    };
+  }
+
+  function buildBadmintonScoringMarkup(category, homeTeamLabel, awayTeamLabel) {
+    const bd = ensureBadmintonData(category.sportData);
+    const anyGameStarted = bd.games.some((g) => g.started);
+    const setupLocked = anyGameStarted || category.categoryLocked;
+    const { aWins, bWins } = getBadmintonGameWins(bd);
+    const neededWins = 2; // best of 3
+    const { homePlayerLabel, awayPlayerLabel, homePlayers, awayPlayers } = getBadmintonPlayerLabels(category, homeTeamLabel, awayTeamLabel);
+    const allServerOptions = [
+      ...homePlayers.map((name) => ({ side: "A", name })),
+      ...awayPlayers.map((name) => ({ side: "B", name })),
+    ];
+    const serverSelectOptions = allServerOptions.length
+      ? allServerOptions.map((o) => {
+          const val = `${o.side}::${o.name}`;
+          const sel = bd.startingServer === o.side && bd.startingServerPlayer === o.name ? "selected" : "";
+          return `<option value="${escapeHtml(val)}" ${sel}>${escapeHtml(o.name)}</option>`;
+        }).join("")
+      : `<option value="">Select server</option>`;
+
+    const currentGame = Number.isInteger(bd.currentGameIndex) ? bd.games[bd.currentGameIndex] : null;
+    const nextGameIndex = bd.games.findIndex((g) => !g.started && !g.completed);
+
+    const declareRow = !bd.categoryLocked && (aWins >= neededWins || bWins >= neededWins)
+      ? `<div class="pickle-next-set-row">
+          ${aWins >= neededWins ? `<button type="button" class="pickle-start-set-btn" data-bwf-action="declare-category" data-side="A">Declare ${escapeHtml(homePlayerLabel)} winner</button>` : ""}
+          ${bWins >= neededWins ? `<button type="button" class="pickle-start-set-btn" data-bwf-action="declare-category" data-side="B">Declare ${escapeHtml(awayPlayerLabel)} winner</button>` : ""}
+        </div>` : "";
+
+    return `
+      <div class="preset-sport-tag">Badminton (BWF rules)</div>
+      <div class="pickle-config-chips">
+        <div class="pickle-config-chip">Best of 3 games</div>
+        <div class="pickle-config-chip">21 pts (win by 2, cap 30)</div>
+        <div class="pickle-config-chip">Games won: ${escapeHtml(aWins)}-${escapeHtml(bWins)}</div>
+      </div>
+
+      <div class="pickle-setup-card">
+        <div class="panel-label">Pre-match setup</div>
+        <div class="pickle-setup-grid">
+          <div class="pickle-choice-group">
+            <div class="pickle-choice-label">Who won toss?</div>
+            <div class="pickle-choice-row">
+              <button type="button" class="pickle-choice-btn ${bd.tossWinner === "A" ? "active" : ""}" data-bwf-action="pick-toss" data-side="A" ${setupLocked ? "disabled" : ""}>${escapeHtml(homePlayerLabel)}</button>
+              <button type="button" class="pickle-choice-btn ${bd.tossWinner === "B" ? "active" : ""}" data-bwf-action="pick-toss" data-side="B" ${setupLocked ? "disabled" : ""}>${escapeHtml(awayPlayerLabel)}</button>
+            </div>
+          </div>
+          <div class="pickle-choice-group pickle-server-picker">
+            <div class="pickle-choice-label">Who serves game 1?</div>
+            <select class="pickle-server-select" data-bwf-action="pick-server" ${setupLocked ? "disabled" : ""}>
+              <option value="">Select player</option>
+              ${serverSelectOptions}
+            </select>
+          </div>
+        </div>
+        <div class="pickle-next-set-row">
+          ${
+            bd.categoryLocked
+              ? `<div class="pickle-locked-note">Category locked.</div>`
+              : currentGame && currentGame.started && !currentGame.completed
+                ? `<div class="pickle-note">Game ${currentGame.number} is live.</div>`
+                : bd.tossWinner && bd.startingServer && nextGameIndex !== -1
+                  ? `<button type="button" class="pickle-start-set-btn" data-bwf-action="start-game" data-game-index="${nextGameIndex}">Start ${ordinal(nextGameIndex + 1)} Game</button>`
+                  : `<div class="pickle-note">Select toss winner and first server to begin.</div>`
+          }
+        </div>
+      </div>
+
+      ${currentGame && currentGame.started && !currentGame.completed ? `
+        <div class="pickle-live-card">
+          <div class="pickle-live-head">
+            <div>
+              <div class="panel-label">Game ${currentGame.number} in progress</div>
+              <div class="pickle-note">Rally winner scores and serves next (BWF rules).</div>
+            </div>
+            <div class="pickle-current-server">Serve: <strong>${escapeHtml(safeText(currentGame.currentServerName, currentGame.currentServer === "A" ? homePlayerLabel : awayPlayerLabel))}</strong></div>
+          </div>
+          <div class="pickle-live-scoreboard">
+            <div class="pickle-live-team"><span>${escapeHtml(homePlayerLabel)}</span><strong class="pickle-live-points">${escapeHtml(currentGame.homePoints)}</strong></div>
+            <div class="pickle-live-team"><span>${escapeHtml(awayPlayerLabel)}</span><strong class="pickle-live-points">${escapeHtml(currentGame.awayPoints)}</strong></div>
+          </div>
+          <div class="pickle-rally-row">
+            <button type="button" class="pickle-rally-btn primary" data-bwf-action="rally" data-side="A">Rally won by ${escapeHtml(homePlayerLabel)}</button>
+            <button type="button" class="pickle-rally-btn primary" data-bwf-action="rally" data-side="B">Rally won by ${escapeHtml(awayPlayerLabel)}</button>
+          </div>
+        </div>` : ""}
+
+      ${declareRow}
+
+      <div class="pickle-sets-card">
+        <div class="panel-label">Game summary</div>
+        <div class="pickle-sets-list">
+          ${bd.games.map((game, index) => {
+            const statusClass = game.completed ? "completed" : game.started ? "live" : "pending";
+            const statusText = game.completed
+              ? `${game.winnerSide === "A" ? homePlayerLabel : awayPlayerLabel} won`
+              : game.started
+                ? `Live • Serve ${escapeHtml(safeText(game.currentServerName, game.currentServer === "A" ? homePlayerLabel : awayPlayerLabel))}`
+                : "Not started";
+            const canUndo = game.started && game.history?.length > 0;
+            const canReset = game.started || game.completed;
+            return `
+              <div class="pickle-set-chip ${statusClass}">
+                <div class="pickle-set-top">
+                  <div class="pickle-set-name">Game ${index + 1}</div>
+                  <div class="pickle-set-status">${statusText}</div>
+                </div>
+                <div class="pickle-set-scoreline">${escapeHtml(homePlayerLabel)} ${escapeHtml(game.homePoints)} – ${escapeHtml(game.awayPoints)} ${escapeHtml(awayPlayerLabel)}</div>
+                <div class="pickle-set-actions">
+                  <button type="button" class="lineup-action-btn" data-bwf-action="undo-game" data-game-index="${index}" ${canUndo ? "" : "disabled"}>Undo</button>
+                  <button type="button" class="lineup-action-btn" data-bwf-action="reset-game" data-game-index="${index}" ${canReset ? "" : "disabled"}>Reset</button>
+                </div>
+              </div>`;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function bindBadmintonHandlers(card, category, categoryIndex, teamTieState, rerender) {
+    card.querySelectorAll('[data-bwf-action="pick-toss"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const bd = ensureBadmintonData(category.sportData);
+        if (bd.games.some((g) => g.started) || teamTieState.tieLocked) return;
+        bd.tossWinner = btn.dataset.side;
+        category.sportData = bd;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-bwf-action="pick-server"]').forEach((select) => {
+      select.addEventListener("change", () => {
+        const bd = ensureBadmintonData(category.sportData);
+        if (bd.games.some((g) => g.started) || teamTieState.tieLocked) return;
+        const [side, ...rest] = String(select.value || "").split("::");
+        bd.startingServer = side || null;
+        bd.startingServerPlayer = rest.join("::") || null;
+        category.sportData = bd;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-bwf-action="start-game"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        startBadmintonGame(category, Number(btn.dataset.gameIndex));
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-bwf-action="rally"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applyBadmintonRally(category, btn.dataset.side);
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-bwf-action="declare-category"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const side = btn.dataset.side;
+        category.winnerSide = side;
+        category.categoryLocked = true;
+        category.isScoringOpen = false;
+        const bd = ensureBadmintonData(category.sportData);
+        bd.categoryLocked = true;
+        category.sportData = bd;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-bwf-action="undo-game"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        undoBadmintonRally(category, Number(btn.dataset.gameIndex));
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-bwf-action="reset-game"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        resetBadmintonGame(category, Number(btn.dataset.gameIndex));
+        rerender();
+      });
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  VOLLEYBALL ENGINE  (FIVB rally-point rules)
+  //  • Sets 1–4: 25 pts, win by 2 (no hard cap in FIVB, but 30 used pragmatically)
+  //  • Set 5 (deciding): 15 pts, win by 2, side-change at 8
+  //  • Rally winner scores; serve goes to winner if they WERE the receiving team
+  //    (if serving team wins rally they keep serve + score; if receiving team wins, they score + take serve)
+  //  • Service rotation: after winning serve, team rotates clockwise (position 2→1,3→2,…,1→6)
+  //  • Best of 5 sets
+  // ─────────────────────────────────────────────────────────────────────────
+
+  function createDefaultVolleyballData() {
+    return {
+      totalSets: 5,
+      tossWinner: null,
+      startingServer: null,          // "A" | "B"
+      // Player rotation order [pos1, pos2, pos3, pos4, pos5, pos6] per team
+      // pos1 is the initial server; rotation is clockwise → pos1 becomes pos6 after rotating
+      rotationA: ["", "", "", "", "", ""],
+      rotationB: ["", "", "", "", "", ""],
+      rotationSetupDone: false,
+      currentSetIndex: null,
+      categoryLocked: false,
+      sets: Array.from({ length: 5 }, (_, i) => ({
+        number: i + 1,
+        started: false,
+        completed: false,
+        currentServer: null,            // "A" | "B"
+        currentServerPlayerIndex: 0,    // index into rotationA/rotationB
+        rotationAOffset: 0,             // how many rotations A has done
+        rotationBOffset: 0,
+        homePoints: 0,
+        awayPoints: 0,
+        winnerSide: null,
+        history: [],
+      })),
+    };
+  }
+
+  function ensureVolleyballData(existingData) {
+    const existing = existingData && typeof existingData === "object" ? existingData : {};
+    const sets = Array.from({ length: 5 }, (_, i) => {
+      const es = Array.isArray(existing.sets) ? existing.sets[i] : null;
+      return {
+        number: i + 1,
+        started: false,
+        completed: false,
+        currentServer: null,
+        currentServerPlayerIndex: 0,
+        rotationAOffset: 0,
+        rotationBOffset: 0,
+        homePoints: 0,
+        awayPoints: 0,
+        winnerSide: null,
+        history: [],
+        ...(es || {}),
+        history: Array.isArray(es?.history) ? es.history : [],
+      };
+    });
+    let currentSetIndex = Number.isInteger(existing.currentSetIndex) ? existing.currentSetIndex : null;
+    if (currentSetIndex != null && (!sets[currentSetIndex] || sets[currentSetIndex].completed)) currentSetIndex = null;
+    return {
+      totalSets: 5,
+      tossWinner: existing.tossWinner || null,
+      startingServer: existing.startingServer || null,
+      rotationA: Array.isArray(existing.rotationA) && existing.rotationA.length === 6 ? existing.rotationA : ["", "", "", "", "", ""],
+      rotationB: Array.isArray(existing.rotationB) && existing.rotationB.length === 6 ? existing.rotationB : ["", "", "", "", "", ""],
+      rotationSetupDone: Boolean(existing.rotationSetupDone),
+      currentSetIndex,
+      categoryLocked: Boolean(existing.categoryLocked),
+      sets,
+    };
+  }
+
+  function getVolleyballSetWins(vb) {
+    const sets = Array.isArray(vb?.sets) ? vb.sets : [];
+    return {
+      aWins: sets.filter((s) => s?.winnerSide === "A").length,
+      bWins: sets.filter((s) => s?.winnerSide === "B").length,
+    };
+  }
+
+  function checkVolleyballSetWinner(set) {
+    const a = Number(set.homePoints || 0);
+    const b = Number(set.awayPoints || 0);
+    const isDeciding = set.number === 5;
+    const target = isDeciding ? 15 : 25;
+    if ((a >= target && a - b >= 2)) return "A";
+    if ((b >= target && b - a >= 2)) return "B";
+    return null;
+  }
+
+  function volleyballCurrentServerName(vb, set, side) {
+    const rotation = side === "A" ? vb.rotationA : vb.rotationB;
+    const offset = side === "A" ? Number(set.rotationAOffset || 0) : Number(set.rotationBOffset || 0);
+    const name = rotation[(offset) % 6];
+    return name || (side === "A" ? "Home Server" : "Away Server");
+  }
+
+  function startVolleyballSet(category, setIndex) {
+    const vb = ensureVolleyballData(category?.sportData);
+    if (vb.categoryLocked || category?.categoryLocked) return;
+    if (!vb.startingServer) return;
+    if (!Number.isInteger(setIndex) || setIndex < 0 || setIndex >= vb.sets.length) return;
+    const set = vb.sets[setIndex];
+    if (!set || set.started || set.completed) return;
+    if (vb.sets.some((s) => s.started && !s.completed)) return;
+
+    // Determine serving team for this set:
+    // Set 1: toss choice; subsequent sets alternate (team that lost previous set serves — FIVB rule)
+    let server = vb.startingServer;
+    if (setIndex > 0) {
+      const prevSet = vb.sets[setIndex - 1];
+      server = prevSet?.winnerSide === "A" ? "B" : "A";
+    }
+
+    set.history.push({ homePoints: 0, awayPoints: 0, currentServer: null, rotationAOffset: 0, rotationBOffset: 0 });
+    set.started = true;
+    set.completed = false;
+    set.currentServer = server;
+    set.rotationAOffset = 0;
+    set.rotationBOffset = 0;
+    set.homePoints = 0;
+    set.awayPoints = 0;
+    set.winnerSide = null;
+
+    vb.currentSetIndex = setIndex;
+    category.sportData = vb;
+  }
+
+  function applyVolleyballRally(category, rallyWinnerSide) {
+    const vb = ensureVolleyballData(category?.sportData);
+    const setIndex = vb.currentSetIndex;
+    if (vb.categoryLocked || category?.categoryLocked) return;
+    if (!Number.isInteger(setIndex) || !vb.sets[setIndex]) return;
+    const set = vb.sets[setIndex];
+    if (!set.started || set.completed) return;
+
+    set.history.push({
+      homePoints: Number(set.homePoints || 0),
+      awayPoints: Number(set.awayPoints || 0),
+      currentServer: set.currentServer,
+      rotationAOffset: Number(set.rotationAOffset || 0),
+      rotationBOffset: Number(set.rotationBOffset || 0),
+    });
+
+    const winner = rallyWinnerSide === "B" ? "B" : "A";
+
+    // FIVB: rally winner scores
+    if (winner === "A") set.homePoints = Number(set.homePoints || 0) + 1;
+    else set.awayPoints = Number(set.awayPoints || 0) + 1;
+
+    // If receiving team won, they get the serve — and they ROTATE before serving
+    if (winner !== set.currentServer) {
+      // Winning team was receiving → they take serve and rotate
+      if (winner === "A") set.rotationAOffset = (Number(set.rotationAOffset || 0) + 1) % 6;
+      else set.rotationBOffset = (Number(set.rotationBOffset || 0) + 1) % 6;
+      set.currentServer = winner;
+    }
+    // If serving team won, they keep serve, no rotation
+
+    // Check set 5 side-change at 8 pts
+    if (set.number === 5) {
+      const leadingTeam = Number(set.homePoints) + Number(set.awayPoints) === 15;
+      // Side change handled visually only — no logic effect needed
+
+    }
+
+    const winnerSide = checkVolleyballSetWinner(set);
+    if (winnerSide) {
+      set.completed = true;
+      set.winnerSide = winnerSide;
+      vb.currentSetIndex = null;
+    }
+
+    category.sportData = vb;
+  }
+
+  function undoVolleyballRally(category, setIndex) {
+    const vb = ensureVolleyballData(category?.sportData);
+    if (!Number.isInteger(setIndex) || !vb.sets[setIndex]) return;
+    const set = vb.sets[setIndex];
+    if (!set.started) return;
+    const snap = set.history.pop();
+    if (!snap) return;
+    set.homePoints = snap.homePoints;
+    set.awayPoints = snap.awayPoints;
+    set.currentServer = snap.currentServer;
+    set.rotationAOffset = snap.rotationAOffset;
+    set.rotationBOffset = snap.rotationBOffset;
+    set.completed = false;
+    set.winnerSide = null;
+    vb.currentSetIndex = setIndex;
+    vb.categoryLocked = false;
+    category.categoryLocked = false;
+    category.winnerSide = null;
+    category.sportData = vb;
+  }
+
+  function resetVolleyballSet(category, setIndex) {
+    const vb = ensureVolleyballData(category?.sportData);
+    if (!Number.isInteger(setIndex) || !vb.sets[setIndex]) return;
+    vb.sets[setIndex] = {
+      number: setIndex + 1, started: false, completed: false, currentServer: null,
+      currentServerPlayerIndex: 0, rotationAOffset: 0, rotationBOffset: 0,
+      homePoints: 0, awayPoints: 0, winnerSide: null, history: [],
+    };
+    if (vb.currentSetIndex === setIndex) vb.currentSetIndex = null;
+    vb.categoryLocked = false;
+    category.categoryLocked = false;
+    category.winnerSide = null;
+    category.sportData = vb;
+  }
+
+  function buildVolleyballScoringMarkup(category, homeTeamLabel, awayTeamLabel) {
+    const vb = ensureVolleyballData(category.sportData);
+    const anySetStarted = vb.sets.some((s) => s.started);
+    const setupLocked = anySetStarted || category.categoryLocked;
+    const { aWins, bWins } = getVolleyballSetWins(vb);
+    const neededWins = 3; // best of 5
+    const homePlayers = getSelectedPlayers(category, "A");
+    const awayPlayers = getSelectedPlayers(category, "B");
+    const homePlayerLabel = homePlayers.length ? homePlayers.join(" + ") : safeText(category?.homePlayer, homeTeamLabel);
+    const awayPlayerLabel = awayPlayers.length ? awayPlayers.join(" + ") : safeText(category?.awayPlayer, awayTeamLabel);
+
+    const currentSet = Number.isInteger(vb.currentSetIndex) ? vb.sets[vb.currentSetIndex] : null;
+    const nextSetIndex = vb.sets.findIndex((s) => !s.started && !s.completed);
+
+    const isDeciding = currentSet && currentSet.number === 5;
+    const total5thPoints = currentSet ? Number(currentSet.homePoints || 0) + Number(currentSet.awayPoints || 0) : 0;
+    const sideChangeNote = isDeciding && total5thPoints < 15 && (Number(currentSet.homePoints) >= 8 || Number(currentSet.awayPoints) >= 8)
+      ? `<div class="pickle-note">⟷ Side change at 8 in the deciding set.</div>` : "";
+
+    // Rotation setup UI (only show if rotation not done yet)
+    const rotationSetupHtml = !vb.rotationSetupDone ? `
+      <div class="pickle-setup-card">
+        <div class="panel-label">Player rotation order</div>
+        <div class="pickle-note" style="margin-bottom:10px">Enter players 1–6 for each team. Position 1 = initial server. Clockwise rotation after winning the serve.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div class="pickle-choice-label" style="margin-bottom:6px">${escapeHtml(homePlayerLabel)}</div>
+            ${[0,1,2,3,4,5].map((i) => `
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="min-width:22px;font-size:12px;color:#888">P${i+1}</span>
+                <input type="text" class="vb-rotation-input" data-vb-side="A" data-vb-pos="${i}"
+                  value="${escapeHtml(vb.rotationA[i] || "")}"
+                  placeholder="Player ${i+1}" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px" />
+              </div>`).join("")}
+          </div>
+          <div>
+            <div class="pickle-choice-label" style="margin-bottom:6px">${escapeHtml(awayPlayerLabel)}</div>
+            ${[0,1,2,3,4,5].map((i) => `
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="min-width:22px;font-size:12px;color:#888">P${i+1}</span>
+                <input type="text" class="vb-rotation-input" data-vb-side="B" data-vb-pos="${i}"
+                  value="${escapeHtml(vb.rotationB[i] || "")}"
+                  placeholder="Player ${i+1}" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px" />
+              </div>`).join("")}
+          </div>
+        </div>
+        <button type="button" class="pickle-start-set-btn" data-vb-action="confirm-rotation" style="margin-top:10px">Confirm Rotation Order</button>
+      </div>` : "";
+
+    const currentServerName = currentSet
+      ? volleyballCurrentServerName(vb, currentSet, currentSet.currentServer)
+      : "";
+
+    const declareRow = !vb.categoryLocked && (aWins >= neededWins || bWins >= neededWins)
+      ? `<div class="pickle-next-set-row">
+          ${aWins >= neededWins ? `<button type="button" class="pickle-start-set-btn" data-vb-action="declare-category" data-side="A">Declare ${escapeHtml(homePlayerLabel)} winner</button>` : ""}
+          ${bWins >= neededWins ? `<button type="button" class="pickle-start-set-btn" data-vb-action="declare-category" data-side="B">Declare ${escapeHtml(awayPlayerLabel)} winner</button>` : ""}
+        </div>` : "";
+
+    return `
+      <div class="preset-sport-tag">Volleyball (FIVB rules)</div>
+      <div class="pickle-config-chips">
+        <div class="pickle-config-chip">Best of 5 sets</div>
+        <div class="pickle-config-chip">Sets 1–4: 25 pts • Set 5: 15 pts</div>
+        <div class="pickle-config-chip">Sets won: ${escapeHtml(aWins)}-${escapeHtml(bWins)}</div>
+      </div>
+
+      ${rotationSetupHtml}
+
+      ${vb.rotationSetupDone ? `
+      <div class="pickle-setup-card">
+        <div class="panel-label">Match setup</div>
+        <div class="pickle-setup-grid">
+          <div class="pickle-choice-group">
+            <div class="pickle-choice-label">Who won toss?</div>
+            <div class="pickle-choice-row">
+              <button type="button" class="pickle-choice-btn ${vb.tossWinner === "A" ? "active" : ""}" data-vb-action="pick-toss" data-side="A" ${setupLocked ? "disabled" : ""}>${escapeHtml(homePlayerLabel)}</button>
+              <button type="button" class="pickle-choice-btn ${vb.tossWinner === "B" ? "active" : ""}" data-vb-action="pick-toss" data-side="B" ${setupLocked ? "disabled" : ""}>${escapeHtml(awayPlayerLabel)}</button>
+            </div>
+          </div>
+          <div class="pickle-choice-group">
+            <div class="pickle-choice-label">Who serves set 1?</div>
+            <div class="pickle-choice-row">
+              <button type="button" class="pickle-choice-btn ${vb.startingServer === "A" ? "active" : ""}" data-vb-action="pick-server" data-side="A" ${setupLocked ? "disabled" : ""}>${escapeHtml(homePlayerLabel)}</button>
+              <button type="button" class="pickle-choice-btn ${vb.startingServer === "B" ? "active" : ""}" data-vb-action="pick-server" data-side="B" ${setupLocked ? "disabled" : ""}>${escapeHtml(awayPlayerLabel)}</button>
+            </div>
+          </div>
+        </div>
+        <div class="pickle-next-set-row">
+          ${
+            vb.categoryLocked
+              ? `<div class="pickle-locked-note">Category locked.</div>`
+              : currentSet && currentSet.started && !currentSet.completed
+                ? `<div class="pickle-note">Set ${currentSet.number} is live.</div>`
+                : vb.tossWinner && vb.startingServer && nextSetIndex !== -1
+                  ? `<button type="button" class="pickle-start-set-btn" data-vb-action="start-set" data-set-index="${nextSetIndex}">Start ${ordinal(nextSetIndex + 1)} Set</button>`
+                  : `<div class="pickle-note">Select toss winner and first server to begin.</div>`
+          }
+        </div>
+      </div>
+
+      ${currentSet && currentSet.started && !currentSet.completed ? `
+        <div class="pickle-live-card">
+          <div class="pickle-live-head">
+            <div>
+              <div class="panel-label">Set ${currentSet.number} in progress${isDeciding ? " (Deciding)" : ""}</div>
+              <div class="pickle-note">Rally winner scores. Receiving team takes serve on winning a rally (FIVB).</div>
+              ${sideChangeNote}
+            </div>
+            <div class="pickle-current-server">Serve: <strong>${escapeHtml(currentServerName)}</strong> (${escapeHtml(currentSet.currentServer === "A" ? homePlayerLabel : awayPlayerLabel)})</div>
+          </div>
+          <div class="pickle-live-scoreboard">
+            <div class="pickle-live-team"><span>${escapeHtml(homePlayerLabel)}</span><strong class="pickle-live-points">${escapeHtml(currentSet.homePoints)}</strong></div>
+            <div class="pickle-live-team"><span>${escapeHtml(awayPlayerLabel)}</span><strong class="pickle-live-points">${escapeHtml(currentSet.awayPoints)}</strong></div>
+          </div>
+          <div class="pickle-rally-row">
+            <button type="button" class="pickle-rally-btn primary" data-vb-action="rally" data-side="A">Rally won by ${escapeHtml(homePlayerLabel)}</button>
+            <button type="button" class="pickle-rally-btn primary" data-vb-action="rally" data-side="B">Rally won by ${escapeHtml(awayPlayerLabel)}</button>
+          </div>
+        </div>` : ""}
+      ` : ""}
+
+      ${declareRow}
+
+      <div class="pickle-sets-card">
+        <div class="panel-label">Set summary</div>
+        <div class="pickle-sets-list">
+          ${vb.sets.map((set, index) => {
+            const statusClass = set.completed ? "completed" : set.started ? "live" : "pending";
+            const statusText = set.completed
+              ? `${set.winnerSide === "A" ? homePlayerLabel : awayPlayerLabel} won`
+              : set.started
+                ? `Live • Serve: ${escapeHtml(volleyballCurrentServerName(vb, set, set.currentServer || "A"))} (${escapeHtml(set.currentServer === "A" ? homePlayerLabel : awayPlayerLabel)})`
+                : "Not started";
+            const canUndo = set.started && set.history?.length > 0;
+            const canReset = set.started || set.completed;
+            const targetPts = index === 4 ? 15 : 25;
+            return `
+              <div class="pickle-set-chip ${statusClass}">
+                <div class="pickle-set-top">
+                  <div class="pickle-set-name">Set ${index + 1}${index === 4 ? " (Deciding – 15 pts)" : ` (${targetPts} pts)`}</div>
+                  <div class="pickle-set-status">${statusText}</div>
+                </div>
+                <div class="pickle-set-scoreline">${escapeHtml(homePlayerLabel)} ${escapeHtml(set.homePoints)} – ${escapeHtml(set.awayPoints)} ${escapeHtml(awayPlayerLabel)}</div>
+                <div class="pickle-set-actions">
+                  <button type="button" class="lineup-action-btn" data-vb-action="undo-set" data-set-index="${index}" ${canUndo ? "" : "disabled"}>Undo</button>
+                  <button type="button" class="lineup-action-btn" data-vb-action="reset-set" data-set-index="${index}" ${canReset ? "" : "disabled"}>Reset</button>
+                </div>
+              </div>`;
+          }).join("")}
+        </div>
+      </div>
+
+      ${vb.rotationSetupDone ? `
+      <div style="margin-top:12px">
+        <button type="button" class="lineup-action-btn" data-vb-action="edit-rotation" ${anySetStarted ? "disabled" : ""}>Edit rotation order</button>
+      </div>` : ""}
+    `;
+  }
+
+  function bindVolleyballHandlers(card, category, categoryIndex, teamTieState, rerender) {
+    card.querySelectorAll('[data-vb-action="confirm-rotation"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const vb = ensureVolleyballData(category.sportData);
+        // collect rotation inputs
+        card.querySelectorAll(".vb-rotation-input").forEach((input) => {
+          const side = input.dataset.vbSide;
+          const pos = Number(input.dataset.vbPos);
+          if (side === "A") vb.rotationA[pos] = safeText(input.value) || `A-P${pos+1}`;
+          else vb.rotationB[pos] = safeText(input.value) || `B-P${pos+1}`;
+        });
+        vb.rotationSetupDone = true;
+        category.sportData = vb;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-vb-action="edit-rotation"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const vb = ensureVolleyballData(category.sportData);
+        if (vb.sets.some((s) => s.started)) return;
+        vb.rotationSetupDone = false;
+        category.sportData = vb;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-vb-action="pick-toss"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const vb = ensureVolleyballData(category.sportData);
+        if (vb.sets.some((s) => s.started) || teamTieState.tieLocked) return;
+        vb.tossWinner = btn.dataset.side;
+        category.sportData = vb;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-vb-action="pick-server"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const vb = ensureVolleyballData(category.sportData);
+        if (vb.sets.some((s) => s.started) || teamTieState.tieLocked) return;
+        vb.startingServer = btn.dataset.side;
+        category.sportData = vb;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-vb-action="start-set"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        startVolleyballSet(category, Number(btn.dataset.setIndex));
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-vb-action="rally"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applyVolleyballRally(category, btn.dataset.side);
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-vb-action="declare-category"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const side = btn.dataset.side;
+        category.winnerSide = side;
+        category.categoryLocked = true;
+        category.isScoringOpen = false;
+        const vb = ensureVolleyballData(category.sportData);
+        vb.categoryLocked = true;
+        category.sportData = vb;
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-vb-action="undo-set"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        undoVolleyballRally(category, Number(btn.dataset.setIndex));
+        rerender();
+      });
+    });
+
+    card.querySelectorAll('[data-vb-action="reset-set"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        resetVolleyballSet(category, Number(btn.dataset.setIndex));
+        rerender();
+      });
+    });
+  }
+
   function declarePickleballCategoryWinner(category, side, categoryIndex, teamTieState) {
     const pb = ensurePickleballTeamData(category?.sportData, fixtures);
 
@@ -2380,14 +3283,16 @@ teamTieState.awayRoster = mergeUniqueRoster(
     }
 
     if (sportKey === "badminton") {
-      return toArray(data.games).reduce(
-        (acc, game) => {
-          acc.home += Number(game?.a || 0);
-          acc.away += Number(game?.b || 0);
-          return acc;
-        },
-        { home: 0, away: 0 }
-      );
+      // Use new rally-scoring structure (games with homePoints/awayPoints)
+      const bd = ensureBadmintonData(data);
+      const { aWins, bWins } = getBadmintonGameWins(bd);
+      return { home: aWins, away: bWins };
+    }
+
+    if (sportKey === "volleyball") {
+      const vb = ensureVolleyballData(data);
+      const { aWins, bWins } = getVolleyballSetWins(vb);
+      return { home: aWins, away: bWins };
     }
 
     if (sportKey === "tennis") {
@@ -2582,10 +3487,15 @@ try {
   const isTeamEvent = detectTeamEvent(fixtures);
   const tournamentSportKeyGlobal = detectEffectiveSportKey(fixtures);
   const isPickleballTournament = tournamentSportKeyGlobal === "pickleball";
-  // Individual pickleball: use team-event shell without lineup, just pickleball scoring
+  const isBadmintonTournament = tournamentSportKeyGlobal === "badminton";
+  const isVolleyballTournament = tournamentSportKeyGlobal === "volleyball";
+  // For these sports, use rally-scoring team-event shell even for individual tournaments (no lineup needed)
   const isIndividualPickleball = isPickleballTournament && !isTeamEvent;
+  const isIndividualBadminton = isBadmintonTournament && !isTeamEvent;
+  const isIndividualVolleyball = isVolleyballTournament && !isTeamEvent;
+  const isIndividualRallySport = isIndividualPickleball || isIndividualBadminton || isIndividualVolleyball;
 
-  if (isTeamEvent || isIndividualPickleball) {
+  if (isTeamEvent || isIndividualRallySport) {
     await loadTeamRosterLookup();
   }
 
@@ -2599,7 +3509,7 @@ try {
   if (String(homeLabel).toUpperCase() === "BYE" || String(awayLabel).toUpperCase() === "BYE") {
     titleEl.textContent = `${homeLabel} vs ${awayLabel}`;
     subEl.textContent = `Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
-    if (isTeamEvent || isIndividualPickleball) showTeamEventShell();
+    if (isTeamEvent || isIndividualRallySport) showTeamEventShell();
     statusPill?.classList.add("error");
     if (statusPill) statusPill.innerHTML = `Status: <strong>BYE</strong>`;
     if (winnerPill) winnerPill.innerHTML = `Winner: <strong>-</strong>`;
@@ -2608,40 +3518,39 @@ try {
     return;
   }
 
-  if (isTeamEvent || isIndividualPickleball) {
+  if (isTeamEvent || isIndividualRallySport) {
     showTeamEventShell();
 
-    // For individual pickleball: hide the lineup review panel and overall board entirely
-    if (isIndividualPickleball) {
+    // For individual rally sports: hide the lineup review panel and overall board entirely
+    if (isIndividualRallySport) {
       lineupReviewPanel?.classList.add("hidden");
       teamOverallBoard?.classList.add("hidden");
     }
 
     titleEl.textContent = `${homeLabel} vs ${awayLabel}`;
-    subEl.textContent = isIndividualPickleball
-      ? `Pickleball • Round ${roundIndex + 1} • Match ${matchIndex + 1}`
+    subEl.textContent = isIndividualRallySport
+      ? `${tournamentSportKeyGlobal.charAt(0).toUpperCase() + tournamentSportKeyGlobal.slice(1)} • Round ${roundIndex + 1} • Match ${matchIndex + 1}`
       : `Team event • Round ${roundIndex + 1} • Match ${matchIndex + 1}`;
 
     if (teamOverallHomeName) teamOverallHomeName.textContent = homeLabel;
     if (teamOverallAwayName) teamOverallAwayName.textContent = awayLabel;
     if (teamOverallSub) {
-      teamOverallSub.textContent = isIndividualPickleball
-        ? "Pickleball match score."
+      teamOverallSub.textContent = isIndividualRallySport
+        ? `${tournamentSportKeyGlobal.charAt(0).toUpperCase() + tournamentSportKeyGlobal.slice(1)} match score.`
         : "Cumulative match points are shown prominently. Category wins are shown below.";
     }
 
     let teamTieState;
-    if (isIndividualPickleball) {
-      // Build a synthetic single-category team tie state for individual pickleball
-      // — players are the match home/away directly, no lineup needed
+    if (isIndividualRallySport) {
+      // Build a synthetic single-category team tie state — players are match home/away, no lineup needed
       const storedState = loadTeamTieState(match, fixtures);
-      if (storedState && storedState.categories?.length === 1 && storedState.categories[0].sportKey === "pickleball") {
+      if (storedState && storedState.categories?.length === 1 && storedState.categories[0].sportKey === tournamentSportKeyGlobal) {
         teamTieState = storedState;
       } else {
         teamTieState = {
           homeRoster: [homeLabel],
           awayRoster: [awayLabel],
-          tournamentSportKey: "pickleball",
+          tournamentSportKey: tournamentSportKeyGlobal,
           tieLocked: false,
           lineupCollapsed: false,
           categories: [{
@@ -2659,13 +3568,13 @@ try {
             winnerSide: null,
             isScoringOpen: true,
             categoryLocked: false,
-            sportKey: "pickleball",
-            sportData: cloneDefaultPresetSportData("pickleball", fixtures),
+            sportKey: tournamentSportKeyGlobal,
+            sportData: cloneDefaultPresetSportData(tournamentSportKeyGlobal, fixtures),
           }],
         };
         // Merge any existing saved state
         const saved = loadTeamTieState(match, fixtures);
-        if (saved?.categories?.[0]?.sportKey === "pickleball") {
+        if (saved?.categories?.[0]?.sportKey === tournamentSportKeyGlobal) {
           teamTieState.categories[0].sportData = saved.categories[0].sportData || teamTieState.categories[0].sportData;
           teamTieState.categories[0].winnerSide = saved.categories[0].winnerSide || null;
           teamTieState.categories[0].categoryLocked = Boolean(saved.categories[0].categoryLocked);
@@ -2917,10 +3826,14 @@ try {
         const categoryBody =
           category.sportKey === "pickleball"
             ? buildPickleballScoringMarkup(category, homeLabel, awayLabel)
-            : buildPresetScoringMarkup(category, homeLabel, awayLabel);
+            : category.sportKey === "badminton"
+              ? buildBadmintonScoringMarkup(category, homeLabel, awayLabel)
+              : category.sportKey === "volleyball"
+                ? buildVolleyballScoringMarkup(category, homeLabel, awayLabel)
+                : buildPresetScoringMarkup(category, homeLabel, awayLabel);
 
         const manualWinnerMarkup =
-          category.sportKey === "pickleball"
+          category.sportKey === "pickleball" || category.sportKey === "badminton" || category.sportKey === "volleyball"
             ? ""
             : `
                 <div class="category-winner-actions" style="margin-top: 14px;">
@@ -2970,6 +3883,10 @@ try {
 
         if (category.sportKey === "pickleball") {
           bindPickleballHandlers(card, category, index, teamTieState, rerender);
+        } else if (category.sportKey === "badminton") {
+          bindBadmintonHandlers(card, category, index, teamTieState, rerender);
+        } else if (category.sportKey === "volleyball") {
+          bindVolleyballHandlers(card, category, index, teamTieState, rerender);
         } else {
           bindPresetHandlers(card, category, rerender, teamTieState);
 
@@ -3053,6 +3970,7 @@ try {
                 cricket: category.sportKey === "cricket" ? category.sportData : null,
                 football: category.sportKey === "football" ? category.sportData : null,
                 badminton: category.sportKey === "badminton" ? category.sportData : null,
+                volleyball: category.sportKey === "volleyball" ? category.sportData : null,
                 pickleball: category.sportKey === "pickleball" ? category.sportData : null,
                 computed: {
                   status: category.winnerSide ? "completed" : (isCategoryLineupComplete(category) ? "live" : "pending"),
