@@ -921,3 +921,107 @@
   border-color: rgba(77, 208, 225, 0.6);
   box-shadow: 0 0 0 3px rgba(77, 208, 225, 0.12);
 }
+
+/* ── Mobile improvements ───────────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
+  .players-page-card {
+    padding: 16px 14px 20px;
+    border-radius: 18px;
+    margin-top: 0;
+  }
+
+  .players-header h1 {
+    font-size: 21px;
+  }
+
+  /* Tabs: scroll horizontally if too many */
+  .players-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .players-tab {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Table: horizontal scroll with shadow hint */
+  .players-table-wrapper {
+    border-radius: 12px;
+    /* shadow on right to hint scrollability */
+    background:
+      linear-gradient(to right, rgba(10, 16, 30, 0) 80%, rgba(10, 16, 30, 0.9) 100%);
+  }
+
+  .players-table th,
+  .players-table td {
+    padding: 10px 10px;
+    font-size: 13px;
+  }
+
+  /* Row action buttons: bigger touch target */
+  .action-btn {
+    padding: 8px 12px;
+    min-height: 36px;
+    font-size: 12px;
+  }
+
+  /* Fixture cards: comfortable on mobile */
+  .fixture-card {
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+
+  .fixture-teams {
+    font-size: 15px;
+  }
+
+  /* Score btn: prominent on mobile */
+  .score-btn {
+    min-height: 40px;
+    padding: 9px 16px;
+  }
+
+  /* Leaderboard table cells */
+  .lb-table th,
+  .lb-table td {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .team-manual-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .team-manual-add {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Stack toolbar items */
+  .players-toolbar {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .players-toolbar > * {
+    width: 100%;
+  }
+
+  .section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .section-head > button {
+    width: 100%;
+    min-height: 44px;
+  }
+}

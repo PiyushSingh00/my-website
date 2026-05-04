@@ -202,48 +202,6 @@
                   </p>
                 </div>
               </div>
-
-              <div id="tournament-detail" class="tournament-detail hidden">
-                <div class="tournament-detail-card">
-                  <h2 id="detail-tournament-name">Tournament name</h2>
-
-                  <p class="detail-line">
-                    <span class="detail-label">Code:</span>
-                    <span id="detail-tournament-code">—</span>
-                  </p>
-
-                  <p class="detail-line">
-                    <span class="detail-label">Total registrations:</span>
-                    <span id="detail-total-registrations">0</span>
-                  </p>
-
-                  <div class="actions-row">
-                    <button
-                      type="button"
-                      class="btn-dark"
-                      id="modalViewPlayers"
-                    >
-                      View players
-                    </button>
-
-                    <button
-                      type="button"
-                      class="btn-dark"
-                      id="generate-code-btn"
-                    >
-                      Share code / link
-                    </button>
-
-                    <button
-                      type="button"
-                      class="btn-secondary danger-btn"
-                      id="stop-registrations-btn"
-                    >
-                      Stop registrations
-                    </button>
-                  </div>
-                </div>
-              </div>
             </section>
 
             <!-- HOST NEW TOURNAMENT VIEW -->
@@ -805,5 +763,114 @@
     </div>
 
     <script type="module" src="scripts/host.js"></script>
-  </body>
+  
+  <!-- Tournament detail MODAL -->
+  <div class="t-detail-modal-shell" id="tournament-detail" aria-modal="true" role="dialog" aria-label="Tournament details">
+    <div class="t-detail-modal-backdrop" id="t-detail-modal-backdrop"></div>
+    <div class="t-detail-modal-card">
+      <div class="t-detail-modal-head">
+        <div>
+          <div class="t-detail-modal-sport" id="detail-tournament-sport">Sport</div>
+          <h2 class="t-detail-modal-title" id="detail-tournament-name">Tournament name</h2>
+        </div>
+        <button type="button" class="t-detail-close-btn" id="t-detail-close-btn" aria-label="Close">&#x2715;</button>
+      </div>
+
+      <div class="t-detail-info-grid">
+        <div class="t-detail-info-block">
+          <div class="t-detail-info-label">Access code</div>
+          <div class="t-detail-info-value" id="detail-tournament-code">—</div>
+        </div>
+        <div class="t-detail-info-block">
+          <div class="t-detail-info-label">Total registrations</div>
+          <div class="t-detail-info-value" id="detail-total-registrations">0</div>
+        </div>
+        <div class="t-detail-info-block">
+          <div class="t-detail-info-label">Status</div>
+          <div class="t-detail-info-value" id="detail-tournament-status">—</div>
+        </div>
+        <div class="t-detail-info-block">
+          <div class="t-detail-info-label">Format</div>
+          <div class="t-detail-info-value" id="detail-tournament-format">—</div>
+        </div>
+        <div class="t-detail-info-block t-detail-info-block--full">
+          <div class="t-detail-info-label">Dates</div>
+          <div class="t-detail-info-value" id="detail-tournament-dates">—</div>
+        </div>
+      </div>
+
+      <div class="t-detail-actions">
+        <button type="button" class="btn-dark" id="modalViewPlayers">View players</button>
+        <button type="button" class="btn-dark" id="generate-code-btn">Share code / link</button>
+        <button type="button" class="btn-secondary danger-btn" id="stop-registrations-btn">Stop registrations</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var modalShell = document.getElementById("tournament-detail");
+      var closeBtn   = document.getElementById("t-detail-close-btn");
+      var backdrop   = document.getElementById("t-detail-modal-backdrop");
+
+      function openDetailModal() {
+        if (!modalShell) return;
+        modalShell.classList.add("is-open");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeDetailModal() {
+        if (!modalShell) return;
+        modalShell.classList.remove("is-open");
+        document.body.style.overflow = "";
+      }
+
+      if (closeBtn) closeBtn.addEventListener("click", closeDetailModal);
+      if (backdrop) backdrop.addEventListener("click", closeDetailModal);
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && modalShell && modalShell.classList.contains("is-open")) {
+          closeDetailModal();
+        }
+      });
+
+      // Watch for existing code toggling the "hidden" class and map to is-open
+      if (modalShell && window.MutationObserver) {
+        var obs = new MutationObserver(function (mutations) {
+          mutations.forEach(function (m) {
+            if (m.attributeName !== "class") return;
+            var cl = modalShell.classList;
+            if (!cl.contains("hidden") && !cl.contains("is-open")) {
+              cl.add("is-open");
+              document.body.style.overflow = "hidden";
+            }
+            if (cl.contains("hidden") && cl.contains("is-open")) {
+              cl.remove("is-open");
+              document.body.style.overflow = "";
+            }
+          });
+        });
+        obs.observe(modalShell, { attributes: true });
+      }
+
+      window.__openTournamentDetailModal  = openDetailModal;
+      window.__closeTournamentDetailModal = closeDetailModal;
+
+      // Populate bonus fields when a tournament card is clicked
+      document.addEventListener("click", function (e) {
+        var card = e.target.closest(".tournament-card");
+        if (!card) return;
+        var sport  = card.dataset.sport  || card.dataset.sportName || "";
+        var status = card.dataset.status || "";
+        var format = card.dataset.format || card.dataset.tournamentFormat || "";
+        var dates  = card.dataset.dates  || "";
+        var el;
+        el = document.getElementById("detail-tournament-sport");   if (el) el.textContent = sport  || "—";
+        el = document.getElementById("detail-tournament-status");  if (el) el.textContent = status || "—";
+        el = document.getElementById("detail-tournament-format");  if (el) el.textContent = format || "—";
+        el = document.getElementById("detail-tournament-dates");   if (el) el.textContent = dates  || "—";
+      });
+    })();
+  </script>
+</body>
 </html>

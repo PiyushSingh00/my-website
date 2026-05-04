@@ -1175,6 +1175,46 @@ body.drawer-lock {
   .pickle-rally-row {
     grid-template-columns: 1fr;
   }
+
+  /* Rally buttons: large touch targets on mobile */
+  .pickle-rally-btn {
+    min-height: 56px;
+    font-size: 15px;
+    border-radius: 16px;
+  }
+
+  /* Toss/choice buttons: comfortable touch size */
+  .pickle-choice-btn {
+    min-height: 48px;
+    padding: 12px 16px;
+    flex: 1 1 auto;
+  }
+
+  /* Score numbers: slightly smaller on narrow screens */
+  .pickle-live-points {
+    font-size: 44px;
+  }
+
+  /* Category card head: stack vertically */
+  .category-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .category-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Setup grid: single column on mobile */
+  .pickle-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Action bar: make back button and save button full-width area */
+  .action-bar {
+    gap: 8px;
+  }
 }
 
 /* Score page team-event refresh */
@@ -1344,6 +1384,66 @@ body.drawer-lock {
 @media (max-width: 700px) {
   .lineup-side-grid,
   .team-overall-score-grid--points {
+    grid-template-columns: 1fr;
+  }
+
+  /* Overall scoreboard: side-by-side even on mobile */
+  .team-overall-score-grid--points {
+    grid-template-columns: 1fr auto 1fr;
+  }
+
+  /* Reduce massive score font on small screens */
+  .overall-team-score--points {
+    font-size: clamp(54px, 16vw, 88px);
+  }
+
+  .overall-team-card--primary {
+    min-height: 140px;
+  }
+
+  /* Category card actions: stack on narrow */
+  .category-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  /* Score notes textarea */
+  .score-notes textarea {
+    font-size: 15px; /* prevent iOS zoom */
+  }
+
+  /* Lineup side grid: stay 2 col but shrink */
+  .lineup-side-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Panel padding tighter on mobile */
+  .team-overall-board,
+  .lineup-review-panel,
+  .category-bars-wrap,
+  .settings-inner {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  /* Lineup row selects: larger hit target */
+  .lineup-player-select {
+    min-height: 48px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 400px) {
+  .team-overall-score-grid--points {
+    grid-template-columns: 1fr;
+  }
+
+  .overall-vs {
+    display: none;
+  }
+
+  .lineup-side-grid {
     grid-template-columns: 1fr;
   }
 }

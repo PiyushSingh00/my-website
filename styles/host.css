@@ -657,6 +657,230 @@ body {
   margin-right: 6px;
 }
 
+/* ── Tournament detail MODAL ───────────────────────────────────────────────── */
+
+.t-detail-modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.t-detail-modal-shell.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.t-detail-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.t-detail-modal-card {
+  position: relative;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  border-radius: 24px;
+  border: 1px solid rgba(77, 208, 225, 0.22);
+  background:
+    radial-gradient(circle at top left, rgba(77, 208, 225, 0.13), transparent 50%),
+    rgba(10, 16, 30, 0.97);
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  padding: 28px 28px 24px;
+  transform: translateY(10px) scale(0.98);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.t-detail-modal-shell.is-open .t-detail-modal-card {
+  transform: translateY(0) scale(1);
+}
+
+.t-detail-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.t-detail-modal-title {
+  margin: 0 0 4px;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.t-detail-modal-sport {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(77, 208, 225, 0.14);
+  border: 1px solid rgba(77, 208, 225, 0.4);
+  color: var(--accent-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.t-detail-close-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(5, 10, 22, 0.98);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.t-detail-close-btn:hover {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}
+
+.t-detail-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.t-detail-info-block {
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(5, 11, 24, 0.7);
+  padding: 12px 14px;
+}
+
+.t-detail-info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.t-detail-info-value {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.t-detail-info-block--full {
+  grid-column: 1 / -1;
+}
+
+.t-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.t-detail-actions .btn-dark,
+.t-detail-actions .view-btn,
+.t-detail-actions .edit-btn {
+  flex: 1 1 auto;
+  text-align: center;
+  justify-content: center;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+.t-detail-actions .delete-btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Tournament card touch improvements ────────────────────────────────────── */
+
+.tournament-card {
+  cursor: pointer;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
+}
+
+.tournament-card:hover {
+  border-color: rgba(77, 208, 225, 0.45);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.tournament-card:active {
+  transform: translateY(0);
+}
+
+/* sport eyebrow tag on tournament card */
+.tournament-card-sport {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(77, 208, 225, 0.12);
+  border: 1px solid rgba(77, 208, 225, 0.3);
+  color: var(--accent-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.tournament-head h3 {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.25;
+}
+
+/* ── Mobile: general improvements ──────────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .t-detail-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .t-detail-info-block--full {
+    grid-column: auto;
+  }
+
+  .t-detail-modal-card {
+    padding: 20px 18px 18px;
+    border-radius: 20px;
+  }
+
+  .t-detail-modal-title {
+    font-size: 21px;
+  }
+}
+
 /* wizard */
 
 .wizard-card {
@@ -1352,12 +1576,18 @@ body {
 @media (max-width: 560px) {
   .topbar {
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
+    padding: 12px 16px;
   }
 
   .topbar-right {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .mode-btn {
+    font-size: 12px;
+    padding: 6px 10px;
   }
 
   .actions-row,
@@ -1368,6 +1598,17 @@ body {
   .actions-row > *,
   .wizard-actions > * {
     flex: 1 1 auto;
+  }
+
+  /* Bigger touch targets for tournament action buttons */
+  .view-btn,
+  .edit-btn,
+  .delete-btn,
+  .btn-dark,
+  .btn-primary,
+  .btn-secondary {
+    min-height: 44px;
+    padding: 11px 18px;
   }
 
   .tournament-head {
