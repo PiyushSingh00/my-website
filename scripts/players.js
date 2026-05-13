@@ -4,6 +4,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
   if (!user) return;
 
+  // PERF FIX 1: Cache auth token once — avoids repeated localStorage reads per API call
+  const AUTH_TOKEN = localStorage.getItem("token") || "";
+
   document.querySelectorAll(".brand").forEach((el) => {
     el.addEventListener("click", () => {
       window.location.href = "index.html";
@@ -47,7 +50,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer " + (localStorage.getItem("token") || ""),
+          Authorization: "Bearer " + AUTH_TOKEN,
         },
         body: JSON.stringify({ mode: "player" }),
       });
@@ -61,7 +64,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer " + (localStorage.getItem("token") || ""),
+          Authorization: "Bearer " + AUTH_TOKEN,
         },
         body: JSON.stringify({ mode: "host" }),
       });
@@ -419,7 +422,7 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
       ...options,
       headers: {
         ...(options.headers || {}),
-        Authorization: "Bearer " + (localStorage.getItem("token") || ""),
+        Authorization: "Bearer " + AUTH_TOKEN,
       },
     });
 
@@ -487,8 +490,14 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
     return cat ? categoryLabel(cat) : "Category";
   }
 
+  // PERF FIX 11: Cache advancedSettings — safeJson + property access called dozens of times
+  // in tight fixture-generation loops. Cache is reset when tournament meta changes.
+  let _cachedAdvancedSettings = null;
+
   function getAdvancedSettings() {
-    return safeJson(tournamentMetaCache?.advancedSettings, tournamentMetaCache?.advancedSettings) || {};
+    if (_cachedAdvancedSettings) return _cachedAdvancedSettings;
+    _cachedAdvancedSettings = safeJson(tournamentMetaCache?.advancedSettings, tournamentMetaCache?.advancedSettings) || {};
+    return _cachedAdvancedSettings;
   }
 
   function getAdvancedMode() {
@@ -643,9 +652,20 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
     syncLeaderboardUi();
   });
 
-  fixturesCollapseToggleBtn?.addEventListener("click", () => {
+  // PERF FIX 10: Track whether fixtures have been loaded yet.
+  // Fixtures load eagerly for umpires (applyUmpireViewMode forces them open).
+  // For all other users, they load lazily on first panel open.
+  let _fixturesLoaded = false;
+
+  fixturesCollapseToggleBtn?.addEventListener("click", async () => {
     isFixturesCollapsed = !isFixturesCollapsed;
     syncFixturesUi();
+
+    // Load fixtures only the first time the panel is opened
+    if (!isFixturesCollapsed && !_fixturesLoaded) {
+      _fixturesLoaded = true;
+      await openAndLoadFixtures();
+    }
   });
 
   function getCaptainSubmittedPlayers(captain) {
@@ -1247,6 +1267,7 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
 }
 
   function hydrateTournamentMetaUi(tournament) {
+    _cachedAdvancedSettings = null; // PERF FIX 11: reset cache when tournament meta changes
     titleEl.textContent = tournament?.tournamentName || "Tournament";
     sportEl.textContent = tournament?.sportName || "";
     datesEl.textContent = tournament?.tournamentDates || "";
@@ -1315,6 +1336,26 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
     });
   }
 
+  // PERF FIX 6: Single delegated listener on tableBody instead of 2 listeners per player row.
+  // Attached once; works for all current and future rows.
+  tableBody.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action !== "accept" && action !== "reject") return;
+    const row = btn.closest("tr");
+    const playerIdx = Number(row?.dataset.playerIdx ?? -1);
+    const filtered = applyFilter(allPlayers);
+    const player = filtered[playerIdx];
+    if (!player) return;
+    try {
+      await updateRegistrationStatus(player, action === "accept" ? "accepted" : "rejected");
+      await loadPlayers();
+    } catch (err) {
+      alert(err.message || `Could not ${action} player.`);
+    }
+  });
+
   function renderPlayers() {
     const filtered = applyFilter(allPlayers);
     tableBody.innerHTML = "";
@@ -1333,9 +1374,10 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
       return;
     }
 
-    filtered.forEach((player) => {
+    filtered.forEach((player, idx) => {
       const status = normalizeStatusPlayersPage(player);
       const tr = document.createElement("tr");
+      tr.dataset.playerIdx = idx; // used by the delegated click handler above
       tr.innerHTML = `
         <td>${escapeHtml(getPlayerDisplayName(player))}</td>
         <td>${escapeHtml(player.age ?? "—")}</td>
@@ -1348,25 +1390,6 @@ const bulkPlayerSummary = document.getElementById("bulk-player-summary");
           </div>
         </td>
       `;
-
-      tr.querySelector('[data-action="accept"]')?.addEventListener("click", async () => {
-        try {
-          await updateRegistrationStatus(player, "accepted");
-          await loadPlayers();
-        } catch (err) {
-          alert(err.message || "Could not accept player.");
-        }
-      });
-
-      tr.querySelector('[data-action="reject"]')?.addEventListener("click", async () => {
-        try {
-          await updateRegistrationStatus(player, "rejected");
-          await loadPlayers();
-        } catch (err) {
-          alert(err.message || "Could not reject player.");
-        }
-      });
-
       tableBody.appendChild(tr);
     });
   }
@@ -1615,6 +1638,9 @@ function revalidateBulkRow(idx) {
   bulkPlayerRows[idx] = normalizeImportedPlayerRow(bulkPlayerRows[idx], idx);
 }
 
+// PERF FIX 2: Stop re-rendering the entire table on every keystroke.
+// On "input": only update the data model + summary text (no DOM rebuild).
+// On "change": update data model + just the message cell for that row.
 function bindBulkPreviewInputs() {
   bulkPlayerPreviewBody?.querySelectorAll("[data-bulk-field]").forEach((el) => {
     el.addEventListener("input", () => {
@@ -1622,7 +1648,7 @@ function bindBulkPreviewInputs() {
       const field = el.dataset.bulkField;
       bulkPlayerRows[idx][field] = el.value;
       revalidateBulkRow(idx);
-      renderBulkPlayerPreview();
+      syncBulkSummary(); // only update the summary count, not the whole table
     });
 
     el.addEventListener("change", () => {
@@ -1630,7 +1656,11 @@ function bindBulkPreviewInputs() {
       const field = el.dataset.bulkField;
       bulkPlayerRows[idx][field] = el.value;
       revalidateBulkRow(idx);
-      renderBulkPlayerPreview();
+      // Update only the message cell for this specific row
+      const row = el.closest("tr");
+      const msgCell = row?.lastElementChild;
+      if (msgCell) msgCell.textContent = bulkPlayerRows[idx].__message;
+      syncBulkSummary();
     });
   });
 
@@ -2359,6 +2389,7 @@ function renderCaptainsSummary() {
     captainsSummaryList.appendChild(card);
   });
 
+  // PERF FIX 4: Toggle only the clicked card's body/icon instead of rebuilding all cards
   captainsSummaryList.querySelectorAll("[data-team-card-toggle]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const playerId = String(btn.getAttribute("data-team-card-toggle") || "");
@@ -2367,7 +2398,11 @@ function renderCaptainsSummary() {
       if (expandedTeamIds.has(playerId)) expandedTeamIds.delete(playerId);
       else expandedTeamIds.add(playerId);
 
-      renderCaptainsSummary();
+      // Only toggle the specific card's body and icon — no full re-render
+      const body = captainsSummaryList.querySelector(`[data-team-card-body="${CSS.escape(playerId)}"]`);
+      body?.classList.toggle("hidden");
+      const chip = btn.querySelector(".team-toggle-chip");
+      if (chip) chip.textContent = expandedTeamIds.has(playerId) ? "▾" : "▸";
     });
   });
 
@@ -2981,7 +3016,8 @@ function renderCaptainsSummary() {
 
     let bestPairs = [];
     let bestScore = -1;
-    for (let attempt = 0; attempt < 500; attempt += 1) {
+    // PERF FIX 5: Reduced from 500 to 80 iterations — prevents UI freeze on mobile
+    for (let attempt = 0; attempt < 80; attempt += 1) {
       const counts = Object.fromEntries(names.map((name) => [name, 0]));
       const selected = [];
       const seen = new Set();
@@ -3216,57 +3252,44 @@ function renderCaptainsSummary() {
     return { rounds: allRounds, groupMeta };
   }
 
-  function getGenericGroupLeaderboardRows(cat, roundIndex) {
+  // PERF FIX 8: getGenericGroupLeaderboardRows and getGroupLeaderboardRows were identical.
+  // Replaced both with one shared function: computeGroupLeaderboardRows.
+  function computeGroupLeaderboardRows(cat, roundIndex) {
     const roundMatches = Array.isArray(cat?.rounds?.[roundIndex]) ? cat.rounds[roundIndex] : [];
     const stats = new Map();
 
-    function ensureEntrant(name) {
+    const ensureEntry = (name) => {
       const key = String(name || "").trim();
       if (!key || key === "BYE" || key === "TBD") return null;
-
       if (!stats.has(key)) {
-        stats.set(key, {
-          teamName: key,
-          rank: 0,
-          matchPoints: 0,
-          matchesPlayed: 0,
-          qualified: false,
-        });
+        stats.set(key, { teamName: key, rank: 0, matchPoints: 0, matchesPlayed: 0, qualified: false });
       }
-
       return stats.get(key);
-    }
+    };
 
     roundMatches.forEach((match, matchIndex) => {
-      const home = ensureEntrant(match?.home);
-      const away = ensureEntrant(match?.away);
+      const home = ensureEntry(match?.home);
+      const away = ensureEntry(match?.away);
       if (!home || !away) return;
-
-      const status = getMatchStatus(match, roundIndex, matchIndex);
-      if (status !== "completed") return;
-
+      if (getMatchStatus(match, roundIndex, matchIndex) !== "completed") return;
       home.matchesPlayed += 1;
       away.matchesPlayed += 1;
-
       home.matchPoints += Number(getFixtureMatchPoints(match, "home") || 0);
       away.matchPoints += Number(getFixtureMatchPoints(match, "away") || 0);
     });
 
-    const rows = [...stats.values()].sort((a, b) => {
-      if (Number(b.matchPoints || 0) !== Number(a.matchPoints || 0)) {
-        return Number(b.matchPoints || 0) - Number(a.matchPoints || 0);
-      }
-      if (Number(b.matchesPlayed || 0) !== Number(a.matchesPlayed || 0)) {
-        return Number(b.matchesPlayed || 0) - Number(a.matchesPlayed || 0);
-      }
-      return String(a.teamName || "").localeCompare(String(b.teamName || ""));
-    });
-
-    return rows.map((row, index) => ({
-      ...row,
-      rank: index + 1,
-    }));
+    return [...stats.values()]
+      .sort((a, b) =>
+        (Number(b.matchPoints || 0) - Number(a.matchPoints || 0)) ||
+        (Number(b.matchesPlayed || 0) - Number(a.matchesPlayed || 0)) ||
+        String(a.teamName || "").localeCompare(String(b.teamName || ""))
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
   }
+
+  // Aliases kept so all existing call sites work without change
+  const getGenericGroupLeaderboardRows = computeGroupLeaderboardRows;
+  const getGroupLeaderboardRows = computeGroupLeaderboardRows;
 
   function getQualifiedEntrantsFromGroups(cat) {
     const groups = Array.isArray(cat?.groups) ? cat.groups : [];
@@ -3313,57 +3336,7 @@ function renderCaptainsSummary() {
     return String(tournamentMetaCache?.stageFormat || "") === "group_knockout";
   }
 
-  function getGroupLeaderboardRows(cat, roundIndex) {
-    const roundMatches = Array.isArray(cat?.rounds?.[roundIndex]) ? cat.rounds[roundIndex] : [];
-    const stats = new Map();
-
-    function ensureTeam(teamName) {
-      const key = String(teamName || "").trim();
-      if (!key || key === "BYE" || key === "TBD") return null;
-
-      if (!stats.has(key)) {
-        stats.set(key, {
-          teamName: key,
-          rank: 0,
-          matchPoints: 0,
-          matchesPlayed: 0,
-          qualified: false,
-        });
-      }
-
-      return stats.get(key);
-    }
-
-    roundMatches.forEach((match, matchIndex) => {
-      const home = ensureTeam(match?.home);
-      const away = ensureTeam(match?.away);
-      if (!home || !away) return;
-
-      const status = getMatchStatus(match, roundIndex, matchIndex);
-      if (status !== "completed") return;
-
-      home.matchesPlayed += 1;
-      away.matchesPlayed += 1;
-
-      home.matchPoints += Number(getFixtureMatchPoints(match, "home") || 0);
-      away.matchPoints += Number(getFixtureMatchPoints(match, "away") || 0);
-    });
-
-    const rows = [...stats.values()].sort((a, b) => {
-      if (Number(b.matchPoints || 0) !== Number(a.matchPoints || 0)) {
-        return Number(b.matchPoints || 0) - Number(a.matchPoints || 0);
-      }
-      if (Number(b.matchesPlayed || 0) !== Number(a.matchesPlayed || 0)) {
-        return Number(b.matchesPlayed || 0) - Number(a.matchesPlayed || 0);
-      }
-      return String(a.teamName || "").localeCompare(String(b.teamName || ""));
-    });
-
-    return rows.map((row, index) => ({
-      ...row,
-      rank: index + 1,
-    }));
-  }
+  // getGroupLeaderboardRows is aliased to computeGroupLeaderboardRows above (Fix 8)
 
   function getQualifiedTeamsFromGroups(cat) {
     const groups = Array.isArray(cat?.groups) ? cat.groups : [];
@@ -3448,9 +3421,7 @@ function renderCaptainsSummary() {
 
     const editing = Boolean(fixturesState.bulkEditMode);
 
-    console.log("TEAM CAT FULL", cat);
-    console.log("TEAM CAT KNOCKOUT", cat?.knockout);
-    
+    // PERF FIX 9: Removed debug console.log statements
     const knockoutSource =
       cat?.knockout ||
       (
@@ -4238,14 +4209,25 @@ function renderCaptainsSummary() {
   openBulkPlayerModal();
 });
 
+// PERF FIX 7: Run independent startup fetches in parallel instead of sequentially.
+// loadTournamentMeta must come first (others read tournamentMetaCache).
+// loadPlayers, refreshTeamSetupState, loadPoolsFromDb, loadLeaderboardFromDb are independent.
 await loadTournamentMeta();
-await loadPlayers();
-await refreshTeamSetupState();
-await loadPoolsFromDb();
-await loadLeaderboardFromDb();
-await openAndLoadFixtures();
+await Promise.all([
+  loadPlayers(),
+  refreshTeamSetupState(),
+  loadPoolsFromDb(),
+  loadLeaderboardFromDb(),
+]);
 
-applyUmpireViewMode();
+// PERF FIX 10: Fixtures are lazy-loaded on first panel open (see toggle listener above).
+// Exception: umpires always see fixtures expanded, so load them eagerly here.
+if (isLoggedInUserUmpire()) {
+  _fixturesLoaded = true;
+  await openAndLoadFixtures();
+}
+
+// PERF FIX 3: Removed duplicate applyUmpireViewMode() — already called inside loadTournamentMeta()
 
 renderPlayers();
 renderCaptainsSummary();
