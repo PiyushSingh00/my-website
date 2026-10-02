@@ -170,8 +170,8 @@
 }
 
 .schema-wrap button.btn-primary {
-  background: linear-gradient(135deg, rgba(72, 120, 255, 0.95), rgba(0, 190, 255, 0.85));
-  border-color: rgba(120, 170, 255, 0.45);
+  background: var(--accent);
+  border-color: rgba(255, 107, 74, 0.35);
 }
 
 .schema-wrap button.btn-dark {

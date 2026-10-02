@@ -5,9 +5,7 @@
   margin: 22px auto 40px;
   padding: 24px 22px 30px;
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at top left, rgba(77, 208, 225, 0.14), transparent 55%),
-    var(--card);
+  background: var(--card);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }

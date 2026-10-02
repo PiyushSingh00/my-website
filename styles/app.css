@@ -1,0 +1,410 @@
+:root {
+  color-scheme: dark;
+  --bg: #071016;
+  --panel: rgba(15, 23, 32, 0.84);
+  --card: rgba(18, 28, 38, 0.92);
+  --card-soft: rgba(24, 36, 46, 0.9);
+  --accent: #ff6b4a;
+  --accent-2: #42d9c8;
+  --accent-3: #9ed56b;
+  --success: #27c07d;
+  --warning: #f5b84b;
+  --danger: #ff6b6b;
+  --text: #f2f6f3;
+  --muted: #aebbb6;
+  --border: rgba(225, 235, 229, 0.12);
+  --border-strong: rgba(225, 235, 229, 0.22);
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-fast: 140ms;
+  --motion: 220ms;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background:
+    linear-gradient(180deg, #071016 0%, #0f1716 52%, #111916 100%);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: "Inter", "Barlow", "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+input,
+textarea,
+select {
+  min-width: 0;
+  font-size: 16px;
+}
+
+button,
+a,
+select,
+input,
+textarea,
+[role="button"],
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-dark,
+.nav-btn,
+.mode-btn,
+.action-btn,
+.view-btn,
+.edit-btn,
+.delete-btn,
+.tab-btn,
+.players-tab,
+.schedule-view-tab,
+.schedule-jump-btn,
+.category-chip,
+.hero-btn,
+.back-link-btn {
+  touch-action: manipulation;
+}
+
+button,
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-dark,
+.nav-btn,
+.mode-btn,
+.action-btn,
+.view-btn,
+.edit-btn,
+.delete-btn,
+.tab-btn,
+.players-tab,
+.schedule-view-tab,
+.schedule-jump-btn,
+.category-chip,
+.hero-btn,
+.back-link-btn {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+a,
+button {
+  -webkit-touch-callout: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid rgba(66, 217, 200, 0.75);
+  outline-offset: 3px;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+table {
+  min-width: 100%;
+}
+
+th,
+td,
+p,
+li,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+label,
+span,
+a,
+button {
+  min-width: 0;
+}
+
+p,
+li,
+td,
+th,
+label,
+.helper-text,
+.muted,
+.players-meta,
+.schedule-meta,
+.hero-subtitle,
+.section-subtitle,
+.empty-copy {
+  overflow-wrap: anywhere;
+}
+
+.topbar {
+  padding-top: max(14px, env(safe-area-inset-top));
+}
+
+.app-shell {
+  min-height: 100dvh;
+}
+
+.hero,
+.main,
+.schedule-main,
+.liveboard-main {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+.brand,
+.brand-link {
+  letter-spacing: 0;
+}
+
+.eyebrow,
+.hero-kicker,
+.section-label {
+  letter-spacing: 0.08em;
+}
+
+.modal,
+.modal-card,
+.modal-shell,
+.dashboard-card,
+.host-card,
+.players-page-card,
+.schedule-card,
+.hero-card,
+.section-card,
+.contact-card,
+.feature-card,
+.browse-card,
+.team-block,
+.team-overall-board,
+.lineup-review-panel,
+.category-bars-wrap,
+.settings-inner {
+  border-radius: var(--radius-lg);
+}
+
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-dark,
+.nav-btn,
+.mode-btn,
+.action-btn,
+.view-btn,
+.edit-btn,
+.delete-btn,
+.calendar-nav-btn,
+.sidebar-toggle-btn,
+.password-toggle,
+.user-avatar-btn,
+.dropdown-item,
+.schedule-view-tab,
+.schedule-jump-btn,
+.players-tab,
+.category-chip,
+.hero-btn,
+.ab-btn,
+.tc-btn,
+.chip-btn,
+.rp-close,
+.player-chip,
+.lineup-collapse-btn,
+.back-link-btn,
+.live-pin-btn {
+  transition-property: background-color, border-color, color, opacity, box-shadow, transform, filter;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-out);
+}
+
+.btn:active,
+.btn-primary:active,
+.btn-secondary:active,
+.btn-dark:active,
+.nav-btn:active,
+.mode-btn:active,
+.action-btn:active,
+.view-btn:active,
+.edit-btn:active,
+.delete-btn:active,
+.schedule-view-tab:active,
+.schedule-jump-btn:active,
+.players-tab:active,
+.category-chip:active,
+.hero-btn:active,
+.ab-btn:active {
+  transform: scale(0.98);
+}
+
+.status-pill,
+.meta-chip,
+.badge,
+.qualified-pill {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.user-avatar-btn,
+.calendar-nav-btn,
+.sidebar-toggle-btn,
+.password-toggle,
+.modal-close,
+.rp-close {
+  flex-shrink: 0;
+}
+
+.players-table-wrapper,
+.table-wrap,
+.schedule-table-wrap,
+.lb-table-wrap {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+}
+
+.players-table,
+.schedule-table,
+.schedule-team-table,
+.leaderboard-table,
+.lb-table {
+  table-layout: auto;
+}
+
+.players-table th,
+.players-table td,
+.schedule-table th,
+.schedule-table td,
+.schedule-team-table th,
+.schedule-team-table td,
+.leaderboard-table th,
+.leaderboard-table td,
+.lb-table th,
+.lb-table td {
+  max-width: 22rem;
+  vertical-align: top;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover,
+  .btn-dark:hover,
+  .btn-secondary:hover,
+  .btn:hover,
+  .nav-btn:hover,
+  .mode-btn:hover,
+  .action-btn:hover,
+  .view-btn:hover,
+  .edit-btn:hover,
+  .delete-btn:hover,
+  .schedule-view-tab:hover,
+  .schedule-jump-btn:hover,
+  .players-tab:hover,
+  .category-chip:hover,
+  .hero-btn:hover,
+  .ab-btn:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .btn-primary:hover,
+  .btn-dark:hover,
+  .btn-secondary:hover,
+  .btn:hover,
+  .nav-btn:hover,
+  .mode-btn:hover,
+  .action-btn:hover,
+  .view-btn:hover,
+  .edit-btn:hover,
+  .delete-btn:hover,
+  .schedule-view-tab:hover,
+  .schedule-jump-btn:hover,
+  .players-tab:hover,
+  .category-chip:hover,
+  .hero-btn:hover,
+  .ab-btn:hover,
+  .user-avatar-btn:hover,
+  .host-mode-card:hover,
+  .upcoming-card:hover,
+  .tournament-card:hover,
+  .browse-card:hover,
+  .contact-card:hover,
+  .team-block:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    backdrop-filter: blur(16px);
+    background: rgba(7, 16, 22, 0.88);
+    border-bottom: 1px solid rgba(225, 235, 229, 0.08);
+  }
+
+  .main,
+  .schedule-main,
+  .liveboard-main {
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
+  }
+
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-dark,
+  .view-btn,
+  .edit-btn,
+  .delete-btn,
+  .ab-btn,
+  .action-btn,
+  .nav-btn,
+  .mode-btn,
+  .schedule-view-tab,
+  .schedule-jump-btn,
+  .players-tab,
+  .hero-btn,
+  .category-chip {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}

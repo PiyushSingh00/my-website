@@ -45,9 +45,7 @@
 
 .schedule-card {
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at top left, rgba(77, 208, 225, 0.12), transparent 55%),
-    var(--card);
+  background: var(--card);
   padding: 18px 18px 16px;
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
