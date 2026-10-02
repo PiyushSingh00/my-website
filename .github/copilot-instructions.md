@@ -1,7 +1,7 @@
 # Copilot Instructions for AI Agents
 
 ## Project Overview
-This is a static web application for managing and displaying sports fixtures, player lists, schedules, and hosting/joining games. The project is organized by feature, with each major page having its own HTML, CSS, and JavaScript files.
+This is a static web application for managing and displaying sports fixtures, player lists, schedules, and hosting/joining games. The project is organized by feature, with each major page having its own HTML, CSS, and JavaScript files. It talks to the ScheduleIt backend through same-origin `/api` routes.
 
 ## Key Structure
 - `index.html`, `host.html`, `join.html`, `fixtures.html`, `players.html`, `schedule.html`: Main entry points for different app sections.
@@ -11,7 +11,7 @@ This is a static web application for managing and displaying sports fixtures, pl
 ## Patterns & Conventions
 - **One-to-one mapping**: Each HTML file is paired with a JS and CSS file of the same name for logic and styling.
 - **No build step**: This is a static site; there is no bundler or build process. All scripts and styles are loaded directly in HTML.
-- **No backend**: All logic is client-side. There are no API calls or server-side code in this repo.
+- **Backend integration**: This repo has no server-side code, but it does call backend `/api` routes. Keep API paths same-origin unless the deployment model changes.
 - **Authentication**: If present, handled in `scripts/auth.js`.
 - **Navigation**: Each page is standalone; navigation is via links between HTML files.
 

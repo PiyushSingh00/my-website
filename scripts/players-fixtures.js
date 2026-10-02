@@ -306,7 +306,7 @@ export function renderIndividualCategoryFixtures(categoryId) {
         <h3>No fixtures yet</h3>
         <p class="muted">${info.sourceCount < 2
           ? "Not enough accepted players to generate fixtures."
-          : "Click "Regenerate fixtures" to create the fixtures."}</p>
+          : "Click &quot;Regenerate fixtures&quot; to create the fixtures."}</p>
       </div>`;
     updateFixturesEditButtonState();
     return;
@@ -446,7 +446,7 @@ export function renderTeamEventFixtures() {
       <div class="empty-state" style="display:flex;">
         <div class="feature-icon">🧩</div>
         <h3>No fixtures yet</h3>
-        <p class="muted">${teams.length < 2 ? "Not enough confirmed teams to generate fixtures." : "Click "Regenerate fixtures" to create the team fixtures."}</p>
+        <p class="muted">${teams.length < 2 ? "Not enough confirmed teams to generate fixtures." : "Click &quot;Regenerate fixtures&quot; to create the team fixtures."}</p>
       </div>`;
     updateFixturesEditButtonState(); updateGoToKnockoutButton(cat); return;
   }

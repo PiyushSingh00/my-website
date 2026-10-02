@@ -69,6 +69,12 @@ import {
   firstFiniteNumber,
 } from "./players-utils.js";
 
+let loadPlayersImpl = async () => {};
+
+export function loadPlayers(tid) {
+  return loadPlayersImpl(tid);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await requireAuth();
@@ -473,8 +479,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Export for players-bulk.js callback
-  export async function loadPlayers(tid = tournamentId) {
+  async function loadPlayers(tid = tournamentId) {
     const candidates = [
       `/api/host/tournaments/${tid}/players`,
       `/api/host/tournaments/${tid}/registrations`,
@@ -493,6 +498,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     state.allPlayers = []; renderPlayerTabs(); renderPlayers();
   }
+  loadPlayersImpl = loadPlayers;
 
   async function updateRegistrationStatus(player, nextStatus) {
     const playerId = getPlayerId(player);

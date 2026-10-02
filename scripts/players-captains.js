@@ -28,7 +28,6 @@ import {
   getCaptainSubmittedPlayers,
   getCanonicalTeamForCaptain,
   getCanonicalTeamPlayers,
-  getManualAddEligiblePlayers,
   apiGet,
   apiPut,
   apiPatch,
